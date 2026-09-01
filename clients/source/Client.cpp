@@ -1,12 +1,14 @@
 #include <string>
 #include <iostream>
-#include <cstring>
-#include <unistd.h>           // execve, dup, dup2, pipe, fork, access, close
-#include <sys/socket.h>       // socketpair, htons, htonl, ntohs, ntohl, select
-#include <netinet/in.h>       // socket, accept, listen, bind, connect
-#include <arpa/inet.h>        // htons, htonl, ntohs, ntohl
-#include <sys/types.h>        // send, recv
-#include <sys/socket.h>       // send, recv
+#include <cstring>				// memcpy, memset, memmove
+#include <unistd.h>				// execve, dup, dup2, pipe, fork, access, close
+#include <sys/socket.h>			// socketpair, htons, htonl, ntohs, ntohl, select
+#include <netinet/in.h>			// socket, accept, listen, bind, connect
+#include <arpa/inet.h>			// htons, htonl, ntohs, ntohl
+#include <sys/types.h>			// send, recv
+#include <sys/socket.h>			// send, recv
+#include <fcntl.h>				// fcntl
+#include <cerrno>				// errno
 
 #include "Client.hpp"
 #include "Exceptions.hpp"
@@ -70,19 +72,19 @@ Client::~Client(void)
 	}
 }
 
-void	Client::connect(std::string const& host, uint32_t port)
+void	Client::connect(std::string const& host, uint32_t portNo)
 {
 	struct addrinfo *list, *tmp;
+	struct sockaddr_storage rawServerAddress{};
+	std::string port = std::to_string(portNo);
 
-	const char* hostChar = host.data();
-	const char* portChar = std::to_string(port).data();
+	std::cout << "attempt to connect to: " << host << " port: " << port << "\n";
 
-	if (getaddrinfo(hostChar, portChar, &this->filter, &list) != 0)
-		throw(ClientException("Failed to find addresses for " + std::string(hostChar) + ":" + std::string(portChar)));
+	if (getaddrinfo(host.data(), port.data(), &this->filter, &list) != 0)
+		throw(ClientException("Failed to find addresses for " + host + ":" + port));
 
 	for (tmp = list; tmp != nullptr; tmp = tmp->ai_next)
 	{
-		std::cerr << "check address" << std::endl;
 		this->socket = ::socket(tmp->ai_family, tmp->ai_socktype, tmp->ai_protocol);
 		if (this->socket == -1)
 			continue;
@@ -94,28 +96,50 @@ void	Client::connect(std::string const& host, uint32_t port)
 	if (tmp == nullptr)
 	{
 		freeaddrinfo(list);
-		throw(ClientException("No available IP host found for port: " + std::string(portChar)));
+		throw(ClientException("No available IP host found for port: " + port));
 	}
-	std::cerr << "found valid" << std::endl;
-	struct sockaddr_storage rawServerAddress;
 	std::memcpy(&rawServerAddress, tmp->ai_addr, tmp->ai_addrlen);
 	freeaddrinfo(list);
-	std::cerr << "done address" << std::endl;
 	this->serverAddress = getAddress(rawServerAddress);
+
+	int flags = fcntl(this->socket, F_GETFL, 0);
+	if (flags == -1)
+		throw(ClientException("Failed to load flags for socket"));
+	if (fcntl(this->socket, F_SETFL, flags | O_NONBLOCK) == -1)
+		throw(ClientException("Failed to set socket as non-blocking"));
+
 	std::cout << "connected to: " << this->serverAddress.host << " port: " << this->serverAddress.port << "\n";
 }
 
-void Client::sendRequest( std::string const& request ) const
+void Client::sendRequest(std::string const& request) const
 {
-	ssize_t	sendBytes, recvBytes;
-	char 	buf[1024];
-	size_t	sizeBuf=1024;
+	std::string 		message = request + "\n";
+	ssize_t				sendBytes = 0UL, recvBytes = 0UL;
 
-	sendBytes = send(this->socket, request.data(), request.size(), 0);
-	if (sendBytes < (ssize_t) strlen(request.data()))
-		throw(ClientException("Failed to send message to: " + this->serverAddress.host));
-	recvBytes = recv(this->socket, buf, sizeBuf, 0);
-	if (recvBytes < 0)
-		throw(ClientException("Failed to read message from: " + this->serverAddress.host));
+	constexpr size_t	sizeBuf = 1024;
+	char 				buf[sizeBuf];
+	memset(buf, 0, sizeBuf);
+
+	while (sendBytes < static_cast<ssize_t>(message.size()))
+	{
+		sendBytes = send(this->socket, message.data() + sendBytes, message.size() - sendBytes, 0);
+
+		// check errors if sendBytes == -1
+	}
+
+	do
+	{
+		recvBytes = recv(this->socket, buf + recvBytes, sizeBuf - recvBytes, 0);
+
+		// recvBytes == 0 means server closed connection
+		// responses from server might be chunked: a buffer is necessary 
+		if (recvBytes == -1)
+		{
+			if (errno == EAGAIN || errno == EWOULDBLOCK)
+				continue;
+			else
+				throw ClientException("Reading error from socket: " + std::string(strerror(errno)));
+		}
+	} while (recvBytes > 0L);
 }
 
