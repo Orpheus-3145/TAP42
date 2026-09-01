@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <cstdint>
 #include <netdb.h> 		// gai_strerror, getaddrinfo, freeaddrinfo
 
@@ -25,6 +26,7 @@ class Client
 
 		void	connect(std::string const& host, uint32_t port);
 		void	sendRequest(std::string const& content) const;
+		int32_t	getSocket(void) const noexcept { return this->socket; }
 
 	private:
 		int32_t			socket{-1};

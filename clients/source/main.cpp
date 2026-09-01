@@ -2,7 +2,7 @@
 
 #include "Exceptions.hpp"
 #include "ArgParser.hpp"
-#include "Client.hpp"
+#include "ThreadClient.hpp"
 
 
 int32_t main(int32_t argc, char** argv)
@@ -14,9 +14,28 @@ int32_t main(int32_t argc, char** argv)
 			return (EXIT_SUCCESS);
 		}
 
-		Client client;
+		ThreadClient client(
+			[](std::string const& data)
+			{
+				// callback fissa, decisa una volta per tutte alla creazione
+				std::cout << "[worker thread] dati ricevuti: " << data << "\n";
+			},
+			[](size_t n)
+			{
+				std::cout << "[worker thread] inviati " << n << " byte\n";
+			},
+			[](std::string const& what)
+			{
+				std::cerr << "[worker thread] errore: " << what << "\n";
+			},
+			[]
+			{
+				std::cout << "[worker thread] connessione chiusa\n";
+			}
+		);
+
 		client.connect(options.host, options.port);
-		client.sendRequest("halo porcoddio");
+		client.send("halo porcoddio");
 
 	} catch (AppException& err) {
 		std::cerr << err.what() << std::endl;

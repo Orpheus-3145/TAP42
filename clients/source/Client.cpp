@@ -142,4 +142,3 @@ void Client::sendRequest(std::string const& request) const
 		}
 	} while (recvBytes > 0L);
 }
-
