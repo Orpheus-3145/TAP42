@@ -2,7 +2,7 @@
 
 #include <ncurses.h>
 
-// NOTE:
+// NCURSES:
 // Usually for every function there are 3 more versions:
 // 		Fun(string)         			<-- perform action on stdscr window
 // 		wFun(win, string)   			<-- perform action on win window
@@ -17,8 +17,14 @@
 //	raw()						<-- disable line buffering, disables signals
 //	cbreak()					<-- disable line buffering, keeps signals enabled
 //	keypad(stdscr, flag)		<-- toggle use of special keys like f(n), arrows, esc, CTRL+D, ...
+//
 //	refresh() [wrefresh(win)]	<-- draws (i.e. makes visible) the stdscr [win] with its modifications, must be called
 //									after outputting data or modifying the windows
+// 	wnoutrefresh(win)			<-- updates the (global) cursor buffer with the logical content of win, (mind the depth-test for overlapping windows)
+//	doupdate()					<-- actually sending the cursor buffer to tty to change the appareance
+//									N.B. refresh = wnoutrefresh + doupdate, so for multiple windows is good 
+//										practice to call wnoutrefresh for each win (mind depth-test) and doupdate at the end only once
+//										
 //	start_color()				<-- start the color functionality	(has_colors() to check if the terminal supports colors)
 //	endwin()					<-- greceful termination of ncurses
 //

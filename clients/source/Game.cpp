@@ -27,37 +27,37 @@ void Game::connectToServer(std::string const& host, uint32_t port)
 
 void Game::gameLoop(void)
 {
-	this->printInfo();
-	this->clientHTTP->startWorker();
+	// this->printInfo();
+	// this->clientHTTP->startWorker();
 	this->interface->loop();
 
-	char* userInput = nullptr;
-	while (true)
-	{
-		if (userInput == nullptr)
-		{
-			userInput = readline(PROMPT);
-			if (userInput == nullptr)
-				{/* ctrl+D, close app */}
-			else if (userInput[0])
-				add_history(userInput);
+	// char* userInput = nullptr;
+	// while (true)
+	// {
+	// 	if (userInput == nullptr)
+	// 	{
+	// 		userInput = readline(PROMPT);
+	// 		if (userInput == nullptr)
+	// 			{/* ctrl+D, close app */}
+	// 		else if (userInput[0])
+	// 			add_history(userInput);
 	
-			if (std::string(userInput) == "end")
-				break;
+	// 		if (std::string(userInput) == "end")
+	// 			break;
 	
-			this->printAsync("sent request: " + std::string(userInput));
-			this->clientHTTP->sendCommandToServer(userInput);
-			free(userInput);
-		}
+	// 		this->printAsync("sent request: " + std::string(userInput));
+	// 		this->clientHTTP->sendCommandToServer(userInput);
+	// 		free(userInput);
+	// 	}
 
-		if (clientHTTP->hasNewResponse())
-		{
-			this->printAsync("got response: " + clientHTTP->consumeResponse());
-			userInput = nullptr;
-		}
-		while (clientHTTP->hasNewEvent())
-			this->printAsync("got event: " + clientHTTP->popEvent());
-	}
+	// 	if (clientHTTP->hasNewResponse())
+	// 	{
+	// 		this->printAsync("got response: " + clientHTTP->consumeResponse());
+	// 		userInput = nullptr;
+	// 	}
+	// 	while (clientHTTP->hasNewEvent())
+	// 		this->printAsync("got event: " + clientHTTP->popEvent());
+	// }
 }
 
 void Game::printInfo(void) noexcept

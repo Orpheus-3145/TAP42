@@ -16,7 +16,7 @@ int32_t main(int32_t argc, char** argv)
 		}
 
 		Game client;
-		client.connectToServer(options.host, options.port);
+		// client.connectToServer(options.host, options.port);
 		client.gameLoop();
 
 	} catch (AppException& err) {
