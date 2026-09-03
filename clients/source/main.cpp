@@ -1,4 +1,5 @@
 #include <iostream>
+#include <queue>
 
 #include "Exceptions.hpp"
 #include "ArgParser.hpp"
@@ -15,9 +16,9 @@ int32_t main(int32_t argc, char** argv)
 		}
 
 		GameCLI client;
-
 		client.connectToServer(options.host, options.port);
-		client.send("halo porcoddio");
+		client.gameLoop();
+
 	} catch (AppException& err) {
 		std::cerr << err.what() << std::endl;
 		return (EXIT_FAILURE);

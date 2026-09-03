@@ -18,7 +18,6 @@ class GameGUI
 		GameGUI& operator=(GameGUI&&) = delete;
 
 		void connectToServer(std::string const& host, uint32_t port);
-		void send(std::string const& data);
 
 	private:
 		std::unique_ptr<ClientHTTP> clientHTTP;

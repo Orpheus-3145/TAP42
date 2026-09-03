@@ -12,6 +12,9 @@
 #include <functional>
 
 
+constexpr inline const char MSG_TERM = '\n';
+constexpr inline const char SP = ' ';
+
 struct Address
 {
 	std::string 			host;
@@ -24,7 +27,7 @@ Address	getAddress(const struct sockaddr_storage*) noexcept;
 class ClientHTTP
 {
 	public:
-		ClientHTTP(void);
+		ClientHTTP(std::mutex& printMutex);
 
 		ClientHTTP(ClientHTTP const&) = delete;
 		ClientHTTP& operator=(ClientHTTP const&) = delete;
@@ -35,34 +38,58 @@ class ClientHTTP
 
 		void	connect(std::string const& host, uint32_t port);
 		void	disconnect(void) noexcept;
+		void	startWorker(void) noexcept;
 		void	stopWorker(void) noexcept;
-		void	sendRequest(std::string const& content);
+		void	sendCommandToServer(std::string const& content);
 		bool	isConnectionOpen(void) const noexcept { return this->connectionAlive.load(); }
 
+		bool		hasNewResponse(void) noexcept;
+		bool		hasNewEvent(void) noexcept;
+		std::string	consumeResponse(void) noexcept;
+		std::string	popEvent(void) noexcept;
+		
+		void printAsync(std::string const& content) const noexcept;
+
 	private:
+		static constexpr size_t R_BUFF_SIZE = 1024UL;
+
 		void run(void);
+		void setResponse(std::string const& resp);
+		void addEvent(std::string const& event) noexcept;
 		void wakeupWorker(void);
-		void handleRead(void);
-		bool theresDataToWrite(void) noexcept;
-		void handleWrite(void);
-		void flushPipe(void) noexcept;
+
+		void readServerInput(void);
+		void parseInput(ssize_t charsRead);
+		void readRequestInput(void);
+		void writeRequestOutput(void);
+
+		// void flushPipe(void) noexcept;
 
 		int32_t			socket{-1};
 		Address		 	serverAddress{};
 		struct addrinfo	filter{};
 
-		std::thread          worker;
-		std::atomic<bool>    connectionAlive{false};
+		std::mutex&				printMutex;
+
+		std::unique_ptr<std::thread>	worker;
+		std::atomic<bool>		connectionAlive{false};
+		std::atomic<bool>		waitingForResponse{false};
 
 		int32_t wakeupFds[2] = {-1, -1};		// pipe for pollwakeup of worker
 
-		std::mutex              sendMutex;
-		std::queue<std::string> sendQueue;
+		size_t					readOffset = 0;
+		char					readingBuffer[R_BUFF_SIZE];
 
-		std::string             currentSend;
-		size_t                  currentOffset = 0;
+		size_t					writeOffset = 0;
+		char					writingBuffer[R_BUFF_SIZE];
 
-		std::mutex              recvMutex;
-		// std::condition_variable recvCond;
-		std::queue<std::string> recvQueue;
+		std::string				pendingReq;
+		std::mutex				mutexReq;
+
+		std::string				pendingResp;
+		std::mutex				mutexResp;
+
+		std::queue<std::string>	eventQueue;
+		std::mutex				mutexEvents;
+
 };
