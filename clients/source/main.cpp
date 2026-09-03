@@ -3,7 +3,7 @@
 
 #include "Exceptions.hpp"
 #include "ArgParser.hpp"
-#include "GameCLI.hpp"
+#include "Game.hpp"
 
 
 int32_t main(int32_t argc, char** argv)
@@ -15,7 +15,7 @@ int32_t main(int32_t argc, char** argv)
 			return (EXIT_SUCCESS);
 		}
 
-		GameCLI client;
+		Game client;
 		client.connectToServer(options.host, options.port);
 		client.gameLoop();
 

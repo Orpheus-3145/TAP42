@@ -2,31 +2,34 @@
 #include <iostream>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <ncurses.h>
 
-#include "GameCLI.hpp"
+#include "Game.hpp"
 #include "Exceptions.hpp"
 
 
-GameCLI::GameCLI(void)
+Game::Game(void)
 {
 	this->clientHTTP = std::make_unique<ClientHTTP>(printMutex);
+	this->interface = std::make_unique<CLI>();
 }
 
-GameCLI::~GameCLI(void)
+Game::~Game(void)
 {
 }
 
-void GameCLI::connectToServer(std::string const& host, uint32_t port)
+void Game::connectToServer(std::string const& host, uint32_t port)
 {
 	assert(this->clientHTTP and "client not existing");
 
 	this->clientHTTP->connect(host, port);
 }
 
-void GameCLI::gameLoop(void)
+void Game::gameLoop(void)
 {
 	this->printInfo();
 	this->clientHTTP->startWorker();
+	this->interface->loop();
 
 	char* userInput = nullptr;
 	while (true)
@@ -57,14 +60,14 @@ void GameCLI::gameLoop(void)
 	}
 }
 
-void GameCLI::printInfo(void) noexcept
+void Game::printInfo(void) noexcept
 {
 	std::string content = "welcome to " + std::string(GAME_NAME) + "\n" + \
 		"enter input, type 'end' to close" + "\n\n";
 	this->printAsync(content);
 }
 
-void GameCLI::printAsync(std::string const& content) noexcept
+void Game::printAsync(std::string const& content) noexcept
 {
 	std::lock_guard<std::mutex> lock(this->printMutex);
 	std::cout << content << std::endl;

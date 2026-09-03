@@ -4,21 +4,22 @@
 #include <cstdint>
 
 #include "ClientHTTP.hpp"
+#include "CLI.hpp"
 
 
 inline constexpr const char* PROMPT = "=> ";
 inline constexpr const char* GAME_NAME = "__TBD_NAME__";
 
-class GameCLI
+class Game
 {
 	public:
-		GameCLI(void);
-		~GameCLI(void);
+		Game(void);
+		~Game(void);
 
-		GameCLI(GameCLI const&) = delete;
-		GameCLI& operator=(GameCLI const&) = delete;
-		GameCLI(GameCLI&&) = delete;
-		GameCLI& operator=(GameCLI&&) = delete;
+		Game(Game const&) = delete;
+		Game& operator=(Game const&) = delete;
+		Game(Game&&) = delete;
+		Game& operator=(Game&&) = delete;
 
 		void connectToServer(std::string const& host, uint32_t port);
 		void gameLoop(void);
@@ -29,4 +30,5 @@ class GameCLI
 
 		std::mutex              	printMutex;
 		std::unique_ptr<ClientHTTP> clientHTTP;
+		std::unique_ptr<CLI>		interface;
 };
