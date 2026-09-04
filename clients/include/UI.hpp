@@ -1,6 +1,11 @@
 #pragma once
 
 #include <ncurses.h>
+#include <queue>
+#include <vector>
+
+#include "Config.hpp"
+
 
 // NCURSES:
 // Usually for every function there are 3 more versions:
@@ -222,19 +227,67 @@
 // 		UK pound sign            --> ACS_STERLING
 // ===========================================================================================================================================================================
 
-class CLI
+constexpr inline int32_t WIDTH_WIN = 100;
+constexpr inline int32_t HEIGHT_WIN = 30;
+constexpr inline uint32_t BUFF_INPUT_SIZE = 1024;
+
+class BasicUI
 {
 	public:
-		CLI(void);
-		~CLI(void);
+		BasicUI(void) noexcept = default;
 
-		CLI(CLI const& other) = delete;
-		CLI& operator=(CLI const& other) = delete;
-		CLI(CLI& other) = delete;
-		CLI& operator=(CLI& other) = delete;
+		BasicUI(BasicUI const& other) = delete;
+		BasicUI& operator=(BasicUI const& other) = delete;
+		BasicUI(BasicUI&& other) = delete;
+		BasicUI& operator=(BasicUI&& other) = delete;
 
-		void loop(void);
+		virtual ~BasicUI(void) {};
 
-	private:
+		virtual void setup(void);
+		virtual void loop(int32_t clientSocket) = 0;
+		virtual void stop(int32_t clientSocket) noexcept = 0;
+		virtual void handleInputFromUser(int32_t clientSocket) = 0;
+		virtual void handleInputFromClient(int32_t clientSocket) = 0;
 
+	protected:
+		virtual void sendDataToClient(int32_t clientSocket);
+		virtual void readDataFromClient(int32_t clientSocket);
+		void parseInput(void);
+
+		bool runLoop{false};
+
+		size_t	readingSize{0UL};
+		char	readingBuffer[Config::R_BUFF_SIZE];
+
+		size_t	writingSize{0UL};
+		char	writingBuffer[Config::R_BUFF_SIZE];
+
+		std::string				pendingResp;
+		std::queue<std::string>	eventQueue;
+};
+
+class CommandLineUI : public BasicUI
+{
+	public:
+		~CommandLineUI(void) override;
+		
+		void setup(void) override;
+		void loop(int32_t clientSocket) override;
+		void stop(int32_t clientSocket) noexcept override;
+
+		void handleInputFromUser(int32_t clientSocket) override;
+		void handleInputFromClient(int32_t clientSocket) override;
+
+	protected:
+		void refreshTabs(void) const noexcept;
+
+		std::vector<WINDOW*> tabs;
+		size_t currLineInput = 1UL;
+		size_t currLineOutput = 1UL;
+
+};
+
+class GraphicUI : public BasicUI
+{
+	//
 };

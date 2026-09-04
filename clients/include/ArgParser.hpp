@@ -28,24 +28,24 @@ enum class FlagType : uint32_t
 	HelpMode = 1 << 3,
 };
 
-constexpr bool operator==(FlagType a, FlagType b)
+constexpr bool operator==(FlagType a, FlagType b) noexcept
 {
 	return static_cast<uint32_t>(a) == static_cast<uint32_t>(b);
 }
 
-constexpr bool operator!=(FlagType a, FlagType b)
+constexpr bool operator!=(FlagType a, FlagType b) noexcept
 {
 	return static_cast<uint32_t>(a) != static_cast<uint32_t>(b);
 }
 
-constexpr FlagType operator|(FlagType a, FlagType b)
+constexpr FlagType operator|(FlagType a, FlagType b) noexcept
 {
 	return static_cast<FlagType>(
 		static_cast<uint32_t>(a) | static_cast<uint32_t>(b)
 	);
 }
 
-constexpr FlagType operator&(FlagType a, FlagType b)
+constexpr FlagType operator&(FlagType a, FlagType b) noexcept
 {
 	return static_cast<FlagType>(
 		static_cast<uint32_t>(a) & static_cast<uint32_t>(b)

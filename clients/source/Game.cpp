@@ -1,74 +1,15 @@
-#include <cassert>
-#include <iostream>
-#include <readline/readline.h>
-#include <readline/history.h>
-#include <ncurses.h>
-
 #include "Game.hpp"
-#include "Exceptions.hpp"
+#include "Utils.hpp"
 
 
-Game::Game(void)
+void Game::start(std::string const& host, uint32_t port)
 {
-	this->clientHTTP = std::make_unique<ClientHTTP>(printMutex);
-	this->interface = std::make_unique<CLI>();
-}
+	ioUtils::SocketPair gameClientSockets = ioUtils::createSocketPair();
 
-Game::~Game(void)
-{
-}
-
-void Game::connectToServer(std::string const& host, uint32_t port)
-{
-	assert(this->clientHTTP and "client not existing");
-
-	this->clientHTTP->connect(host, port);
-}
-
-void Game::gameLoop(void)
-{
-	// this->printInfo();
-	// this->clientHTTP->startWorker();
-	this->interface->loop();
-
-	// char* userInput = nullptr;
-	// while (true)
-	// {
-	// 	if (userInput == nullptr)
-	// 	{
-	// 		userInput = readline(PROMPT);
-	// 		if (userInput == nullptr)
-	// 			{/* ctrl+D, close app */}
-	// 		else if (userInput[0])
-	// 			add_history(userInput);
+	this->clientHTTP.connect(host, port);
+	this->clientHTTP.startWorker(gameClientSockets.first);
 	
-	// 		if (std::string(userInput) == "end")
-	// 			break;
-	
-	// 		this->printAsync("sent request: " + std::string(userInput));
-	// 		this->clientHTTP->sendCommandToServer(userInput);
-	// 		free(userInput);
-	// 	}
-
-	// 	if (clientHTTP->hasNewResponse())
-	// 	{
-	// 		this->printAsync("got response: " + clientHTTP->consumeResponse());
-	// 		userInput = nullptr;
-	// 	}
-	// 	while (clientHTTP->hasNewEvent())
-	// 		this->printAsync("got event: " + clientHTTP->popEvent());
-	// }
-}
-
-void Game::printInfo(void) noexcept
-{
-	std::string content = "welcome to " + std::string(GAME_NAME) + "\n" + \
-		"enter input, type 'end' to close" + "\n\n";
-	this->printAsync(content);
-}
-
-void Game::printAsync(std::string const& content) noexcept
-{
-	std::lock_guard<std::mutex> lock(this->printMutex);
-	std::cout << content << std::endl;
+	this->interface.setup();
+	this->interface.loop(gameClientSockets.second);
+	this->interface.stop(gameClientSockets.second);
 }

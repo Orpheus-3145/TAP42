@@ -16,8 +16,7 @@ int32_t main(int32_t argc, char** argv)
 		}
 
 		Game client;
-		// client.connectToServer(options.host, options.port);
-		client.gameLoop();
+		client.start(options.host, options.port);
 
 	} catch (AppException& err) {
 		std::cerr << err.what() << std::endl;

@@ -4,31 +4,24 @@
 #include <cstdint>
 
 #include "ClientHTTP.hpp"
-#include "CLI.hpp"
+#include "UI.hpp"
 
-
-inline constexpr const char* PROMPT = "=> ";
-inline constexpr const char* GAME_NAME = "__TBD_NAME__";
 
 class Game
 {
 	public:
-		Game(void);
-		~Game(void);
-
+		Game(void) noexcept = default;
+		
 		Game(Game const&) = delete;
 		Game& operator=(Game const&) = delete;
 		Game(Game&&) = delete;
 		Game& operator=(Game&&) = delete;
 
-		void connectToServer(std::string const& host, uint32_t port);
-		void gameLoop(void);
+		~Game(void) = default;
+
+		void start(std::string const& host, uint32_t port);
 		
 	private:
-		void printInfo(void) noexcept;
-		void printAsync(std::string const& content) noexcept;
-
-		std::mutex              	printMutex;
-		std::unique_ptr<ClientHTTP> clientHTTP;
-		std::unique_ptr<CLI>		interface;
+		ClientHTTP 		clientHTTP{};
+		CommandLineUI	interface{};		// later on might be a pointer for doing poly stuff
 };
