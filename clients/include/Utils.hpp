@@ -50,3 +50,4 @@ void printMutated(std::string const& content) noexcept;
 
 };
 
+std::string getCurrDate(void) noexcept;

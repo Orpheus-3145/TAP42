@@ -11,6 +11,10 @@
 #include <sys/types.h>			// send, recv
 #include <sys/socket.h>			// send, recv
 #include <mutex>
+#include <iomanip>
+#include <ctime>
+#include <chrono>
+#include <sstream>
 
 
 namespace ioUtils {
@@ -224,3 +228,16 @@ void printMutated(std::string const& content) noexcept
 }
 
 };
+
+std::string getCurrDate(void) noexcept
+{
+	auto now = std::chrono::system_clock::now();
+	std::time_t nowTimeT = std::chrono::system_clock::to_time_t(now);
+
+	std::tm tmBuf;
+	localtime_r(&nowTimeT, &tmBuf);  // versione thread-safe di localtime (POSIX)
+
+	std::ostringstream oss;
+	oss << std::put_time(&tmBuf, "%d-%m-%y");  // DD-mm-AA (anno a 2 cifre)
+	return oss.str();
+}

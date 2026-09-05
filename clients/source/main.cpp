@@ -4,7 +4,18 @@
 #include "Exceptions.hpp"
 #include "ArgParser.hpp"
 #include "Game.hpp"
+#include "Logger.hpp"
+#include "Utils.hpp"
+#include "Config.hpp"
 
+
+void startLogging(void)
+{
+	std::string logName = Config::LOG_DIR + getCurrDate() + "_logfile.log";
+	Logger::getInstance().setLogFile(logName);
+	Logger::getInstance().setMinLevel(Config::DEFAULT_LOG_LEVEL);
+	Logger::getInstance().setConsoleOutput(false);
+}
 
 int32_t main(int32_t argc, char** argv)
 {

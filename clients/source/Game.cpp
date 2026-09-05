@@ -9,7 +9,7 @@ void Game::start(std::string const& host, uint32_t port)
 	this->clientHTTP.connect(host, port);
 	this->clientHTTP.startWorker(gameClientSockets.first);
 	
-	this->interface.setup();
-	this->interface.loop(gameClientSockets.second);
-	this->interface.stop(gameClientSockets.second);
+	// this->interface.setup();
+	// this->interface.loop(gameClientSockets.second);
+	// this->interface.stop(gameClientSockets.second);
 }
