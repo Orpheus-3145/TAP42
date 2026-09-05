@@ -15,12 +15,15 @@ void BasicUI::setup(void)
 
 	this->readingSize = 0UL;
 	this->writingSize = 0UL;
+
+	LOG_DEBUG(LogContext::UI, "Setup for BasicUI interface done");
 }
 
 void BasicUI::sendDataToClient(int32_t clientSocket)
 {
 	assert(clientSocket != -1 and "invalid client socket");
 
+	LOG_DEBUG(LogContext::UI, "Forwarding command to client");
 	ioUtils::writeNonBlock(clientSocket, this->writingBuffer, this->writingSize);	// NB handle if returns -1
 
 	if (this->writingSize >= ::strlen(Config::QUIT) and !::strncmp(this->writingBuffer, Config::QUIT, ::strlen(Config::QUIT)))
@@ -35,7 +38,9 @@ void BasicUI::readDataFromClient(int32_t clientSocket)
 
 	while(true)	// while loop because buffer could overflow
 	{
+		LOG_DEBUG(LogContext::UI, "Reading game input from client");
 		ssize_t n = ioUtils::readNonBlock(clientSocket, this->readingBuffer + this->readingSize, Config::R_BUFF_SIZE - this->readingSize);
+
 		if (n > 0L)
 		{
 			this->readingSize += n;
@@ -43,7 +48,10 @@ void BasicUI::readDataFromClient(int32_t clientSocket)
 			continue;
 		}
 		else if (n == -1L)		// client closed connection
+		{
+			LOG_WARN(LogContext::UI, "Client unexpectedly terminated connection, closing session");
 			this->runLoop = false;
+		}
 		break;
 	}
 }
@@ -57,16 +65,23 @@ void BasicUI::parseInput(void)
 		if (endMsg == nullptr)
 			break;
 		
+		// NB better input parsing
 		ssize_t lenMsg = endMsg - startMsg;
 		if (lenMsg < 2)
 			throw CLIException("Bad server input: " + std::string(startMsg, lenMsg));
 
 		if (!::strncmp(startMsg, "OK", 2) or !::strncmp(startMsg, "ERR", 3))
+		{
+			LOG_INFO(LogContext::UI, "Got new response: '" + std::string(startMsg, lenMsg) + "'");
 			this->pendingResp = std::string(startMsg, lenMsg);		// NB check if there's already a response
+		}
 		else if (!::strncmp(startMsg, "EVT", 3))
+		{
+			LOG_INFO(LogContext::UI, "Got new event: '" + std::string(startMsg, lenMsg) + "'");
 			this->eventQueue.push(std::string(startMsg, lenMsg));
+		}
 		else
-			throw CLIException("Server input not mapped");
+			LOG_WARN(LogContext::UI, "Unknown command: '" + std::string(startMsg, lenMsg) + "'");
 
 		startMsg += lenMsg + 1UL;
 		this->readingSize -= lenMsg + 1UL;
@@ -107,12 +122,15 @@ void CommandLineUI::setup(void)
 	::wmove(this->tabs[0], this->currLineInput++, 1);
 	::wrefresh(this->tabs[1]);
 	::wrefresh(this->tabs[0]);
+
+	LOG_DEBUG(LogContext::UI, "Setup for CommandLine interface done");
 }
 
-void CommandLineUI::loop(int32_t clientSocket)
+void CommandLineUI::loop(int32_t clientSocket)		// NB move this loop in Game ?
 {
 	assert(clientSocket != -1 and "invalid client socket");
 
+	LOG_INFO(LogContext::UI, "Started UI client, listening to UNIX socket: " + std::to_string(clientSocket));
 	this->runLoop = true;
 	while(this->runLoop == true)
 	{
@@ -130,6 +148,7 @@ void CommandLineUI::loop(int32_t clientSocket)
 		{
 			if (errno == EINTR)
 				continue;
+			LOG_ERROR(LogContext::UI, "Poll failed: " + std::string(strerror(errno)));
 			throw CLIException("poll failed: " + std::string(strerror(errno)));
 		}
 
@@ -141,9 +160,11 @@ void CommandLineUI::loop(int32_t clientSocket)
 
 		// client closed connection (because server did so) (POLLHUP) or got an error (POLLERR | POLLNVAL)
 		if (fds[1].revents & (POLLHUP | POLLERR | POLLNVAL))
+		{
+			LOG_WARN(LogContext::UI, "Client unexpectedly terminated connection, closing session");
 			this->runLoop = false;
+		}
 
-		::refresh();
 		::wrefresh(this->tabs[1]);
 		::wrefresh(this->tabs[0]);
 	}
@@ -156,6 +177,8 @@ void CommandLineUI::stop(int32_t clientSocket) noexcept
 	for (WINDOW* tab : tabs)
 		::delwin(tab);
 	::endwin();
+
+	LOG_INFO(LogContext::UI, "Game stopped");
 }
 
 void CommandLineUI::refreshTabs(void) const noexcept
@@ -171,19 +194,24 @@ void CommandLineUI::handleInputFromUser(int32_t clientSocket)
 	switch (inputChar)
 	{
 		case KEY_RESIZE:	// NB resize doesn't work
+			LOG_DEBUG(LogContext::UI, "Resize window callback");
 			break;
 
 		case Config::MSG_TERM:
-			this->sendDataToClient(clientSocket);
+			LOG_INFO(LogContext::UI, "Got new command: '" + std::string(this->writingBuffer, this->writingSize) + "'");
+			this->sendDataToClient(clientSocket);		// NB map command into HTTP command
 			::wmove(this->tabs[0], this->currLineInput++, 1);
 			break;
-		
+
 		default:
 			this->writingBuffer[this->writingSize++] = inputChar;
 			break;
 	}
 	if (this->writingSize == BUFF_INPUT_SIZE)
+	{
+		LOG_ERROR(LogContext::UI, "Input buffer overflow");
 		throw CLIException("Input buffer overflow");
+	}
 }
 
 void CommandLineUI::handleInputFromClient(int32_t clientSocket)

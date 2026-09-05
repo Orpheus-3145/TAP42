@@ -3,14 +3,21 @@
 #include "Exceptions.hpp"
 
 #include <iostream>
-#include <cstring>				// strerror, memchr, memeset, memmove
+#include <format>
+#include <iomanip>
+#include <chrono>
+#include <sstream>
+#include <mutex>
+
+#include <cstring>
+#include <ctime>
+#include <cassert>				// strerror, memchr, memeset, memmove
 #include <unistd.h>				// execve, dup, dup2, pipe, fork, access, close
 #include <sys/socket.h>			// socketpair, htons, htonl, ntohs, ntohl, select
 #include <netinet/in.h>			// socket, accept, listen, bind, connect
 #include <arpa/inet.h>			// htons, htonl, ntohs, ntohl
 #include <sys/types.h>			// send, recv
 #include <sys/socket.h>			// send, recv
-#include <mutex>
 
 
 namespace ioUtils {
@@ -96,6 +103,8 @@ ssize_t readNonBlock(int32_t fd, char* buffer, size_t size)
 		
 		if (n > 0)
 		{
+			LOG_DEBUG(LogContext::IO, "Read " + std::to_string(n) + " bytes from fd: " + std::to_string(fd));
+			LOG_DEBUG(LogContext::IO, "Read: '" + escapeNewLine(buffer + offset, n) + "'");
 			offset += n;
 			if (static_cast<size_t>(offset) == size)		// overflow
 				break;
@@ -108,6 +117,8 @@ ssize_t readNonBlock(int32_t fd, char* buffer, size_t size)
 			break;
 		if (errno == EINTR)
 			continue;
+
+		LOG_ERROR(LogContext::IO, "Recv failed: " + std::string(strerror(errno)));
 		throw ReadException("Recv failed: " + std::string(strerror(errno)));
 	}
 	return offset;
@@ -125,6 +136,8 @@ ssize_t writeNonBlock(int32_t fd, const char* buffer, size_t size)
 		
 		if (n > 0)
 		{
+			LOG_DEBUG(LogContext::IO, "Written " + std::to_string(n) + " bytes on fd: " + std::to_string(fd));
+			LOG_DEBUG(LogContext::IO, "Written: '" + escapeNewLine(buffer + offset, size - offset) + "'");
 			offset += n;
 			if (static_cast<size_t>(offset) == size)
 				break;
@@ -132,10 +145,14 @@ ssize_t writeNonBlock(int32_t fd, const char* buffer, size_t size)
 		}
 
 		if (errno == EAGAIN || errno == EWOULDBLOCK)	// buffer full, wait for next pollout
+		{
+			LOG_WARN(LogContext::IO, "Destination buffer is full, try later");
 			return -1L;
+		}
 		if (errno == EINTR)
 			continue;
 
+		LOG_ERROR(LogContext::IO, "Send failed: " + std::string(strerror(errno)));
 		throw WriteException("Send failed: " + std::string(strerror(errno)));
 	}
 	return offset;
@@ -149,10 +166,14 @@ ssize_t pipe(int32_t sourceFd, int32_t destFd)
 	while (true)
 	{
 		readSize = readNonBlock(sourceFd, inputBuffer, Config::R_BUFF_SIZE);
-		if (readSize <= 0L)
+		if (readSize <= 0L)		// if other peer disconnected or there's nothing else to read
 			break;
+		LOG_DEBUG(LogContext::IO, "Piping input to the other end");
 		if (writeNonBlock(destFd, inputBuffer, readSize) == -1L)
-			throw IOException("Can't empty pipe input data into output");
+		{
+			LOG_ERROR(LogContext::IO, "Couldn't write on destination fd, piping failed");
+			throw IOException("Couldn't write on destination fd, piping failed");
+		}
 	}
 	return (readSize);
 }
@@ -172,6 +193,7 @@ SocketPair createSocketPair(void)
 		if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
 			throw(CLIException("Failed to set socket as non-blocking"));
 	}
+	LOG_DEBUG(LogContext::IO, "Created socket pair: [" + std::to_string(sockets[0]) + " " + std::to_string(sockets[1]) + "]");
 	return SocketPair{sockets[0], sockets[1]};
 }
 
@@ -198,6 +220,7 @@ Pipe createPipe(void)
 		if (::fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
 			throw(HTTPException("Failed to set socket as non-blocking"));
 	}
+	LOG_DEBUG(LogContext::IO, "Created pipe: [" + std::to_string(_pipe[0]) + " " + std::to_string(_pipe[1]) + "]");
 	return Pipe{_pipe[1], _pipe[0]};
 }
 
@@ -215,6 +238,8 @@ void closePipe(Pipe& pipe) noexcept
 	}
 }
 
+};
+
 void printMutated(std::string const& content) noexcept
 {
 	static std::mutex printMutex;
@@ -223,4 +248,34 @@ void printMutated(std::string const& content) noexcept
 	std::cout << content << std::endl;
 }
 
-};
+std::string createLogPath(const char* logFolder) noexcept
+{
+	auto now = std::chrono::system_clock::now();
+	std::time_t nowTimeT = std::chrono::system_clock::to_time_t(now);
+
+	std::tm tmBuf;
+	localtime_r(&nowTimeT, &tmBuf);  // versione thread-safe di localtime (POSIX)
+
+	std::ostringstream oss;
+	oss << std::put_time(&tmBuf, "%d-%m-%y");  // DD-mm-AA (anno a 2 cifre)
+
+	return std::format("{}/{}_logfile.log", logFolder, oss.str());
+}
+
+std::string escapeNewLine(const char* buffer, size_t size) noexcept
+{
+	assert(buffer != nullptr and "null buffer pointer");
+	std::string escaped;
+
+	for (size_t i = 0UL; i < size; i++)
+	{
+		if (buffer[i] != '\n')
+			escaped.push_back(buffer[i]);
+		else
+		{
+			escaped.push_back('\\');
+			escaped.push_back('n');
+		}
+	}
+	return escaped;
+}

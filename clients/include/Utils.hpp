@@ -46,7 +46,8 @@ struct Pipe
 Pipe createPipe(void);
 void closePipe(Pipe& pipe) noexcept;
 
-void printMutated(std::string const& content) noexcept;
-
 };
 
+void printMutated(std::string const& content) noexcept;
+std::string createLogPath(const char* logFolder) noexcept;
+std::string escapeNewLine(const char* buffer, size_t size) noexcept;
