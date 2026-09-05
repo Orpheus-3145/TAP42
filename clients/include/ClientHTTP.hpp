@@ -24,13 +24,15 @@ class ClientHTTP
 
 		void	connect(std::string const& host, uint32_t port);
 		void	disconnect(void) noexcept;
-		bool	isConnectionOpen(void) const noexcept { return this->connectionAlive.load(); }
+		bool	isWorkerRunning(void) const noexcept { return this->keepAlive.load(); }
 		void	startWorker(int32_t gameSocket) noexcept;
 		void	stopWorker(void) noexcept;
-	
+
 	private:
 		void	wakeUpWorker(void) noexcept;
-		void	run(int32_t gameSocket);
+		void	flushPipe(void) const noexcept;
+
+		void	pollLoop(int32_t gameSocket);
 
 		int32_t			gameSocket{-1};
 		ioUtils::Pipe	wakeupPipe{-1, -1};		// pipe for pollwakeup the worker	
@@ -38,5 +40,5 @@ class ClientHTTP
 
 		std::thread	worker;
 
-		std::atomic<bool>		connectionAlive{false};
+		std::atomic<bool>	keepAlive{false};
 };

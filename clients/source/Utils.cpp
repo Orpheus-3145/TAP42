@@ -212,12 +212,12 @@ ssize_t writeNonBlock(int32_t fd, const char* buffer, size_t size)
 
 ssize_t pipe(int32_t sourceFd, int32_t destFd)
 {
-	char	inputBuffer[Config::R_BUFF_SIZE];
+	char	inputBuffer[Config::BUFF_SIZE];
 	ssize_t	readSize = 0L;
 
 	while (true)
 	{
-		readSize = readNonBlock(sourceFd, inputBuffer, Config::R_BUFF_SIZE);
+		readSize = readNonBlock(sourceFd, inputBuffer, Config::BUFF_SIZE);
 		if (readSize <= 0L)		// if other peer disconnected or there's nothing else to read
 			break;
 		LOG_DEBUG(LogContext::IO, "Piping input to the other end");

@@ -245,9 +245,9 @@ class CommandLineUI
 		~CommandLineUI(void);
 		
 		void setup(void);
-		void start(void) noexcept { this->refreshTabs(); }
-		void stop(void) noexcept;
-		void refreshTabs(void) const noexcept {::doupdate(); }
+		void show(void) noexcept { this->refresh(); }
+		void clear(void) noexcept;
+		void refresh(void) const noexcept { ::doupdate(); }
 
 		void handleUserInput(void);
 		void handleResponse(std::string const& response);
@@ -262,7 +262,7 @@ class CommandLineUI
 		ioUtils::Pipe commandPipe;
 
 		size_t	commandLength{0L};
-		char	commandBuffer[Config::R_BUFF_SIZE];
+		char	commandBuffer[Config::BUFF_SIZE];
 };
 
 class GraphicUI

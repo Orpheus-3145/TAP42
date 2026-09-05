@@ -9,7 +9,8 @@
 
 CommandLineUI::~CommandLineUI(void)
 {
-	this->stop();
+	if (this->tabs.empty() == false)
+		this->clear();
 }
 
 void CommandLineUI::setup(void)
@@ -45,7 +46,7 @@ void CommandLineUI::setup(void)
 	LOG_DEBUG(LogContext::UI, "Setup for CommandLine interface done");
 }
 
-void CommandLineUI::stop(void) noexcept
+void CommandLineUI::clear(void) noexcept
 {
 	for (WINDOW*& tab : this->tabs)
 		::delwin(tab);
@@ -59,7 +60,7 @@ void CommandLineUI::handleUserInput(void)
 {
 	int32_t inputChar = wgetch(this->tabs[0]);
 
-	if (this->commandLength == Config::R_BUFF_SIZE)
+	if (this->commandLength == Config::BUFF_SIZE)
 		throw BufferOverflowException("Command buffer overflow");
 
 	switch (inputChar)
@@ -68,7 +69,7 @@ void CommandLineUI::handleUserInput(void)
 			LOG_DEBUG(LogContext::UI, "Resize window callback");
 			break;
 
-		case Config::MSG_TERM:
+		case Config::COMMAND_TERM:
 			LOG_INFO(LogContext::UI, "Got new command: " + std::string(this->commandBuffer, this->commandLength));
 			ioUtils::write(this->commandPipe.in, this->commandBuffer, this->commandLength);
 			this->commandLength = 0UL;

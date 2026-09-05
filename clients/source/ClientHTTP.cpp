@@ -40,19 +40,20 @@ void ClientHTTP::startWorker(int32_t gameSocket) noexcept
 {
 	assert(gameSocket != -1 and "invalid game socket");
 
-	this->worker = std::thread(&ClientHTTP::run, this, gameSocket);
+	this->worker = std::thread(&ClientHTTP::pollLoop, this, gameSocket);
+	this->keepAlive.store(true);
 	LOG_INFO(LogContext::HTTP, "Started HTTP worker, listening to UNIX socket: " + std::to_string(gameSocket));
 }
 
 void ClientHTTP::stopWorker(void) noexcept
 {
-	this->connectionAlive.store(false);
+	this->keepAlive.store(false);
 
 	this->wakeUpWorker();
 	if (this->worker.joinable())
 	{
 		this->worker.join();
-		LOG_DEBUG(LogContext::HTTP, "Stopped worker");
+		LOG_DEBUG(LogContext::HTTP, "Stopped HTP worker");
 	}
 }
 
@@ -62,12 +63,17 @@ void ClientHTTP::wakeUpWorker(void) noexcept
 	ioUtils::write(this->wakeupPipe.in, &byte, 1UL);
 }
 
-void ClientHTTP::run(int32_t gameSocket)
+void ClientHTTP::flushPipe(void) const noexcept
 {
 	char tmp[64];
+	ioUtils::read(this->wakeupPipe.out, tmp, 64);
+}
 
-	this->connectionAlive.store(true);
-	while (this->connectionAlive.load())
+void ClientHTTP::pollLoop(int32_t gameSocket)
+{
+	assert(gameSocket != -1 and "invalid game socket");
+
+	while (this->keepAlive.load())
 	{
 		struct pollfd fds[3];
 		// to awake manually the thread
@@ -91,10 +97,7 @@ void ClientHTTP::run(int32_t gameSocket)
 		}
 
 		if (fds[0].revents & POLLIN)	// worker awaken from main thread, flush pipe	NB use it to gracelly close the client when user closes session?
-		{
-			LOG_DEBUG(LogContext::HTTP, "Manually awaken from main thread");
-			ioUtils::read(this->wakeupPipe.out, tmp, 64);
-		}
+			this->flushPipe();
 		
 		if (fds[1].revents & POLLIN)	// request from Game -> send to server
 		{
@@ -102,7 +105,7 @@ void ClientHTTP::run(int32_t gameSocket)
 			if (ioUtils::pipe(gameSocket, this->httpSocket) == -1L)
 			{
 				LOG_INFO(LogContext::HTTP, "Game stopped, closing session");
-				this->connectionAlive.store(false);
+				this->keepAlive.store(false);
 			}
 		}
 
@@ -110,7 +113,7 @@ void ClientHTTP::run(int32_t gameSocket)
 		if (fds[1].revents & (POLLHUP | POLLERR | POLLNVAL))
 		{
 			LOG_INFO(LogContext::HTTP, "Game stopped, closing session");
-			this->connectionAlive.store(false);
+			this->keepAlive.store(false);
 		}
 
 		if (fds[2].revents & POLLIN)	// response or event from server -> send to game
@@ -119,7 +122,7 @@ void ClientHTTP::run(int32_t gameSocket)
 			if (ioUtils::pipe(this->httpSocket, gameSocket) == -1L)
 			{
 				LOG_INFO(LogContext::HTTP, "Server terminated connection, closing session");
-				this->connectionAlive.store(false);
+				this->keepAlive.store(false);
 			}
 		}
 
@@ -127,7 +130,7 @@ void ClientHTTP::run(int32_t gameSocket)
 		if (fds[2].revents & (POLLHUP | POLLERR | POLLNVAL))
 		{
 			LOG_INFO(LogContext::HTTP, "Server terminated connection, closing session");
-			this->connectionAlive.store(false);
+			this->keepAlive.store(false);
 		}
 	}
 }

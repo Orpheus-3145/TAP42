@@ -9,6 +9,7 @@
 Game::Game(void) noexcept
 {
 	this->commandPipe = ioUtils::createPipe();
+	this->wakeupPipe = ioUtils::createPipe();
 
 	this->clientHTTP = std::make_unique<ClientHTTP>();
 	this->interface = std::make_unique<CommandLineUI>(this->commandPipe);
@@ -16,11 +17,11 @@ Game::Game(void) noexcept
 
 Game::~Game(void)
 {
-	this->stop();
 	ioUtils::closePipe(this->commandPipe);
+	ioUtils::closePipe(this->wakeupPipe);
 }
 
-void Game::start(std::string const& host, uint32_t port)
+void Game::run(std::string const& host, uint32_t port)
 {
 	this->serverInputLength = 0UL;
 	this->commandLength = 0UL;
@@ -29,54 +30,86 @@ void Game::start(std::string const& host, uint32_t port)
 
 	this->clientHTTP->connect(host, port);
 	this->clientHTTP->startWorker(gameClientSockets.first);
-	this->interface->setup();
-	this->interface->start();
 
-	try
+	this->interface->setup();
+	this->interface->show();
+
+	this->startWorker(gameClientSockets.second);
+	if (this->worker.joinable())
 	{
-		this->loop(gameClientSockets.second);
+		this->worker.join();
+		LOG_DEBUG(LogContext::GAME, "Stopped worker");
 	}
-	catch(const AppException& e)
-	{
-		std::cerr << e.what() << '\n';
-	}
-	
-	this->stop();
+	this->clientHTTP->stopWorker();
+
+	LOG_DEBUG(LogContext::GAME, "Stopped worker");
+
+	this->clientHTTP->disconnect();
+	this->interface->clear();
+
+	LOG_INFO(LogContext::GAME, "Game stopped");
 
 	ioUtils::closePair(gameClientSockets);
 }
 
-void Game::stop(void) noexcept
+void Game::startWorker(int32_t clientSocket) noexcept
 {
-	this->clientHTTP->disconnect();
-	this->interface->stop();
+	assert(clientSocket != -1 and "invalid game socket");
 
-	LOG_INFO(LogContext::GAME, "Game stopped");
+	this->worker = std::thread(&Game::pollLoop, this, clientSocket);
+	this->keepAlive.store(true);
+	LOG_INFO(LogContext::GAME, "Started game worker, listening to UNIX socket: " + std::to_string(clientSocket));
 }
 
-void Game::loop(int32_t clientSocket)
+void Game::stopWorker(void) noexcept
+{
+	this->keepAlive.store(false);
+
+	this->wakeUpWorker();
+	if (this->worker.joinable())
+	{
+		this->worker.join();
+		LOG_DEBUG(LogContext::GAME, "Stopped game worker");
+	}
+}
+
+void Game::wakeUpWorker(void) noexcept
+{
+	char byte = 'x';
+	ioUtils::write(this->wakeupPipe.in, &byte, 1UL);
+}
+
+void Game::flushPipe(void) const noexcept
+{
+	char tmp[64];
+	ioUtils::read(this->wakeupPipe.out, tmp, 64);
+}
+
+void Game::pollLoop(int32_t clientSocket)
 {
 	assert(clientSocket != -1 and "invalid client socket");
 
-	LOG_INFO(LogContext::UI, "Started UI client, listening to UNIX socket: " + std::to_string(clientSocket));
-	this->runLoop = true;
-	while(this->runLoop == true)
+	while (this->keepAlive.load())
 	{
-		struct pollfd fds[3];
+		struct pollfd fds[4];
 		// user input
 		fds[0].fd = STDIN_FILENO;
 		fds[0].events = POLLIN;
 		fds[0].revents = 0;
-		// user input
-		fds[1].fd = this->commandPipe.out;
+		// main thread calls
+		fds[1].fd = this->wakeupPipe.out;
 		fds[1].events = POLLIN;
 		fds[1].revents = 0;
-		// client socket
-		fds[2].fd = clientSocket;
+		// user input
+		fds[2].fd = this->commandPipe.out;
 		fds[2].events = POLLIN;
 		fds[2].revents = 0;
+		// client socket
+		fds[3].fd = clientSocket;
+		fds[3].events = POLLIN;
+		fds[3].revents = 0;
 
-		if (ioUtils::poll(fds, 3, -1) == -1)
+		if (ioUtils::poll(fds, 4, -1) == -1)
 		{
 			if (errno == EINTR)
 				continue;
@@ -87,20 +120,23 @@ void Game::loop(int32_t clientSocket)
 		if (fds[0].revents & POLLIN)
 			this->interface->handleUserInput();
 
-		if (fds[1].revents & POLLIN)
+		if (fds[1].revents & POLLIN)	// worker awaken from main thread, flush pipe	NB use it to gracelly close the client when user closes session?
+			this->flushPipe();
+		
+		if (fds[2].revents & POLLIN)
 			this->forwardCommandToServer(clientSocket);
 
-		if (fds[2].revents & POLLIN)
+		if (fds[3].revents & POLLIN)
 			this->readDataFromServer(clientSocket);
 
 		// client closed connection (because server did so) (POLLHUP) or got an error (POLLERR | POLLNVAL)
-		if (fds[2].revents & (POLLHUP | POLLERR | POLLNVAL))
+		if (fds[3].revents & (POLLHUP | POLLERR | POLLNVAL))
 		{
 			LOG_WARN(LogContext::UI, "Client unexpectedly terminated connection, closing session");
-			this->runLoop = false;
+			this->keepAlive.store(false);
 		}
 
-		this->interface->refreshTabs();
+		this->interface->refresh();
 	}
 }
 
@@ -109,7 +145,7 @@ void Game::forwardCommandToServer(int32_t clientSocket)
 	assert(clientSocket != -1 and "invalid client socket");
 
 	LOG_DEBUG(LogContext::UI, "Forwarding command to client");
-	this->commandLength = ioUtils::read(this->commandPipe.out, this->commandBuffer, Config::R_BUFF_SIZE);
+	this->commandLength = ioUtils::read(this->commandPipe.out, this->commandBuffer, Config::BUFF_SIZE);
 	
 	// if necessary parse/format command
 	
@@ -121,9 +157,8 @@ void Game::forwardCommandToServer(int32_t clientSocket)
 
 	// handle graceful termination
 	if (this->commandLength >= ::strlen(Config::QUIT) and !::strncmp(this->commandBuffer, Config::QUIT, ::strlen(Config::QUIT)))
-		this->runLoop = false;
+		this->keepAlive.store(false);
 	this->commandLength = 0UL;
-
 }
 
 void Game::readDataFromServer(int32_t clientSocket)
@@ -133,7 +168,7 @@ void Game::readDataFromServer(int32_t clientSocket)
 	ssize_t n = 0L;
 	do	// while loop because buffer could overflow
 	{
-		n = ioUtils::readNonBlock(clientSocket, this->serverBuffer + this->serverInputLength, Config::R_BUFF_SIZE - this->serverInputLength);
+		n = ioUtils::readNonBlock(clientSocket, this->serverBuffer + this->serverInputLength, Config::BUFF_SIZE - this->serverInputLength);
 
 		if (n > 0L)
 		{
@@ -144,7 +179,7 @@ void Game::readDataFromServer(int32_t clientSocket)
 		else if (n == -1L)		// client closed connection
 		{
 			LOG_WARN(LogContext::UI, "Client unexpectedly terminated connection, closing session");
-			this->runLoop = false;
+			this->keepAlive.store(false);
 		}
 	} while(n > 0L);
 }
@@ -174,7 +209,10 @@ void Game::handleServerInput(void)
 			this->interface->handleEvent(std::string(startMsg, lenMsg));
 		}
 		else
+		{
 			LOG_WARN(LogContext::UI, "Unknown command: '" + std::string(startMsg, lenMsg) + "'");
+			this->interface->handleEvent("UNKNWON - " + std::string(startMsg, lenMsg));
+		}
 
 		startMsg += lenMsg + 1UL;
 		this->serverInputLength -= lenMsg + 1UL;

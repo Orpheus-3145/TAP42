@@ -29,7 +29,7 @@ int32_t main(int32_t argc, char** argv)
 		}
 
 		Game client;
-		client.start(options.host, options.port);
+		client.run(options.host, options.port);
 
 	} catch (AppException& err) {
 		std::cerr << err.what() << std::endl;
