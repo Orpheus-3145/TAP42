@@ -130,5 +130,4 @@ void ClientHTTP::run(int32_t gameSocket)
 			this->connectionAlive.store(false);
 		}
 	}
-	ioUtils::closeSocket(gameSocket);	// close gameSocket so also game gets notified
 }

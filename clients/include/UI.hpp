@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "Config.hpp"
+#include "Utils.hpp"
 
 
 // NCURSES:
@@ -229,65 +230,42 @@
 
 constexpr inline int32_t WIDTH_WIN = 100;
 constexpr inline int32_t HEIGHT_WIN = 30;
-constexpr inline uint32_t BUFF_INPUT_SIZE = 1024;
 
-class BasicUI
+class CommandLineUI
 {
 	public:
-		BasicUI(void) noexcept = default;
+		CommandLineUI(ioUtils::Pipe commandPipe) noexcept :
+			commandPipe{commandPipe} {}
 
-		BasicUI(BasicUI const& other) = delete;
-		BasicUI& operator=(BasicUI const& other) = delete;
-		BasicUI(BasicUI&& other) = delete;
-		BasicUI& operator=(BasicUI&& other) = delete;
+		CommandLineUI(CommandLineUI const& other) = delete;
+		CommandLineUI& operator=(CommandLineUI const& other) = delete;
+		CommandLineUI(CommandLineUI&& other) = delete;
+		CommandLineUI& operator=(CommandLineUI&& other) = delete;
 
-		virtual ~BasicUI(void) {};
-
-		virtual void setup(void);
-		virtual void loop(int32_t clientSocket) = 0;
-		virtual void stop(int32_t clientSocket) noexcept = 0;
-		virtual void handleInputFromUser(int32_t clientSocket) = 0;
-		virtual void handleInputFromClient(int32_t clientSocket) = 0;
-
-	protected:
-		virtual void sendDataToClient(int32_t clientSocket);
-		virtual void readDataFromClient(int32_t clientSocket);
-		void parseInput(void);
-
-		bool runLoop{false};
-
-		size_t	readingSize{0UL};
-		char	readingBuffer[Config::R_BUFF_SIZE];
-
-		size_t	writingSize{0UL};
-		char	writingBuffer[Config::R_BUFF_SIZE];
-
-		std::string				pendingResp;
-		std::queue<std::string>	eventQueue;
-};
-
-class CommandLineUI : public BasicUI
-{
-	public:
-		~CommandLineUI(void) override;
+		~CommandLineUI(void);
 		
-		void setup(void) override;
-		void loop(int32_t clientSocket) override;
-		void stop(int32_t clientSocket) noexcept override;
+		void setup(void);
+		void start(void) noexcept { this->refreshTabs(); }
+		void stop(void) noexcept;
+		void refreshTabs(void) const noexcept {::doupdate(); }
 
-		void handleInputFromUser(int32_t clientSocket) override;
-		void handleInputFromClient(int32_t clientSocket) override;
+		void handleUserInput(void);
+		void handleResponse(std::string const& response);
+		void handleEvent(std::string const& event);
 
 	protected:
-		void refreshTabs(void) const noexcept;
 
 		std::vector<WINDOW*> tabs;
-		size_t currLineInput = 1UL;
-		size_t currLineOutput = 1UL;
+		size_t currLineInput{1UL};
+		size_t currLineOutput{1UL};
 
+		ioUtils::Pipe commandPipe;
+
+		size_t	commandLength{0L};
+		char	commandBuffer[Config::R_BUFF_SIZE];
 };
 
-class GraphicUI : public BasicUI
+class GraphicUI
 {
 	//
 };

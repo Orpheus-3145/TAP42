@@ -91,6 +91,58 @@ int32_t	connectToServer(std::string const& host, uint32_t portNo, struct addrinf
 	return socket;
 }
 
+ssize_t read(int32_t fd, char* buffer, size_t size)
+{
+	if (size == 0UL)
+		return 0L;
+	
+	size_t	offset = 0UL;
+	while (true)
+	{
+		ssize_t n = ::read(fd, buffer + offset, size - offset);
+		if (n > 0L)
+		{
+			LOG_DEBUG(LogContext::IO, "Read " + std::to_string(n) + " bytes from fd: " + std::to_string(fd));
+			LOG_DEBUG(LogContext::IO, "Read: '" + escapeNewLine(buffer + offset, n) + "'");
+			offset += n;
+		}
+		if (n < 0L)
+		{
+			LOG_ERROR(LogContext::UI, "Read failed: " + std::string(strerror(errno)));
+			throw ReadException("Read failed: " + std::string(strerror(errno)));
+		}
+		else
+			break;
+	}
+	return offset;
+}
+
+ssize_t write(int32_t fd, const char* buffer, size_t size)
+{
+	if (size == 0UL)
+		return 0L;
+
+	size_t	offset = 0UL;
+	while (true)
+	{
+		ssize_t n = ::write(fd, buffer + offset, size - offset);
+		if (n > 0L)
+		{
+			LOG_DEBUG(LogContext::IO, "Write " + std::to_string(n) + " bytes from fd: " + std::to_string(fd));
+			LOG_DEBUG(LogContext::IO, "Write: '" + escapeNewLine(buffer + offset, n) + "'");
+			offset += n;
+		}
+		if (n < 0L)
+		{
+			LOG_ERROR(LogContext::UI, "Write failed: " + std::string(strerror(errno)));
+			throw ReadException("Write failed: " + std::string(strerror(errno)));
+		}
+		else
+			break;
+	}
+	return offset;
+}
+
 ssize_t readNonBlock(int32_t fd, char* buffer, size_t size)
 {
 	if (size == 0UL)
@@ -204,6 +256,12 @@ void closeSocket(int32_t& socket) noexcept
 	::shutdown(socket, SHUT_RDWR);
 	::close(socket);
 	socket = -1;
+}
+
+void closePair(SocketPair& pair) noexcept
+{
+	closeSocket(pair.first);
+	closeSocket(pair.second);
 }
 
 Pipe createPipe(void)
