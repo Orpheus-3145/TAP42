@@ -39,16 +39,16 @@ void Game::run(std::string const& host, uint32_t port)
 	if (this->worker.joinable())
 	{
 		this->worker.join();
-		LOG_DEBUG(LogContext::GAME, "Stopped worker");
+		LOG_DEBUG(LogContext::GAME_CLIENT, "Stopped worker");
 	}
 	this->clientHTTP->stopWorker();
 
-	LOG_DEBUG(LogContext::GAME, "Stopped worker");
+	LOG_DEBUG(LogContext::GAME_CLIENT, "Stopped worker");
 
 	this->clientHTTP->disconnect();
 	this->interface->clear();
 
-	LOG_INFO(LogContext::GAME, "Game stopped");
+	LOG_INFO(LogContext::GAME_CLIENT, "Game stopped");
 
 	ioUtils::closePair(gameClientSockets);
 }
@@ -59,7 +59,7 @@ void Game::startWorker(int32_t clientSocket) noexcept
 
 	this->worker = std::thread(&Game::pollLoop, this, clientSocket);
 	this->keepAlive.store(true);
-	LOG_INFO(LogContext::GAME, "Started game worker, listening to UNIX socket: " + std::to_string(clientSocket));
+	LOG_INFO(LogContext::GAME_CLIENT, "Started game worker, listening to UNIX socket: " + std::to_string(clientSocket));
 }
 
 void Game::stopWorker(void) noexcept
@@ -70,7 +70,7 @@ void Game::stopWorker(void) noexcept
 	if (this->worker.joinable())
 	{
 		this->worker.join();
-		LOG_DEBUG(LogContext::GAME, "Stopped game worker");
+		LOG_DEBUG(LogContext::GAME_CLIENT, "Stopped game worker");
 	}
 }
 
@@ -114,7 +114,7 @@ void Game::pollLoop(int32_t clientSocket)
 		{
 			if (errno == EINTR)
 				continue;
-			LOG_ERROR(LogContext::UI, "Poll failed: " + std::string(strerror(errno)));
+			LOG_ERROR(LogContext::INTERFACE, "Poll failed: " + std::string(strerror(errno)));
 			throw CLIException("poll failed: " + std::string(strerror(errno)));
 		}
 
@@ -133,7 +133,7 @@ void Game::pollLoop(int32_t clientSocket)
 		// client closed connection (because server did so) (POLLHUP) or got an error (POLLERR | POLLNVAL)
 		if (fds[3].revents & (POLLHUP | POLLERR | POLLNVAL))
 		{
-			LOG_WARN(LogContext::UI, "Client unexpectedly terminated connection, closing session");
+			LOG_WARN(LogContext::INTERFACE, "Client unexpectedly terminated connection, closing session");
 			this->keepAlive.store(false);
 		}
 
@@ -145,14 +145,14 @@ void Game::forwardCommandToServer(int32_t clientSocket)
 {
 	assert(clientSocket != -1 and "invalid client socket");
 
-	LOG_DEBUG(LogContext::UI, "Forwarding command to client");
+	LOG_DEBUG(LogContext::INTERFACE, "Forwarding command to client");
 	this->commandLength = ioUtils::read(this->commandPipe.out, this->commandBuffer, Config::BUFF_SIZE);
 	
 	// if necessary parse/format command
 	
 	if (ioUtils::writeNonBlock(clientSocket, this->commandBuffer, this->commandLength) == -1)
 	{
-		LOG_WARN(LogContext::GAME, "Game-client socket is busy on write side");
+		LOG_WARN(LogContext::GAME_CLIENT, "Game-client socket is busy on write side");
 		// maybe add id it to polling until it's done?
 	}
 
@@ -174,12 +174,12 @@ void Game::readDataFromServer(int32_t clientSocket)
 		if (n > 0L)
 		{
 			this->serverInputLength += n;
-			LOG_DEBUG(LogContext::UI, "Reading game input from client");
+			LOG_DEBUG(LogContext::INTERFACE, "Reading game input from client");
 			this->handleServerInput();
 		}
 		else if (n == -1L)		// client closed connection
 		{
-			LOG_WARN(LogContext::UI, "Client unexpectedly terminated connection, closing session");
+			LOG_WARN(LogContext::INTERFACE, "Client unexpectedly terminated connection, closing session");
 			this->keepAlive.store(false);
 		}
 	} while(n > 0L);
@@ -201,17 +201,17 @@ void Game::handleServerInput(void)
 
 		if (!::strncmp(startMsg, "OK", 2) or !::strncmp(startMsg, "ERR", 3))
 		{
-			LOG_INFO(LogContext::UI, "Got new response: '" + std::string(startMsg, lenMsg) + "'");
+			LOG_INFO(LogContext::INTERFACE, "Got new response: '" + std::string(startMsg, lenMsg) + "'");
 			this->interface->handleResponse(std::string(startMsg, lenMsg));
 		}
 		else if (!::strncmp(startMsg, "EVT", 3))
 		{
-			LOG_INFO(LogContext::UI, "Got new event: '" + std::string(startMsg, lenMsg) + "'");
+			LOG_INFO(LogContext::INTERFACE, "Got new event: '" + std::string(startMsg, lenMsg) + "'");
 			this->interface->handleEvent(std::string(startMsg, lenMsg));
 		}
 		else
 		{
-			LOG_WARN(LogContext::UI, "Unknown command: '" + std::string(startMsg, lenMsg) + "'");
+			LOG_WARN(LogContext::INTERFACE, "Unknown command: '" + std::string(startMsg, lenMsg) + "'");
 			this->interface->handleEvent("UNKNWON - " + std::string(startMsg, lenMsg));
 		}
 

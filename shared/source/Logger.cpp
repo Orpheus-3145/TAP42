@@ -19,15 +19,16 @@ std::ostream& operator<<(std::ostream& os, LogLevel level) noexcept
 	return os;
 }
 
+
 std::ostream& operator<<(std::ostream& os, LogContext context) noexcept
 {
 	switch (context)
 	{
-		case LogContext::HTTP: os << "CLIENT_HTTP"; break;
-		case LogContext::GAME: os << "GAME"; break;
-		case LogContext::UI: os << "INTERFACE"; break;
-		case LogContext::IO: os << "READ_WRITE_OP"; break;
-		case LogContext::GENERAL: os << "GENERAL"; break;
+		case LogContext::NONE: os << "NONE"; break;
+		case LogContext::HTTP_CLIENT: os << "HTTP_CLIENT"; break;
+		case LogContext::GAME_CLIENT: os << "GAME_CLIENT"; break;
+		case LogContext::INTERFACE: os << "INTERFACE"; break;
+		case LogContext::INPUT_OUTPUT: os << "INPUT_OUTPUT"; break;
 	}
 	return os;
 }
@@ -72,12 +73,24 @@ void Logger::log(LogContext context, LogLevel level, const std::string& message)
 
 	if (level < this->minLevel)
 		return;
+	else if ((this->filter & context) == LogContext::NONE)
+		return;
 
+	constexpr int32_t kTimestampWidth = 26;
+	constexpr int32_t kLevelWidth  = 8;
+	constexpr int32_t kContextWidth = 14;
 	std::ostringstream line;
-	line << "[" << currentTimestamp() << "] "
-		 << "[" << level << "] "
-		 << "[" << context << "] "
-		 << message;
+
+	auto padField = [](const std::string& content, int width) {
+		std::ostringstream tmp;
+		tmp << std::left << std::setw(width) << content;
+		return tmp.str();
+	};
+	
+	line << padField("[" + currentTimestamp() + "]", kTimestampWidth) << ' '
+		<< padField("[" + Logger::to_string(level) + "]", kLevelWidth) << ' '
+		<< padField("[" + Logger::to_string(context) + "]", kContextWidth)
+		<< " - " << message;
 
 	if (this->consoleOutput)
 	{
@@ -98,6 +111,20 @@ void Logger::debug(LogContext context, const std::string& message) noexcept { th
 void Logger::info(LogContext context, const std::string& message) noexcept  { this->log(context, LogLevel::INFO, message); }
 void Logger::warn(LogContext context, const std::string& message) noexcept  { this->log(context, LogLevel::WARN, message); }
 void Logger::error(LogContext context, const std::string& message) noexcept { this->log(context, LogLevel::ERROR, message); }
+
+std::string Logger::to_string(LogLevel const& level) noexcept
+{
+	std::ostringstream line;
+	line << level;
+	return line.str();
+}
+
+std::string Logger::to_string(LogContext const& context) noexcept
+{
+	std::ostringstream line;
+	line << context;
+	return line.str();
+}
 
 std::string Logger::currentTimestamp(void) noexcept
 {

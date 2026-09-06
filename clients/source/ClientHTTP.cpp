@@ -22,7 +22,7 @@ void ClientHTTP::connect(std::string const& host, uint32_t port)
 {
 	this->httpSocket = ioUtils::connectToServer(host, port, nullptr);
 
-	LOG_INFO(LogContext::HTTP, "Client HTTP connected to host: " + host + " - port: " + std::to_string(port));
+	LOG_INFO(LogContext::HTTP_CLIENT, "Client HTTP connected to host: " + host + " - port: " + std::to_string(port));
 }
 
 void ClientHTTP::disconnect(void) noexcept
@@ -33,7 +33,7 @@ void ClientHTTP::disconnect(void) noexcept
 	this->stopWorker();
 	ioUtils::closeSocket(this->httpSocket);
 
-	LOG_DEBUG(LogContext::HTTP, "Client HTTP disconnected");
+	LOG_DEBUG(LogContext::HTTP_CLIENT, "Client HTTP disconnected");
 }
 
 void ClientHTTP::startWorker(int32_t gameSocket) noexcept
@@ -42,7 +42,7 @@ void ClientHTTP::startWorker(int32_t gameSocket) noexcept
 
 	this->worker = std::thread(&ClientHTTP::pollLoop, this, gameSocket);
 	this->keepAlive.store(true);
-	LOG_INFO(LogContext::HTTP, "Started HTTP worker, listening to UNIX socket: " + std::to_string(gameSocket));
+	LOG_INFO(LogContext::HTTP_CLIENT, "Started HTTP_CLIENT worker, listening to UNIX socket: " + std::to_string(gameSocket));
 }
 
 void ClientHTTP::stopWorker(void) noexcept
@@ -53,7 +53,7 @@ void ClientHTTP::stopWorker(void) noexcept
 	if (this->worker.joinable())
 	{
 		this->worker.join();
-		LOG_DEBUG(LogContext::HTTP, "Stopped HTP worker");
+		LOG_DEBUG(LogContext::HTTP_CLIENT, "Stopped HTP worker");
 	}
 }
 
@@ -92,7 +92,7 @@ void ClientHTTP::pollLoop(int32_t gameSocket)
 		{
 			if (errno == EINTR)
 				continue;
-			LOG_ERROR(LogContext::HTTP, "Poll failed: " + std::string(strerror(errno)));
+			LOG_ERROR(LogContext::HTTP_CLIENT, "Poll failed: " + std::string(strerror(errno)));
 			break;
 		}
 
@@ -101,10 +101,10 @@ void ClientHTTP::pollLoop(int32_t gameSocket)
 		
 		if (fds[1].revents & POLLIN)	// request from Game -> send to server
 		{
-			LOG_DEBUG(LogContext::HTTP, "Got command from game");
+			LOG_DEBUG(LogContext::HTTP_CLIENT, "Got command from game");
 			if (ioUtils::pipe(gameSocket, this->httpSocket) == -1L)
 			{
-				LOG_INFO(LogContext::HTTP, "Game stopped, closing session");
+				LOG_INFO(LogContext::HTTP_CLIENT, "Game stopped, closing session");
 				this->keepAlive.store(false);
 			}
 		}
@@ -112,16 +112,16 @@ void ClientHTTP::pollLoop(int32_t gameSocket)
 		// game closed connection (POLLHUP) or got an error (POLLERR | POLLNVAL)
 		if (fds[1].revents & (POLLHUP | POLLERR | POLLNVAL))
 		{
-			LOG_INFO(LogContext::HTTP, "Game stopped, closing session");
+			LOG_INFO(LogContext::HTTP_CLIENT, "Game stopped, closing session");
 			this->keepAlive.store(false);
 		}
 
 		if (fds[2].revents & POLLIN)	// response or event from server -> send to game
 		{
-			LOG_DEBUG(LogContext::HTTP, "Got response/event from server");
+			LOG_DEBUG(LogContext::HTTP_CLIENT, "Got response/event from server");
 			if (ioUtils::pipe(this->httpSocket, gameSocket) == -1L)
 			{
-				LOG_INFO(LogContext::HTTP, "Server terminated connection, closing session");
+				LOG_INFO(LogContext::HTTP_CLIENT, "Server terminated connection, closing session");
 				this->keepAlive.store(false);
 			}
 		}
@@ -129,7 +129,7 @@ void ClientHTTP::pollLoop(int32_t gameSocket)
 		// server closed connection (POLLHUP) or got an error (POLLERR | POLLNVAL)
 		if (fds[2].revents & (POLLHUP | POLLERR | POLLNVAL))
 		{
-			LOG_INFO(LogContext::HTTP, "Server terminated connection, closing session");
+			LOG_INFO(LogContext::HTTP_CLIENT, "Server terminated connection, closing session");
 			this->keepAlive.store(false);
 		}
 	}

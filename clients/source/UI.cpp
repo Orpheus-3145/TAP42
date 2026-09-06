@@ -12,14 +12,14 @@ InputTab::InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t sendComma
 	this->border = ::newwin(h, w, y, x);
 	if (this->border == nullptr)
 	{
-		LOG_ERROR(LogContext::UI, "Failed to create window");
+			LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
 		throw CLIException("Failed to create window");
 	}
 	::box(this->border, borderChar, borderChar);
 	this->main = ::newwin(h - 2, w - 2, y + 1, x + 1);
 	if (this->main == nullptr)
 	{
-		LOG_ERROR(LogContext::UI, "Failed to create window");
+		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
 		throw CLIException("Failed to create window");
 	}
 	::waddstr(this->main, Config::PROMPT);
@@ -229,7 +229,7 @@ void InputTab::forwardCommand(void) noexcept
 
 	if (bufferSize > 0UL)
 	{
-		LOG_INFO(LogContext::UI, "Got new command: " + std::string(commandBuffer, bufferSize));
+		LOG_INFO(LogContext::INTERFACE, "Got new command: " + std::string(commandBuffer, bufferSize));
 		ioUtils::write(this->sendCommandFd, commandBuffer, bufferSize);
 
 		this->history.emplace_back(0UL, std::array<char, Config::BUFF_SIZE>{});
@@ -363,8 +363,7 @@ void CommandLineUI::setup(void)
 	this->tabs[CommandLineUI::OUTPUT_TAB] = InputTab(LINES - 3, (COLS - 2) / 2, 2, (COLS - 2) / 2 + 1, this->commandPipe.in);
 	// this->tabs[CommandLineUI::OUTPUT_TAB].appendContent("this is where the output is shown");
 	this->setCurrentTab(CommandLineUI::INPUT_TAB);
-
-	LOG_DEBUG(LogContext::UI, "Setup for CommandLine interface done");
+	LOG_DEBUG(LogContext::INTERFACE, "Setup for CommandLine interface done");
 }
 
 void CommandLineUI::clear(void) noexcept
@@ -372,7 +371,7 @@ void CommandLineUI::clear(void) noexcept
 	this->tabs.clear();
 	::endwin();
 
-	LOG_INFO(LogContext::UI, "UI stopped");
+	LOG_INFO(LogContext::INTERFACE, "UI stopped");
 }
 
 void CommandLineUI::handleUserInput(void)
@@ -382,7 +381,7 @@ void CommandLineUI::handleUserInput(void)
 	switch (inputChar)
 	{
 		case KEY_RESIZE:	// NB resize doesn't work
-			LOG_DEBUG(LogContext::UI, "Resize window callback");
+			LOG_DEBUG(LogContext::INTERFACE, "Resize window callback");
 			break;
 
 		case Config::COMMAND_TERM:
