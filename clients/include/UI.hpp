@@ -3,6 +3,7 @@
 #include <ncurses.h>
 #include <queue>
 #include <vector>
+#include <map>
 #include <array>
 
 #include "Config.hpp"
@@ -234,6 +235,8 @@ constexpr inline int32_t HEIGHT_WIN = 30;
 
 class Tab
 {
+	using HistoryCommands = std::vector<std::pair<size_t,std::array<char,Config::BUFF_SIZE>>>;
+
 	public:
 		Tab(void) : Tab::Tab(LINES, COLS, 0, 0) {}
 		Tab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar = 0, int32_t sendCommandFd = -1);
@@ -256,16 +259,19 @@ class Tab
 		void storeCharInput(void);
 		void storeCharInput(char input);
 
+		void showPreviousCommand(void) noexcept;
+		void showFollowingCommand(void) noexcept;
+
 		void forwardCommand(void) noexcept;
 		void refresh(void) const noexcept;
 
 	private:
+		HistoryCommands	history;
+		size_t			curentCommandIndex{0UL};
+
 		WINDOW* border{nullptr};
 		WINDOW* main{nullptr};
 		int32_t sendCommandFd{-1};
-
-		size_t	commandLength{0UL};
-		char	commandBuffer[Config::BUFF_SIZE];
 };
 
 class CommandLineUI

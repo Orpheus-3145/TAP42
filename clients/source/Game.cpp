@@ -28,8 +28,8 @@ void Game::run(std::string const& host, uint32_t port)
 
 	ioUtils::SocketPair gameClientSockets = ioUtils::createSocketPair();
 
-	this->clientHTTP->connect(host, port);
-	this->clientHTTP->startWorker(gameClientSockets.first);
+	// this->clientHTTP->connect(host, port);
+	// this->clientHTTP->startWorker(gameClientSockets.first);
 	(void) host;
 	(void) port;
 	this->interface->setup();
