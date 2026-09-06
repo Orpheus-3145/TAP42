@@ -6,6 +6,17 @@
 #include <cassert>
 
 
+inline std::vector<const char*> comands{
+	"attack",
+	"move",
+	"test",
+	"inventory",
+	"attrack",
+	"find",
+	"talk",
+	"look"
+};
+
 Game::Game(void) noexcept
 {
 	this->commandPipe = ioUtils::createPipe();

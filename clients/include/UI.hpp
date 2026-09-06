@@ -233,21 +233,39 @@
 // 		UK pound sign            --> ACS_STERLING
 // ===========================================================================================================================================================================
 
+class BasicTab
+{
+	public:
+		BasicTab(void) : BasicTab::BasicTab(90, 40, 0, 0) {}
+		BasicTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar = -1);
 
-class InputTab
+		BasicTab(BasicTab const& other) noexcept = delete;
+		BasicTab& operator=(BasicTab const& other) noexcept = delete;
+		BasicTab(BasicTab&&) noexcept;
+		BasicTab& operator=(BasicTab&&) noexcept;
+
+		virtual ~BasicTab(void);
+
+		virtual void appendContent(std::string const& newContent) noexcept;
+		virtual void refresh(void) const noexcept { ::wnoutrefresh(this->main); }
+	
+	protected:
+		WINDOW* border{nullptr};
+		WINDOW* main{nullptr};
+};
+
+class InputTab : public BasicTab
 {
 	using HistoryCommands = std::vector<std::pair<size_t,std::array<char,Config::BUFF_SIZE>>>;
 
 	public:
-		InputTab(void) : InputTab::InputTab(LINES, COLS, 0, 0, -1) {LOG_DEBUG(LogContext::UI, "(in)default cst"); }
-		InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t sendCommandFd, int32_t borderChar = 0);
+		using BasicTab::BasicTab;
 
-		InputTab(InputTab const& other) noexcept = delete;
-		InputTab& operator=(InputTab const& other) noexcept = delete;
+		InputTab(void) : InputTab::InputTab(90, 40, 0, 0, -1) {}
+		InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar = -1, int32_t sendCommandFd = -1);
+
 		InputTab(InputTab&&) noexcept;
 		InputTab& operator=(InputTab&&) noexcept;
-
-		~InputTab(void);
 
 		void deleteCharForward(void) noexcept;
 		void deleteCharBack(void) noexcept;
@@ -263,42 +281,29 @@ class InputTab
 		void showFollowingCommand(void) noexcept;
 
 		void forwardCommand(void) noexcept;
-		void refresh(void) const noexcept { ::wnoutrefresh(this->main); }
+		void appendContent(std::string const& newContent) noexcept override;
 
 	private:
-		WINDOW* border{nullptr};
-		WINDOW* main{nullptr};
 		int32_t sendCommandFd{-1};
 
 		HistoryCommands	history;
 		size_t			currentCommandIndex{0UL};
 		const int32_t	startX = ::strlen(Config::PROMPT);
-
 };
 
-class OutputTab
+class OutputTab : public BasicTab
 {
 	public:
-		OutputTab(void) : OutputTab::OutputTab(LINES, COLS, 0, 0) { LOG_DEBUG(LogContext::UI, "(out) default cst"); }
-		OutputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar = 0);
+		using BasicTab::BasicTab;
 
-		OutputTab(OutputTab const& other) noexcept = delete;
-		OutputTab& operator=(OutputTab const& other) noexcept = delete;
 		OutputTab(OutputTab&&) noexcept;
 		OutputTab& operator=(OutputTab&&) noexcept;
 
-		~OutputTab(void);
-
-		void appendContent(std::string const& newContent) noexcept;
-
-		void refresh(void) const noexcept { ::wnoutrefresh(this->main); }
+		void appendContent(std::string const& newContent) noexcept override;
 
 	private:
-		WINDOW* border{nullptr};
-		WINDOW* main{nullptr};
-
 		std::deque<std::string> content;
-		size_t					startShowContentIndex{0UL};
+		size_t					firstLineToPrintIndex{0UL};
 };
 
 class CommandLineUI
@@ -317,7 +322,7 @@ class CommandLineUI
 		void setup(void);
 		void show(void) noexcept { this->refresh(); }
 		void clear(void) noexcept;
-		void refresh(void) noexcept { this->getCurrentTab().refresh(); ::doupdate(); }
+		void refresh(void) noexcept { this->getCurrentTab()->refresh(); ::doupdate(); }
 
 		void handleUserInput(void);
 		void handleResponse(std::string const& response);
@@ -326,7 +331,7 @@ class CommandLineUI
 		void switchForwardTab(void) noexcept;
 		void switchBackwardTab(void) noexcept;
 
-		InputTab& getCurrentTab(void) noexcept { return this->tabs[this->currentTabIndex]; }
+		BasicTab* getCurrentTab(void) noexcept { return this->tabs[this->currentTabIndex].get(); }
 		void setCurrentTab(size_t currentITabIndex) noexcept;
 
 	private:
@@ -335,7 +340,7 @@ class CommandLineUI
 		static constexpr size_t INPUT_TAB = 1;
 		static constexpr size_t OUTPUT_TAB = 2;
 
-		std::vector<InputTab> tabs;
+		std::vector<std::unique_ptr<BasicTab>> tabs;
 		size_t currentTabIndex{0UL};
 
 		ioUtils::Pipe commandPipe;
