@@ -1,0 +1,62 @@
+{
+  "rooms": {
+    "loc.start": {
+      "name": "Village Square",
+      "description": "A bustling square with cobblestone paths.",
+      "exits": { "north": "loc.tavern", "east": "loc.shop" },
+      "items": [],
+      "npcs": ["npc.guard"]
+    },
+    "loc.tavern": {
+      "name": "The Prancing Pony",
+      "description": "A cozy tavern filled with warmth and laughter.",
+      "exits": { "south": "loc.start" },
+      "items": ["item.ale"],
+      "npcs": []
+    },
+    "loc.shop": {
+      "name": "General Store",
+      "description": "Shelves lined with various goods and supplies.",
+      "exits": { "west": "loc.start" },
+      "items": [],
+      "npcs": ["npc.merchant"]
+    }
+  },
+
+  "items": {
+    "item.ale": { "name": "Frothy Ale", "description": "A refreshing drink that restores energy." },
+    "item.reward_coin": { "name": "Gold Coin", "description": "A shiny reward coin." }
+  },
+
+  "npcs": {
+    "npc.guard": {
+      "name": "Village Guard",
+      "description": "A stern-looking guard watching over the square.",
+      "dialogue": ["Stay safe, traveler.", "The roads can be dangerous."],
+      "hp": 20
+    },
+    "npc.merchant": {
+      "name": "Shop Keeper",
+      "description": "A friendly merchant eager to trade.",
+      "dialogue": ["Welcome to my shop!", "What can I get for you today?"],
+      "hp": 15
+    }
+  },
+
+  "quests": {
+    "quest.fetch_ale": {
+      "name": "Fetch the Ale",
+      "description": "Bring back the frothy ale from the tavern.",
+      "type": "fetch",
+      "target_id": "item.ale",
+      "reward_item_id": "item.reward_coin"
+    },
+    "quest.defeat_guard": {
+      "name": "Defeat the Guard",
+      "description": "The guard is causing trouble - defeat him.",
+      "type": "defeat",
+      "target_id": "npc.guard",
+      "reward_item_id": ""
+    }
+  }
+}
