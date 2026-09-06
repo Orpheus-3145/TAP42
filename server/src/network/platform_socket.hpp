@@ -5,7 +5,12 @@
 #ifdef _WIN32
   #include <winsock2.h>
   #include <ws2tcpip.h>
-  #pragma comment(lib, "Ws2_32.lib")
+  #if defined(_MSC_VER)
+    // MSVC-only: auto-links the lib without needing a linker flag. g++/clang
+    // (the Makefile's actual toolchain, which passes -lws2_32 explicitly)
+    // don't understand this pragma and would just warn about it for nothing.
+    #pragma comment(lib, "Ws2_32.lib")
+  #endif
 using socket_t_impl = SOCKET;
   #define INVALID_SOCK_VALUE INVALID_SOCKET
 #else

@@ -1,6 +1,6 @@
 CXX := g++
 CXXFLAGS := -std=c++17 -Wall -Wextra -Wpedantic -Isrc
-SRC := $(shell find src -name '*.cpp')
+SRC := $(wildcard src/*.cpp src/*/*.cpp)
 OBJ := $(SRC:.cpp=.o)
 TARGET := tap-server
 
@@ -28,7 +28,7 @@ run: all
 	./$(TARGET)
 
 lint:
-	@which cppcheck > /dev/null 2>&1 && cppcheck --enable=warning,style --std=c++17 --quiet --error-exitcode=1 --suppressions-list=.cppcheck-suppressions -Isrc src || echo "cppcheck non trovato, salto il lint"
+	@command -v cppcheck > /dev/null 2>&1 && cppcheck --enable=warning,style --std=c++17 --quiet --error-exitcode=1 --suppressions-list=.cppcheck-suppressions -Isrc src || echo "cppcheck non trovato, salto il lint"
 
 clean:
 	rm -f $(OBJ) $(TARGET)
