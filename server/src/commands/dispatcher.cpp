@@ -1,3 +1,5 @@
+// Handles CONNECT/LOOK/MOVE/WHO/CHAT/QUIT directly; everything else is
+// delegated to its own file and just wired in here.
 #include "commands/dispatcher.hpp"
 
 #include <sstream>

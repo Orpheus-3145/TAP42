@@ -1,3 +1,4 @@
+// Two sliding-window counters, that's the whole trick.
 #include "logging/abuse_monitor.hpp"
 
 #include <mutex>

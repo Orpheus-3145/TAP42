@@ -1,3 +1,4 @@
+// Nothing clever - a mutex and a map. It just needs to be correct.
 #include "network/registry.hpp"
 
 SessionRegistry& SessionRegistry::instance() {

@@ -1,3 +1,6 @@
+// Nothing exciting here except platform_init() ignoring SIGPIPE on POSIX -
+// without that, a send() to a client who just vanished takes the whole
+// server down with it.
 #include "network/platform_socket.hpp"
 
 #ifndef _WIN32

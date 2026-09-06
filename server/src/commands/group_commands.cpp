@@ -1,3 +1,5 @@
+// leave_group_locked is shared with disconnect handling, and ACCEPT calls it
+// too - see the comment inline for the double-membership bug that fixed.
 #include "commands/group_commands.hpp"
 
 #include <algorithm>

@@ -1,3 +1,4 @@
+// TALK - one command, one NPC, one line of dialogue at a time.
 #pragma once
 
 #include <memory>

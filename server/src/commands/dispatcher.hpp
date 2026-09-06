@@ -1,3 +1,5 @@
+// The front door for every command coming off the wire: parse it, route it,
+// and clean up properly when a client goes away.
 #pragma once
 
 #include <memory>

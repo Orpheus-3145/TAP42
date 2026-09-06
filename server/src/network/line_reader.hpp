@@ -1,3 +1,5 @@
+// Turns a raw byte stream into complete '\n'-terminated lines, buffering
+// whatever comes in half-finished until the rest arrives.
 #pragma once
 
 #include <string>

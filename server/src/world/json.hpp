@@ -1,3 +1,5 @@
+// A JSON parser we wrote ourselves instead of pulling in a library - just
+// enough to load the world file, nothing that aims to be spec-complete.
 #pragma once
 
 #include <map>

@@ -1,3 +1,6 @@
+// One Session per connected client. The write_mutex is doing more work than
+// it looks like: it's what stops a broadcast from writing to a socket that
+// another thread is closing at the exact same moment.
 #pragma once
 
 #include <atomic>

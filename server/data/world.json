@@ -10,22 +10,67 @@
     "loc.tavern": {
       "name": "The Prancing Pony",
       "description": "A cozy tavern filled with warmth and laughter.",
-      "exits": { "south": "loc.start" },
+      "exits": { "south": "loc.start", "north": "loc.crossroads" },
       "items": ["item.ale"],
       "npcs": []
     },
     "loc.shop": {
       "name": "General Store",
       "description": "Shelves lined with various goods and supplies.",
-      "exits": { "west": "loc.start" },
+      "exits": { "west": "loc.start", "north": "loc.chapel" },
       "items": [],
       "npcs": ["npc.merchant"]
+    },
+    "loc.crossroads": {
+      "name": "Crossroads",
+      "description": "A weathered signpost marks the meeting of several dirt roads.",
+      "exits": { "south": "loc.tavern", "east": "loc.forest", "north": "loc.well" },
+      "items": [],
+      "npcs": []
+    },
+    "loc.forest": {
+      "name": "Forest Path",
+      "description": "A narrow trail winds through tall, whispering trees.",
+      "exits": { "west": "loc.crossroads", "south": "loc.bridge" },
+      "items": [],
+      "npcs": ["npc.bandit"]
+    },
+    "loc.bridge": {
+      "name": "Old Stone Bridge",
+      "description": "A crumbling stone bridge arches over a rushing river.",
+      "exits": { "north": "loc.forest", "south": "loc.mill" },
+      "items": [],
+      "npcs": []
+    },
+    "loc.mill": {
+      "name": "Abandoned Mill",
+      "description": "Dust and cobwebs cling to the idle machinery of a long-abandoned mill.",
+      "exits": { "north": "loc.bridge", "west": "loc.chapel" },
+      "items": ["item.rusty_key"],
+      "npcs": []
+    },
+    "loc.chapel": {
+      "name": "Village Chapel",
+      "description": "Sunlight filters through stained glass onto rows of empty pews.",
+      "exits": { "east": "loc.mill", "south": "loc.shop" },
+      "items": [],
+      "npcs": ["npc.priest"]
+    },
+    "loc.well": {
+      "name": "Old Well",
+      "description": "A moss-covered well sits forgotten at the edge of the village.",
+      "exits": { "south": "loc.crossroads" },
+      "items": ["item.old_lantern"],
+      "npcs": []
     }
   },
 
   "items": {
     "item.ale": { "name": "Frothy Ale", "description": "A refreshing drink that restores energy." },
-    "item.reward_coin": { "name": "Gold Coin", "description": "A shiny reward coin." }
+    "item.rusty_key": { "name": "Rusty Key", "description": "An old iron key, caked with rust." },
+    "item.old_lantern": { "name": "Old Lantern", "description": "A dented lantern that still holds a little oil." },
+    "item.reward_coin": { "name": "Gold Coin", "description": "A shiny reward coin." },
+    "item.bandit_loot": { "name": "Bandit's Pouch", "description": "A small pouch of coins taken off a defeated bandit." }
   },
 
   "npcs": {
@@ -40,6 +85,23 @@
       "description": "A friendly merchant eager to trade.",
       "dialogue": ["Welcome to my shop!", "What can I get for you today?"],
       "hp": 15
+    },
+    "npc.priest": {
+      "name": "Village Priest",
+      "description": "An elderly priest tending quietly to the chapel.",
+      "dialogue": [
+        "Blessings upon you, traveler.",
+        "The tavern keeper always appreciates a fresh ale delivery.",
+        "Bandits have been troubling travelers on the forest path - someone should deal with them.",
+        "I heard the old well hides something forgotten. Bring back what you find, if you're curious."
+      ],
+      "hp": 10
+    },
+    "npc.bandit": {
+      "name": "Forest Bandit",
+      "description": "A rough-looking bandit blocking the forest path.",
+      "dialogue": ["Hand over your valuables!", "This path belongs to us now."],
+      "hp": 25
     }
   },
 
@@ -56,6 +118,20 @@
       "description": "The guard is causing trouble - defeat him.",
       "type": "defeat",
       "target_id": "npc.guard",
+      "reward_item_id": ""
+    },
+    "quest.defeat_bandit": {
+      "name": "Defeat the Bandit",
+      "description": "A bandit is blocking the forest path - deal with him.",
+      "type": "defeat",
+      "target_id": "npc.bandit",
+      "reward_item_id": "item.bandit_loot"
+    },
+    "quest.find_key": {
+      "name": "Find the Rusty Key",
+      "description": "Search the abandoned mill for the old rusty key.",
+      "type": "fetch",
+      "target_id": "item.rusty_key",
       "reward_item_id": ""
     }
   }

@@ -1,3 +1,5 @@
+// A lookup table of who's currently connected, keyed by player name. Every
+// time we need to push an event at someone, this is how we find their socket.
 #pragma once
 
 #include <memory>

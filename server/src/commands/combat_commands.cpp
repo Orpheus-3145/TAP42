@@ -1,3 +1,5 @@
+// Damage rolls, respawn, the lot - see the design-choice note further down
+// for why this is atomic-per-command instead of turn-based.
 #include "commands/combat_commands.hpp"
 
 #include <algorithm>

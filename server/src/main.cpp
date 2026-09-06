@@ -1,3 +1,4 @@
+// Load the world, start listening. That's the whole entry point.
 #include <cstdlib>
 #include <iostream>
 

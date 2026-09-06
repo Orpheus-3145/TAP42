@@ -1,3 +1,5 @@
+// Deliberately dumb abuse detection: flag command flooding and rapid
+// reconnects with a log line, don't try to be clever about blocking anyone.
 #pragma once
 
 #include <chrono>

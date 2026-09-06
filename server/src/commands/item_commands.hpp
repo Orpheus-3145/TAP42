@@ -1,3 +1,5 @@
+// TAKE, DROP, INVENTORY - moving item instances between a room and a
+// player's inventory. No duplication, ever.
 #pragma once
 
 #include <memory>

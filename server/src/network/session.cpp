@@ -1,3 +1,6 @@
+// Just the one function, but it's the most important one in the project -
+// see the comment inside for why the lock and the connected check can't be
+// reordered.
 #include "network/session.hpp"
 
 void send_line(Session& session, const std::string& message) {

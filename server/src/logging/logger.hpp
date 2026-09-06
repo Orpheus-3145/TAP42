@@ -1,3 +1,5 @@
+// Structured logging to stdout - every line is one JSON object, so it's
+// grep-able and easy to feed into whatever log pipeline you point at it.
 #pragma once
 
 #include <string>

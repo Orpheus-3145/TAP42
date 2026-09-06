@@ -1,3 +1,5 @@
+// This is where the whole concurrency model actually lives: accept a
+// client, hand it a thread, let it block on recv() until it disconnects.
 #include "network/server.hpp"
 
 #include <memory>

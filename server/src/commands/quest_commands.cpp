@@ -1,3 +1,5 @@
+// No ACCEPT command - every quest is just "in_progress" from the moment
+// you connect. Simpler, and the RFC never asked for an accept step anyway.
 #include "commands/quest_commands.hpp"
 
 #include <sstream>

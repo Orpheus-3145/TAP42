@@ -1,3 +1,5 @@
+// Thin wrapper around raw sockets so the rest of the codebase doesn't have
+// to sprinkle #ifdefs everywhere for Windows vs POSIX.
 #pragma once
 
 #ifdef _WIN32

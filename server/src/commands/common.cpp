@@ -1,3 +1,5 @@
+// broadcast_to_room/broadcast_to_group always release the world lock before
+// touching a socket - never hold a mutex while doing network I/O.
 #include "commands/common.hpp"
 
 #include <algorithm>

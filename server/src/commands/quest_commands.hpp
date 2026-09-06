@@ -1,3 +1,5 @@
+// QUEST/QUESTS plus the two triggers other commands call into when a fetch
+// or defeat quest gets satisfied.
 #pragma once
 
 #include <memory>

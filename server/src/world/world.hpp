@@ -1,3 +1,5 @@
+// The whole game state lives here - rooms, items, NPCs, players, quests,
+// groups - all sitting behind one mutex. Nothing fancy, just correct.
 #pragma once
 
 #include <cstddef>

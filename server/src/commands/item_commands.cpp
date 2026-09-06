@@ -1,3 +1,5 @@
+// Straightforward: resolve the reference, move the id between the two
+// vectors, tell the quest system if a fetch quest just got satisfied.
 #include "commands/item_commands.hpp"
 
 #include <algorithm>

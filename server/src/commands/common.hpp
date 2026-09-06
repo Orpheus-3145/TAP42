@@ -1,3 +1,5 @@
+// Grab-bag of helpers every command handler ends up needing: tokenizing
+// input, broadcasting to a room or group, resolving an item/NPC by name.
 #pragma once
 
 #include <string>

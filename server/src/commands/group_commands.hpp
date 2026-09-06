@@ -1,3 +1,5 @@
+// GROUP INVITE/ACCEPT/LEAVE - kept deliberately simple, one pending invite
+// per player, one group per player.
 #pragma once
 
 #include <memory>

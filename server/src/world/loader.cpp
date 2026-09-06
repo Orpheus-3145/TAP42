@@ -1,3 +1,5 @@
+// A broken world file should fail loudly at startup, not cause weird bugs
+// three commands into a play session - hence all the validation below.
 #include "world/loader.hpp"
 
 #include <fstream>

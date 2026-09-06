@@ -1,3 +1,5 @@
+// Escaping matters more than it looks like: a chat message with a stray
+// quote in it would otherwise break every log line after it.
 #include "logging/logger.hpp"
 
 #include <chrono>

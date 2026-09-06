@@ -1,3 +1,5 @@
+// Reads world.json and checks it against itself - every exit, item and NPC
+// reference has to actually point at something real before we start the server.
 #pragma once
 
 #include <string>

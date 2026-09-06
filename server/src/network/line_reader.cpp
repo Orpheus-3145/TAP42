@@ -1,3 +1,5 @@
+// The MAX_LINE_LENGTH cap below exists because a client that never sends a
+// newline would otherwise grow recv_buffer forever - easiest DoS in the book.
 #include "network/line_reader.hpp"
 
 #include "logging/logger.hpp"

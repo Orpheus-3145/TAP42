@@ -1,3 +1,4 @@
+// The accept loop lives here - one thread per client, nothing async about it.
 #pragma once
 
 #include <cstdint>
