@@ -1,3 +1,73 @@
+# Project-specific build artifacts
 *.o
 *.exe
 tap-server
+
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Linker files
+*.ilk
+
+# Debugger Files
+*.pdb
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+*.so.*
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.out
+*.app
+
+# Build directories
+build/
+Build/
+build-*/
+
+# CMake generated files (not used by this project, kept for safety)
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+# Runtime logs (the CLI client writes real log files under logs/)
+*.log
+logs/
+
+# vcpkg
+vcpkg_installed/
+
+# debug information files
+*.dwo
+
+# test output & cache
+Testing/
+.cache/
