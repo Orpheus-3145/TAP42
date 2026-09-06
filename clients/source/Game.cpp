@@ -30,7 +30,8 @@ void Game::run(std::string const& host, uint32_t port)
 
 	this->clientHTTP->connect(host, port);
 	this->clientHTTP->startWorker(gameClientSockets.first);
-
+	(void) host;
+	(void) port;
 	this->interface->setup();
 	this->interface->show();
 

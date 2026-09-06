@@ -3,6 +3,7 @@
 #include <ncurses.h>
 #include <queue>
 #include <vector>
+#include <array>
 
 #include "Config.hpp"
 #include "Utils.hpp"
@@ -231,6 +232,42 @@
 constexpr inline int32_t WIDTH_WIN = 100;
 constexpr inline int32_t HEIGHT_WIN = 30;
 
+class Tab
+{
+	public:
+		Tab(void) : Tab::Tab(LINES, COLS, 0, 0) {}
+		Tab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar = 0, int32_t sendCommandFd = -1);
+
+		Tab(Tab const& other) noexcept = delete;
+		Tab& operator=(Tab const& other) noexcept = delete;
+		Tab(Tab&&) noexcept;
+		Tab& operator=(Tab&&) noexcept;
+
+		~Tab(void);
+
+		void appendContent(const char* content) noexcept;
+		void deleteCharForward(void) noexcept;
+		void deleteCharBack(void) noexcept;
+
+		void moveCursorLeft(void) const noexcept;
+		void moveCursorRight(void) const noexcept;
+
+		int32_t getCharInput(void) const noexcept;
+		void storeCharInput(void);
+		void storeCharInput(char input);
+
+		void forwardCommand(void) noexcept;
+		void refresh(void) const noexcept;
+
+	private:
+		WINDOW* border{nullptr};
+		WINDOW* main{nullptr};
+		int32_t sendCommandFd{-1};
+
+		size_t	commandLength{0UL};
+		char	commandBuffer[Config::BUFF_SIZE];
+};
+
 class CommandLineUI
 {
 	public:
@@ -247,22 +284,28 @@ class CommandLineUI
 		void setup(void);
 		void show(void) noexcept { this->refresh(); }
 		void clear(void) noexcept;
-		void refresh(void) const noexcept { ::doupdate(); }
+		void refresh(void) noexcept { this->getCurrentTab().refresh(); ::doupdate(); }
 
 		void handleUserInput(void);
 		void handleResponse(std::string const& response);
 		void handleEvent(std::string const& event);
 
-	protected:
+		void switchForwardTab(void) noexcept;
+		void switchBackwardTab(void) noexcept;
 
-		std::vector<WINDOW*> tabs;
-		size_t currLineInput{1UL};
-		size_t currLineOutput{1UL};
+		Tab& getCurrentTab(void) noexcept { return this->tabs[this->currentTabIndex]; }
+		void setCurrentTab(size_t currentITabIndex) noexcept;
+
+	private:
+		static constexpr size_t N_TABS = 3;
+		static constexpr size_t FRAME_TAB = 0;
+		static constexpr size_t INPUT_TAB = 1;
+		static constexpr size_t OUTPUT_TAB = 2;
+
+		std::vector<Tab> tabs;
+		size_t currentTabIndex{0UL};
 
 		ioUtils::Pipe commandPipe;
-
-		size_t	commandLength{0L};
-		char	commandBuffer[Config::BUFF_SIZE];
 };
 
 class GraphicUI
