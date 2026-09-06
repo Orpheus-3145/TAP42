@@ -37,7 +37,7 @@ struct Quest {
     std::string id;
     std::string name;
     std::string description;
-    QuestType type;
+    QuestType type = QuestType::Fetch;
     std::string target_id;      // item id (Fetch) or npc id (Defeat)
     std::string reward_item_id; // empty = no reward
 };

@@ -1,0 +1,20 @@
+# Deliberate style-suggestion suppressions — each entry is a specific
+# line, not a blanket rule, so a NEW instance of the same pattern elsewhere
+# in the codebase still gets flagged.
+
+# counter_damage is declared here alongside the other combat result
+# variables and read again after the if/else that sets it — narrowing its
+# scope would mean duplicating the declaration, not simplifying anything.
+variableScope:src/commands/combat_commands.cpp:48
+
+# `direction`/`inviter` are used across the whole function body below the
+# declaration; cppcheck's suggested narrower scope doesn't actually apply.
+variableScope:src/commands/dispatcher.cpp:83
+variableScope:src/commands/group_commands.cpp:52
+
+# Early-return loops over 2-3 candidates are clearer here than
+# std::find_if + lambda for a one-off id/name lookup.
+useStlAlgorithm:src/commands/common.cpp:71
+useStlAlgorithm:src/commands/common.cpp:122
+useStlAlgorithm:src/commands/common.cpp:135
+useStlAlgorithm:src/world/loader.cpp:137

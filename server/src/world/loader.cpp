@@ -133,7 +133,7 @@ bool load_world(const std::string& path) {
                 return false;
             }
         }
-        for (auto& npc_id : room.npc_ids) {
+        for (const auto& npc_id : room.npc_ids) {
             if (!world.npcs.count(npc_id)) {
                 log_error("world_validation_failed",
                           {{"room", room_id}, {"error", "unknown npc '" + npc_id + "'"}});

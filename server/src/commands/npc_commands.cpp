@@ -23,8 +23,8 @@ void cmd_talk(const std::shared_ptr<Session>& session, const std::vector<std::st
     std::string response;
     {
         std::lock_guard<std::mutex> lock(world.mutex);
-        auto& player = world.players.at(session->player_id);
-        auto& room = world.rooms.at(player.current_room);
+        const auto& player = world.players.at(session->player_id);
+        const auto& room = world.rooms.at(player.current_room);
         std::string npc_id = resolve_npc_ref_locked(room.npc_ids, ref);
         if (npc_id.empty()) {
             response = "ERR ERR_NPC_NOT_FOUND " + ref;

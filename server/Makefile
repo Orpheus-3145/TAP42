@@ -28,7 +28,7 @@ run: all
 	./$(TARGET)
 
 lint:
-	@which cppcheck > /dev/null 2>&1 && cppcheck --enable=warning,style --std=c++17 --quiet src || echo "cppcheck non trovato, salto il lint"
+	@which cppcheck > /dev/null 2>&1 && cppcheck --enable=warning,style --std=c++17 --quiet --error-exitcode=1 --suppressions-list=.cppcheck-suppressions -Isrc src || echo "cppcheck non trovato, salto il lint"
 
 clean:
 	rm -f $(OBJ) $(TARGET)

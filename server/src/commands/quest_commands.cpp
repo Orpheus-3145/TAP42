@@ -43,7 +43,7 @@ void on_item_taken(const std::string& player_id, const std::string& item_id) {
             completed.push_back(qid);
         }
     }
-    for (auto& qid : completed) complete_quest_and_notify(player_id, qid, "take", item_id);
+    for (const auto& qid : completed) complete_quest_and_notify(player_id, qid, "take", item_id);
 }
 
 void on_npc_defeated(const std::string& player_id, const std::string& npc_id) {
@@ -62,7 +62,7 @@ void on_npc_defeated(const std::string& player_id, const std::string& npc_id) {
             completed.push_back(qid);
         }
     }
-    for (auto& qid : completed) complete_quest_and_notify(player_id, qid, "defeat", npc_id);
+    for (const auto& qid : completed) complete_quest_and_notify(player_id, qid, "defeat", npc_id);
 }
 
 void cmd_quests(const std::shared_ptr<Session>& session) {

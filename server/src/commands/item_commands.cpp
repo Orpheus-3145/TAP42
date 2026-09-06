@@ -86,7 +86,7 @@ void cmd_inventory(const std::shared_ptr<Session>& session) {
     std::ostringstream oss;
     {
         std::lock_guard<std::mutex> lock(world.mutex);
-        auto& player = world.players.at(session->player_id);
+        const auto& player = world.players.at(session->player_id);
         oss << "OK [";
         for (size_t i = 0; i < player.inventory.size(); ++i) {
             if (i > 0) oss << ",";

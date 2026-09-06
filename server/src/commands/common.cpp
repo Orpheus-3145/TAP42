@@ -52,7 +52,7 @@ void broadcast_to_room(const std::string& room_id, const std::string& except_pla
             if (player.current_room == room_id && pid != except_player) targets.push_back(pid);
         }
     }
-    for (auto& pid : targets) {
+    for (const auto& pid : targets) {
         auto session = SessionRegistry::instance().get(pid);
         if (session) send_line(*session, message);
     }
@@ -67,12 +67,12 @@ void broadcast_to_group(const std::string& group_id, const std::string& except_p
         std::lock_guard<std::mutex> lock(world.mutex);
         auto it = world.groups.find(group_id);
         if (it != world.groups.end()) {
-            for (auto& pid : it->second) {
+            for (const auto& pid : it->second) {
                 if (pid != except_player) targets.push_back(pid);
             }
         }
     }
-    for (auto& pid : targets) {
+    for (const auto& pid : targets) {
         auto session = SessionRegistry::instance().get(pid);
         if (session) send_line(*session, message);
     }
@@ -101,14 +101,14 @@ std::string serialize_room_locked(const Room& room) {
     }
     oss << "],\"items\":[";
     first = true;
-    for (auto& item_id : room.item_instance_ids) {
+    for (const auto& item_id : room.item_instance_ids) {
         if (!first) oss << ",";
         oss << "\"" << item_id << "\"";
         first = false;
     }
     oss << "],\"npcs\":[";
     first = true;
-    for (auto& npc_id : room.npc_ids) {
+    for (const auto& npc_id : room.npc_ids) {
         if (!first) oss << ",";
         oss << "\"" << npc_id << "\"";
         first = false;
@@ -118,7 +118,7 @@ std::string serialize_room_locked(const Room& room) {
 }
 
 std::string resolve_item_ref_locked(const std::vector<std::string>& candidate_ids, const std::string& ref) {
-    for (auto& id : candidate_ids) {
+    for (const auto& id : candidate_ids) {
         if (id == ref) return id;
     }
     auto& world = World::instance();
@@ -131,7 +131,7 @@ std::string resolve_item_ref_locked(const std::vector<std::string>& candidate_id
 }
 
 std::string resolve_npc_ref_locked(const std::vector<std::string>& candidate_ids, const std::string& ref) {
-    for (auto& id : candidate_ids) {
+    for (const auto& id : candidate_ids) {
         if (id == ref) return id;
     }
     auto& world = World::instance();
