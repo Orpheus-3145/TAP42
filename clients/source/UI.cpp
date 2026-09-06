@@ -3,15 +3,248 @@
 #include "ClientHTTP.hpp"
 
 #include <string>
-#include <cstring>
 #include <cassert>
 
 
-Tab::Tab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar, int32_t sendCommandFd) :
+InputTab::InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t sendCommandFd, int32_t borderChar) :
 	sendCommandFd{sendCommandFd}
 {
-	this->history.emplace_back(0UL, std::array<char, Config::BUFF_SIZE>{});
+	this->border = ::newwin(h, w, y, x);
+	if (this->border == nullptr)
+	{
+		LOG_ERROR(LogContext::UI, "Failed to create window");
+		throw CLIException("Failed to create window");
+	}
+	::box(this->border, borderChar, borderChar);
+	this->main = ::newwin(h - 2, w - 2, y + 1, x + 1);
+	if (this->main == nullptr)
+	{
+		LOG_ERROR(LogContext::UI, "Failed to create window");
+		throw CLIException("Failed to create window");
+	}
+	::waddstr(this->main, Config::PROMPT);
+	::wmove(this->main, 0, startX);
 
+	if (this->sendCommandFd != -1)		// means that this tab is supposed to receive input (and forward it)
+		::keypad(this->main, TRUE);
+
+	::wnoutrefresh(this->border);
+	::wnoutrefresh(this->main);
+
+	this->history.emplace_back(0UL, std::array<char, Config::BUFF_SIZE>{});
+}
+
+InputTab::InputTab(InputTab&& other) noexcept :
+	border{other.border},
+	main{other.main},
+	sendCommandFd{other.sendCommandFd},
+	history{other.history},
+	currentCommandIndex{other.currentCommandIndex}
+{
+	other.border = nullptr;
+	other.main = nullptr;
+
+	::wnoutrefresh(this->border);
+	::wnoutrefresh(this->main);
+}
+
+InputTab& InputTab::operator=(InputTab&& other) noexcept
+{
+	if (this != &other)
+	{
+		if (this->main) ::delwin(this->main);
+		if (this->border) ::delwin(this->border);
+
+		this->border = other.border;
+		this->main = other.main;
+		this->sendCommandFd = other.sendCommandFd;
+		this->history = other.history;
+		this->currentCommandIndex = other.currentCommandIndex;
+
+		other.border = nullptr;
+		other.main = nullptr;
+
+		::wnoutrefresh(this->border);
+		::wnoutrefresh(this->main);
+	}
+	return *this;
+}
+
+InputTab::~InputTab(void)
+{
+	if (this->main) ::delwin(this->main);
+	if (this->border) ::delwin(this->border);
+}
+
+void InputTab::deleteCharForward(void) noexcept
+{
+	int32_t y, x;
+	(void)y;
+	getyx(this->main, y, x);
+
+	size_t& bufferSize = this->history.at(this->currentCommandIndex).first;
+	char* commandBuffer = this->history.at(this->currentCommandIndex).second.data();
+
+	if (x == this->startX + static_cast<int32_t>(bufferSize))
+		return;
+
+	mvwdelch(this->main, y, x);
+	::wmove(this->main, y, x);
+
+	x -= this->startX;
+
+	::memmove(commandBuffer + x, commandBuffer + x + 1, static_cast<int32_t>(bufferSize) - x);
+	bufferSize--;
+
+	this->refresh();
+}
+
+void InputTab::deleteCharBack(void) noexcept
+{
+	int32_t y, x;
+	getyx(this->main, y, x);
+
+	if (x == this->startX)
+		return;
+
+	size_t& bufferSize = this->history.at(this->currentCommandIndex).first;
+	char* commandBuffer = this->history.at(this->currentCommandIndex).second.data();
+
+	mvwdelch(this->main, y, x - 1);
+	::wmove(this->main, y, x - 1);
+
+	x -= this->startX;
+
+	::memmove(commandBuffer + x - 1, commandBuffer + x, static_cast<int32_t>(bufferSize) - x);
+	bufferSize--;
+
+	this->refresh();
+}
+
+void InputTab::moveCursorLeft(void) const noexcept
+{
+	int32_t y, x;
+	(void)y;
+
+	getyx(this->main, y, x);
+
+	if (x > this->startX)
+		::wmove(this->main, y, x - 1);
+}
+
+void InputTab::moveCursorRight(void) const noexcept
+{
+	int32_t y, x;
+	(void)y;
+	
+	getyx(this->main, y, x);
+
+	int32_t bufferSize = static_cast<int32_t>(this->history.at(this->currentCommandIndex).first);
+	if (x < this->startX + bufferSize - 1)
+		::wmove(this->main, y, x + 1);
+}
+
+int32_t InputTab::getCharInput(void) const noexcept
+{
+	return ::wgetch(this->main);
+}
+
+void InputTab::storeCharInput(void)
+{
+	this->storeCharInput(this->getCharInput());
+}
+
+void InputTab::storeCharInput(char input)
+{
+	size_t& bufferSize = this->history.at(this->currentCommandIndex).first;
+	char* commandBuffer = this->history.at(this->currentCommandIndex).second.data();
+
+	int32_t y, x;
+	(void)y;
+	getyx(this->main, y, x);
+
+	x -= this->startX;
+
+	if (x < static_cast<int32_t>(bufferSize))
+		::memmove(commandBuffer + x + 1, commandBuffer + x, static_cast<int32_t>(bufferSize) - x);
+	commandBuffer[x] = input;
+	bufferSize++;
+
+	if (bufferSize == Config::BUFF_SIZE)
+		throw BufferOverflowException("Command buffer overflow");
+
+	mvwaddstr(this->main, y, 0, Config::PROMPT);
+	waddnstr(this->main, commandBuffer, bufferSize);
+	this->refresh();
+}
+
+void InputTab::showPreviousCommand(void) noexcept
+{
+	if (this->currentCommandIndex == 0UL)
+		return;
+	this->currentCommandIndex--;
+
+	size_t& bufferSize = this->history.at(this->currentCommandIndex).first;
+	char* commandBuffer = this->history.at(this->currentCommandIndex).second.data();
+
+	int32_t y, x;
+	(void)x;
+	getyx(this->main, y, x);
+
+	::wmove(this->main, y, 0);
+	::wclrtoeol(this->main);
+	mvwaddstr(this->main, y, 0, Config::PROMPT);
+	waddnstr(this->main, commandBuffer, bufferSize);
+	this->refresh();
+}
+
+void InputTab::showFollowingCommand(void) noexcept
+{
+	if (this->currentCommandIndex == this->history.size() - 1UL)
+		return;
+	this->currentCommandIndex++;
+
+	size_t& bufferSize = this->history.at(this->currentCommandIndex).first;
+	char* commandBuffer = this->history.at(this->currentCommandIndex).second.data();
+
+	int32_t y, x;
+	(void)x;
+	getyx(this->main, y, x);
+
+	::wmove(this->main, y, 0);
+	::wclrtoeol(this->main);
+	mvwaddstr(this->main, y, 0, Config::PROMPT);
+	waddnstr(this->main, commandBuffer, bufferSize);
+	this->refresh();
+
+}
+
+void InputTab::forwardCommand(void) noexcept
+{
+	if (this->sendCommandFd == -1)
+		return;
+
+	size_t& bufferSize = this->history.at(this->currentCommandIndex).first;
+	char* commandBuffer = this->history.at(this->currentCommandIndex).second.data();
+
+	if (bufferSize > 0UL)
+	{
+		LOG_INFO(LogContext::UI, "Got new command: " + std::string(commandBuffer, bufferSize));
+		ioUtils::write(this->sendCommandFd, commandBuffer, bufferSize);
+
+		this->history.emplace_back(0UL, std::array<char, Config::BUFF_SIZE>{});
+		this->currentCommandIndex++;
+	}
+
+	int32_t y, x;
+	getyx(this->main, y, x);
+
+	mvwaddstr(this->main, y + 1, 0, Config::PROMPT);
+}
+
+
+OutputTab::OutputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar)
+{
 	this->border = ::newwin(h, w, y, x);
 	if (this->border == nullptr)
 	{
@@ -26,19 +259,15 @@ Tab::Tab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar, int32_t
 		throw CLIException("Failed to create window");
 	}
 
-	if (this->sendCommandFd != -1)		// means that this tab is supposed to receive input (and forward it)
-		::keypad(this->main, TRUE);
-
 	::wnoutrefresh(this->border);
 	::wnoutrefresh(this->main);
 }
 
-Tab::Tab(Tab&& other) noexcept :
-	history{other.history},
-	curentCommandIndex{other.curentCommandIndex},
+OutputTab::OutputTab(OutputTab&& other) noexcept :
 	border{other.border},
 	main{other.main},
-	sendCommandFd{other.sendCommandFd}
+	content{std::move(other.content)},
+	startShowContentIndex{startShowContentIndex}
 {
 	other.border = nullptr;
 	other.main = nullptr;
@@ -47,18 +276,17 @@ Tab::Tab(Tab&& other) noexcept :
 	::wnoutrefresh(this->main);
 }
 
-Tab& Tab::operator=(Tab&& other) noexcept
+OutputTab& OutputTab::operator=(OutputTab&& other) noexcept
 {
 	if (this != &other)
 	{
 		if (this->main) ::delwin(this->main);
 		if (this->border) ::delwin(this->border);
 
-		this->history = other.history;
-		this->curentCommandIndex = other.curentCommandIndex;
 		this->border = other.border;
 		this->main = other.main;
-		this->sendCommandFd = other.sendCommandFd;
+		this->content = std::move(other.content);
+		this->startShowContentIndex = startShowContentIndex;
 
 		other.border = nullptr;
 		other.main = nullptr;
@@ -69,181 +297,40 @@ Tab& Tab::operator=(Tab&& other) noexcept
 	return *this;
 }
 
-Tab::~Tab(void)
+OutputTab::~OutputTab(void)
 {
 	if (this->main) ::delwin(this->main);
 	if (this->border) ::delwin(this->border);
 }
 
-void Tab::appendContent(const char* content) noexcept
+void OutputTab::appendContent(std::string const& newContent) noexcept
 {
-	int32_t y, x;
-	getyx(this->main, y, x);
+	this->content.push_back(newContent);
 
-	mvwaddstr(this->main, y, 0, content);
-	::wmove(this->main, y + 1, 0);
-	this->refresh();
-}
-
-void Tab::deleteCharForward(void) noexcept
-{
-	int32_t y, x;
-	(void)y;
-	getyx(this->main, y, x);
-
-	size_t& bufferSize = this->history.at(this->curentCommandIndex).first;
-	char* commandBuffer = this->history.at(this->curentCommandIndex).second.data();
-
-	if (x == static_cast<int32_t>(bufferSize))
-		return;
-
-	mvwdelch(this->main, y, x);
-	::wmove(this->main, y, x);
-
-	::memmove(commandBuffer + x, commandBuffer + x + 1, static_cast<int32_t>(bufferSize) - x);
-	bufferSize--;
-
-	this->refresh();
-}
-
-void Tab::deleteCharBack(void) noexcept
-{
-	int32_t y, x;
-	getyx(this->main, y, x);
-
-	if (x == 0)
-		return;
-
-	size_t& bufferSize = this->history.at(this->curentCommandIndex).first;
-	char* commandBuffer = this->history.at(this->curentCommandIndex).second.data();
-
-	mvwdelch(this->main, y, x - 1);
-	::wmove(this->main, y, x - 1);
-
-	::memmove(commandBuffer + x - 1, commandBuffer + x, static_cast<int32_t>(bufferSize) - x);
-	bufferSize--;
-
-	this->refresh();
-}
-
-void Tab::moveCursorLeft(void) const noexcept
-{
-	int32_t y, x;
-	(void)y;
-
-	getyx(this->main, y, x);
-	if (x > 0)
-		::wmove(this->main, y, x - 1);
-}
-
-void Tab::moveCursorRight(void) const noexcept
-{
-	int32_t y, x;
-	(void)y;
-	
-	getyx(this->main, y, x);
-
-	size_t const& bufferSize = this->history.at(this->curentCommandIndex).first;
-	if (x < static_cast<int32_t>(bufferSize) - 1)
-		::wmove(this->main, y, x + 1);
-}
-
-int32_t Tab::getCharInput(void) const noexcept
-{
-	return ::wgetch(this->main);
-}
-
-void Tab::storeCharInput(void)
-{
-	this->storeCharInput(this->getCharInput());
-}
-
-void Tab::storeCharInput(char input)
-{
-	size_t& bufferSize = this->history.at(this->curentCommandIndex).first;
-	char* commandBuffer = this->history.at(this->curentCommandIndex).second.data();
-
-	int32_t y, x;
-	(void)y;
-	getyx(this->main, y, x);
-
-	if (x < static_cast<int32_t>(bufferSize))
-		::memmove(commandBuffer + x + 1, commandBuffer + x, static_cast<int32_t>(bufferSize) - x);
-	commandBuffer[x] = input;
-	bufferSize++;
-
-	if (bufferSize == Config::BUFF_SIZE)
-		throw BufferOverflowException("Command buffer overflow");
-
-	mvwaddnstr(this->main, y, 0, commandBuffer, bufferSize);
-	::wmove(this->main, y, x + 1);
-	this->refresh();
-}
-
-void Tab::showPreviousCommand(void) noexcept
-{
-	if (this->curentCommandIndex == 0UL)
-		return;
-	this->curentCommandIndex--;
-
-	size_t& bufferSize = this->history.at(this->curentCommandIndex).first;
-	char* commandBuffer = this->history.at(this->curentCommandIndex).second.data();
-
-	int32_t y, x;
+	int32_t h, w, y, x;
 	(void)x;
-	getyx(this->main, y, x);
+	(void)w;
+	getmaxyx(this->main, h, w);
 
-	::wmove(this->main, y, 0);
-	::wclrtoeol(this->main);
-	mvwaddnstr(this->main, y, 0, commandBuffer, bufferSize);
-	this->refresh();
-}
-
-void Tab::showFollowingCommand(void) noexcept
-{
-	if (this->curentCommandIndex == this->history.size() - 1UL)
-		return;
-	this->curentCommandIndex++;
-
-	size_t& bufferSize = this->history.at(this->curentCommandIndex).first;
-	char* commandBuffer = this->history.at(this->curentCommandIndex).second.data();
-
-	int32_t y, x;
-	(void)x;
-	getyx(this->main, y, x);
-
-	::wmove(this->main, y, 0);
-	::wclrtoeol(this->main);
-	mvwaddnstr(this->main, y, 0, commandBuffer, bufferSize);
-	this->refresh();
-
-}
-
-void Tab::forwardCommand(void) noexcept
-{
-	if (this->sendCommandFd == -1)
-		return;
-
-	size_t& bufferSize = this->history.at(this->curentCommandIndex).first;
-	char* commandBuffer = this->history.at(this->curentCommandIndex).second.data();
-
-	if (bufferSize > 0UL)
+	if (static_cast<int32_t>(this->content.size()) > h)
 	{
-		LOG_INFO(LogContext::UI, "Got new command: " + std::string(commandBuffer, bufferSize));
-		ioUtils::write(this->sendCommandFd, commandBuffer, bufferSize);
+		this->startShowContentIndex++;
 
-		this->history.emplace_back(0UL, std::array<char, Config::BUFF_SIZE>{});
-		this->curentCommandIndex++;
+		for (int32_t i = 0; i < h; i++)
+		{
+			::wmove(this->main, i, 0);
+			::wclrtoeol(this->main);
+			::waddstr(this->main, this->content.at(i + this->startShowContentIndex).data());
+		}
+	}
+	else
+	{
+		getyx(this->main, y, x);
+		mvwaddstr(this->main, y, 0, newContent.data());
+		::wmove(this->main, y + 1, 0);
 	}
 
-	int32_t y, x;
-	getyx(this->main, y, x);
-	::wmove(this->main, y + 1, 0);
-}
-
-void Tab::refresh(void) const noexcept
-{
-	::wnoutrefresh(this->main);
+	this->refresh();
 }
 
 
@@ -258,7 +345,7 @@ void CommandLineUI::setup(void)
 	this->currentTabIndex = 0UL;
 
 	// adjust window size
-	printf("\033[8;%d;%dt", HEIGHT_WIN, WIDTH_WIN);
+	printf("\033[8;%d;%dt", Config::HEIGHT_WIN, Config::WIDTH_WIN);
 	fflush(stdout);
 
 	::initscr();
@@ -267,14 +354,14 @@ void CommandLineUI::setup(void)
 
 	this->tabs.resize(CommandLineUI::N_TABS);
 	// main
-	this->tabs[CommandLineUI::FRAME_TAB] = Tab();
-	this->tabs[CommandLineUI::FRAME_TAB].appendContent("insert some shit, 'quit' to close");
+	this->tabs[CommandLineUI::FRAME_TAB] = InputTab();
+	// this->tabs[CommandLineUI::FRAME_TAB].appendContent("insert some shit, 'quit' to close");
 	// left inpput panel
-	this->tabs[CommandLineUI::INPUT_TAB] = Tab(LINES - 3, (COLS - 2) / 2, 2, 1, 0, this->commandPipe.in);
-	this->tabs[CommandLineUI::INPUT_TAB].appendContent("this is where the input is shown");
+	this->tabs[CommandLineUI::INPUT_TAB] = InputTab(LINES - 3, (COLS - 2) / 2, 2, 1, this->commandPipe.in);
+	// this->tabs[CommandLineUI::INPUT_TAB].appendContent("this is where the input is shown");
 	// right inpput panel
-	this->tabs[CommandLineUI::OUTPUT_TAB] = Tab(LINES - 3, (COLS - 2) / 2, 2, (COLS - 2) / 2 + 1, 0, this->commandPipe.in);
-	this->tabs[CommandLineUI::OUTPUT_TAB].appendContent("this is where the output is shown");
+	this->tabs[CommandLineUI::OUTPUT_TAB] = InputTab(LINES - 3, (COLS - 2) / 2, 2, (COLS - 2) / 2 + 1, this->commandPipe.in);
+	// this->tabs[CommandLineUI::OUTPUT_TAB].appendContent("this is where the output is shown");
 	this->setCurrentTab(CommandLineUI::INPUT_TAB);
 
 	LOG_DEBUG(LogContext::UI, "Setup for CommandLine interface done");
@@ -347,12 +434,14 @@ void CommandLineUI::handleUserInput(void)
 
 void CommandLineUI::handleResponse(std::string const& response)
 {
-	this->tabs[OUTPUT_TAB].appendContent(response.data());
+	(void) response;
+	// this->tabs[OUTPUT_TAB].appendContent(response.data());
 }
 
 void CommandLineUI::handleEvent(std::string const& event)
 {
-	this->tabs[OUTPUT_TAB].appendContent(event.data());
+	(void) event;
+	// this->tabs[OUTPUT_TAB].appendContent(event.data());
 }
 
 void CommandLineUI::switchForwardTab(void) noexcept

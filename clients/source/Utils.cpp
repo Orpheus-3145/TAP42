@@ -337,3 +337,16 @@ std::string escapeNewLine(const char* buffer, size_t size) noexcept
 	}
 	return escaped;
 }
+
+bool timerElapsed(int32_t intervalSeconds)
+{
+	static auto lastRun = std::chrono::steady_clock::now();
+
+	auto now = std::chrono::steady_clock::now();
+	if (now - lastRun >= std::chrono::seconds(intervalSeconds))
+	{
+		lastRun = now;
+		return true;
+	}
+	return false;
+}
