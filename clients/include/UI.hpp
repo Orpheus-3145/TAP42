@@ -233,6 +233,22 @@
 // 		UK pound sign            --> ACS_STERLING
 // ===========================================================================================================================================================================
 
+
+static std::vector<const char*> COMMANDS{
+	"aaaaaaa",
+	"aaabbb",
+	"aabbbb",
+	"abbbbb",
+	"move",
+	"test",
+	"inventory",
+	"attrack",
+	"find",
+	"talk",
+	"look"
+};
+
+
 class BasicTab
 {
 	public:
@@ -256,7 +272,7 @@ class BasicTab
 
 class InputTab : public BasicTab
 {
-	using HistoryCommands = std::vector<std::pair<size_t,std::array<char,Config::BUFF_SIZE>>>;
+	using HistoryCommands = std::deque<std::pair<size_t,std::array<char,Config::BUFF_SIZE>>>;
 
 	public:
 		using BasicTab::BasicTab;
@@ -277,6 +293,9 @@ class InputTab : public BasicTab
 		void storeCharInput(void);
 		void storeCharInput(char input);
 
+		void suggestNextCommand(void) noexcept;
+		void suggestPastCommand(void) noexcept;
+
 		void showPreviousCommand(void) noexcept;
 		void showFollowingCommand(void) noexcept;
 
@@ -284,11 +303,27 @@ class InputTab : public BasicTab
 		void appendContent(std::string const& newContent) noexcept override;
 
 	private:
+		void startHintMode(void) noexcept;
+		void stopHintMode(void) noexcept;
+
 		int32_t sendCommandFd{-1};
 
 		HistoryCommands	history;
-		size_t			currentCommandIndex{0UL};
-		const int32_t	startX = ::strlen(Config::PROMPT);
+		std::vector<const char*> hints;
+
+		ssize_t			currentCommandIndex{-1L};
+		ssize_t			currentSuggestedIndex{-1L};
+		const int32_t	startX{::strlen(Config::PROMPT)};
+
+		size_t	bufferSize{0UL};
+		char	commandBuffer[Config::BUFF_SIZE];
+		// char	commandBuffer[Config::BUFF_SIZE + 1];		// NB set last char to 0 use it as c-strings ?
+
+		size_t	tmpBufferSize{0UL};
+		char	tmpCommandBuffer[Config::BUFF_SIZE];
+
+		bool autocompleteMode{false};
+
 };
 
 class OutputTab : public BasicTab

@@ -6,17 +6,6 @@
 #include <cassert>
 
 
-inline std::vector<const char*> comands{
-	"attack",
-	"move",
-	"test",
-	"inventory",
-	"attrack",
-	"find",
-	"talk",
-	"look"
-};
-
 Game::Game(void) noexcept
 {
 	this->commandPipe = ioUtils::createPipe();
@@ -39,8 +28,8 @@ void Game::run(std::string const& host, uint32_t port)
 
 	ioUtils::SocketPair gameClientSockets = ioUtils::createSocketPair();
 
-	this->clientHTTP->connect(host, port);
-	this->clientHTTP->startWorker(gameClientSockets.first);
+	// this->clientHTTP->connect(host, port);
+	// this->clientHTTP->startWorker(gameClientSockets.first);
 	(void) host;
 	(void) port;
 	this->interface->setup();
