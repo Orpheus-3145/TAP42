@@ -113,7 +113,8 @@
 //
 //	getbegyx(local_win, y, x)				<-- get the window start coors, absolute: so relative to the screen
 //	getparyx(child, y, x)					<-- get the window start coors, relative to its parsent screen (getparyx(stdscr, y, x) sets x=y=-1)
-//	getmaxyxl(local_win, height, width)		<-- get the windows size
+//												valid only for windows created with subwin() derwin()
+//	getmaxyx(local_win, height, width)		<-- get the windows size
 //
 //	scr_dump("debug.dump")					<-- dumps screen info (so every window inside) to a file for debugging purpuses
 //	scr_restore("debug.dump")				<-- restore the whole screen
@@ -127,6 +128,7 @@
 // 		4, 19,   		<- maxRow and maxCol of dest to copy data to
 // 		true/false)	    <- true: copy only non-space chars, false: copy every char
 //
+//	werase(inw)								<-- cleans the content of the win (i..e fill win buffer with ' ')
 // ===========================================================================================================================================================================
 // Borders: to separate windows
 //	box(win, vertLineChar, horLineChar)						<-- draws a box around the window, putting vertLineChar
@@ -264,10 +266,15 @@ class BasicTab
 
 		virtual void appendContent(std::string const& newContent) noexcept;
 		virtual void refresh(void) const noexcept { ::wnoutrefresh(this->main); }
+		virtual void resize(int32_t newHeight, int32_t newWidth, int32_t newY = -1, int32_t newX = -1);
+
+		virtual void writeLine(std::string const& newContent) const noexcept;
 	
 	protected:
 		WINDOW* border{nullptr};
 		WINDOW* main{nullptr};
+
+		std::vector<std::string> _state;
 };
 
 class InputTab : public BasicTab
@@ -341,7 +348,7 @@ class OutputTab : public BasicTab
 		size_t					firstLineToPrintIndex{0UL};
 };
 
-class CommandLineUI
+class CommandLineUI		// NB make parent UI class that does I/O with Game
 {
 	public:
 		CommandLineUI(ioUtils::Pipe commandPipe) noexcept :
@@ -354,20 +361,21 @@ class CommandLineUI
 
 		~CommandLineUI(void);
 		
-		void setup(void);
+		void setup(int32_t height, int32_t width) noexcept;		// NB parent
 		void show(void) noexcept { this->refresh(); }
 		void clear(void) noexcept;
 		void refresh(void) noexcept { ::doupdate(); }
 
-		void handleUserInput(void);
-		void handleResponse(std::string const& response);
-		void handleEvent(std::string const& event);
+		void handleUserInput(void);		// NB parent
+		void handleResponse(std::string const& response);		// NB parent
+		void handleEvent(std::string const& event);		// NB parent
 
 		void switchForwardTab(void) noexcept;
 		void switchBackwardTab(void) noexcept;
 
-		BasicTab* getCurrentTab(void) noexcept { return this->tabs[this->currentTabIndex].get(); }
+		BasicTab* getCurrentTab(void) { return this->tabs.at(this->currentTabIndex).get(); }
 		void setCurrentTab(size_t currentITabIndex) noexcept;
+		void resize(void);		// NB parent
 
 	private:
 		static constexpr size_t N_TABS = 3;
@@ -378,7 +386,9 @@ class CommandLineUI
 		std::vector<std::unique_ptr<BasicTab>> tabs;
 		size_t currentTabIndex{0UL};
 
-		ioUtils::Pipe commandPipe;
+		ioUtils::Pipe commandPipe;	// NB add poll loop in CommandLineUI that reads/write these pipes
+		ioUtils::Pipe responsePipe;
+		ioUtils::Pipe eventPipe;
 };
 
 class GraphicUI

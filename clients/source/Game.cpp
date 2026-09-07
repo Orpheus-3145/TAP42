@@ -4,6 +4,11 @@
 
 #include <cstring>				// strerror, memchr, memeset, memmove
 #include <cassert>
+#include <functional>
+
+#include <csignal>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 
 Game::Game(void) noexcept
@@ -32,7 +37,7 @@ void Game::run(std::string const& host, uint32_t port)
 	// this->clientHTTP->startWorker(gameClientSockets.first);
 	(void) host;
 	(void) port;
-	this->interface->setup();
+	this->interface->setup(Config::HEIGHT_WIN, Config::WIDTH_WIN);
 	this->interface->show();
 
 	this->startWorker(gameClientSockets.second);
@@ -86,9 +91,29 @@ void Game::flushPipe(void) const noexcept
 	ioUtils::read(this->wakeupPipe.out, tmp, 64);
 }
 
+std::function<void(int)> signal_handler_fn;
+
+extern "C" void signal_handler_wrapper(int sig) {
+    if (signal_handler_fn) {
+        signal_handler_fn(sig);
+    }
+}
+
 void Game::pollLoop(int32_t clientSocket)
 {
 	assert(clientSocket != -1 and "invalid client socket");
+
+	// ioUtils::Pipe resizePipe = ioUtils::createPipe();
+	// signal_handler_fn = [resizePipe.in](int sig) {
+	// 	LOG_DEBUG(LogContext::INTERFACE, "(output) got resize callback");
+	// 	write(resizePipe.in, "x", 1);
+    //     // qui puoi usare catture, perché è uno std::function
+    // };
+
+    // std::signal(SIGWINCH, signal_handler_wrapper);
+
+    // signal(SIGWINCH, [](int fd) {
+	// });
 
 	while (this->keepAlive.load())
 	{
@@ -121,6 +146,19 @@ void Game::pollLoop(int32_t clientSocket)
 		if (fds[0].revents & POLLIN)
 			this->interface->handleUserInput();
 
+		// if (fds[1].revents & POLLIN)
+		// {
+		// 	char tmp;
+		// 	write(resizePipe.out, &tmp, 1);
+
+		// 	struct winsize ws;
+		// 	ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
+		// 	resizeterm(ws.ws_row, ws.ws_col);
+
+		// 	LOG_DEBUG(LogContext::INTERFACE, "(input) got resize callback");
+		// 	this->interface->resize();
+		// }
+
 		if (fds[1].revents & POLLIN)	// worker awaken from main thread, flush pipe	NB use it to gracelly close the client when user closes session?
 			this->flushPipe();
 		
@@ -139,6 +177,7 @@ void Game::pollLoop(int32_t clientSocket)
 
 		this->interface->refresh();
 	}
+	// ioUtils::closePipe(resizePipe);
 }
 
 void Game::forwardCommandToServer(int32_t clientSocket)
@@ -212,6 +251,7 @@ void Game::handleServerInput(void)
 		else
 		{
 			LOG_WARN(LogContext::INTERFACE, "Unknown command: '" + std::string(startMsg, lenMsg) + "'");
+			// tmp, should throw error or send error to client
 			this->interface->handleEvent("UNKNWON - " + std::string(startMsg, lenMsg));
 		}
 

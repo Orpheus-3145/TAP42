@@ -8,7 +8,6 @@
 
 BasicTab::BasicTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar)
 {
-	int32_t th = 0, tw = 0, ty = 0, tx = 0;
 	if (borderChar > -1)
 	{
 		this->border = ::newwin(h, w, y, x);
@@ -20,24 +19,33 @@ BasicTab::BasicTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderCha
 		::box(this->border, borderChar, borderChar);
 		::wnoutrefresh(this->border);
 
-		th = 2;
-		tw = 2;
-		ty = 1;
-		tx = 1;
+		this->main = ::newwin(h - 2, w - 2, y + 1, x + 1);
+		if (this->main == nullptr)
+		{
+			LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
+			throw CLIException("Failed to create window");
+		}
 	}
-
-	this->main = ::newwin(h - th, w - tw, y + ty, x + tx);
-	if (this->main == nullptr)
+	else
 	{
-		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
-		throw CLIException("Failed to create window");
+		this->main = ::newwin(h, w, y, x);
+		if (this->main == nullptr)
+		{
+			LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
+			throw CLIException("Failed to create window");
+		}
 	}
+	::keypad(stdscr, true);		// NB tmp!
+	::keypad(this->main, true);		// NB tmp!
+	::keypad(this->border, true);		// NB tmp!
+
 	::wnoutrefresh(this->main);
 }
 
 BasicTab::BasicTab(BasicTab&& other) noexcept :
 	border{other.border},
-	main{other.main}
+	main{other.main},
+	_state{std::move(other._state)}
 {
 	other.border = nullptr;
 	other.main = nullptr;
@@ -56,6 +64,7 @@ BasicTab& BasicTab::operator=(BasicTab&& other) noexcept
 
 		this->border = other.border;
 		this->main = other.main;
+		this->_state = std::move(other._state);
 
 		other.border = nullptr;
 		other.main = nullptr;
@@ -75,6 +84,61 @@ BasicTab::~BasicTab(void)
 
 void BasicTab::appendContent(std::string const& newContent) noexcept
 {
+	this->_state.push_back(newContent);
+	this->writeLine(newContent);
+}
+
+void BasicTab::resize(int32_t newHeight, int32_t newWidth, int32_t newY, int32_t newX)
+{
+	int32_t y, x, h, w;
+	if (this->border)
+	{
+		getmaxyx(this->border, h, w);
+		if ((h == newHeight) and (w == newWidth))
+			return;
+
+		::werase(this->border);
+		::wresize(this->border, newHeight, newWidth);
+
+		getbegyx(this->border, y, x);
+		if (((y != -1) or (x != -1)) and ((y != newY) or (x != newX)))
+			mvwin(this->border, newY, newX);
+
+		::box(this->border, 0, 0);		// NB store border char
+		::wnoutrefresh(this->border);
+
+		getmaxyx(this->main, h, w);
+		// if ((h == newHeight) and (w == newWidth))
+		// 	return;
+
+		if (wresize(this->main, newHeight - 2, newWidth - 2) == ERR)
+		::werase(this->main);
+		getbegyx(this->main, y, x);
+
+		if ((y != newY + 1) or (x != newX + 1))
+			mvwin(this->main, newY + 1, newX + 1);
+	}
+	else
+	{
+		getmaxyx(this->main, h, w);
+		if ((h == newHeight) and (w == newWidth))
+			return;
+
+		wresize(this->main, newHeight, newWidth);
+		werase(this->main);
+		getbegyx(this->main, y, x);
+
+		if ((y != newY) or (x != newX))
+			mvwin(this->main, newY, newX);
+	}
+
+	wmove(this->main, 0, 0);
+	for (std::string const& line: this->_state)
+		this->writeLine(line);
+}
+
+void BasicTab::writeLine(std::string const& newContent) const noexcept
+{
 	int32_t y, x;
 	(void)x;
 	getyx(this->main, y, x);
@@ -82,16 +146,14 @@ void BasicTab::appendContent(std::string const& newContent) noexcept
 	waddstr(this->main, newContent.data());
 	::wmove(this->main, y + 1, 0);
 
-	this->_state.push_back(newContent);
 	this->refresh();
 }
-
 
 InputTab::InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar, int32_t sendCommandFd) :
 	BasicTab(h, w, y, x, borderChar),
 	sendCommandFd{sendCommandFd}
 {
-	keypad(this->main, true);
+	::keypad(this->main, true);
 
 	::waddstr(this->main, Config::PROMPT);
 
@@ -379,10 +441,7 @@ void InputTab::updateHints(void) noexcept
 	for(const char* command : COMMANDS)
 	{
 		if (!::strncmp(command, this->commandBuffer, std::min(this->bufferSize, ::strlen(command))))
-		{
-			LOG_DEBUG(LogContext::INTERFACE, "found: " + std::string(command));
 			this->hints.push_back(command);
-		}
 	}
 	this->autocompleteMode = this->hints.empty() == false;
 	this->currentSuggestedIndex = -1L;
@@ -390,7 +449,6 @@ void InputTab::updateHints(void) noexcept
 
 void InputTab::clearHints(void) noexcept
 {
-	LOG_DEBUG(LogContext::INTERFACE, "ended");
 	this->autocompleteMode = false;
 	this->hints.clear();
 }
@@ -457,13 +515,16 @@ CommandLineUI::~CommandLineUI(void)
 		this->clear();
 }
 
-void CommandLineUI::setup(void)
+void CommandLineUI::setup(int32_t height, int32_t width) noexcept
 {
 	this->currentTabIndex = 0UL;
 
 	// adjust window size
-	printf("\033[8;%d;%dt", Config::HEIGHT_WIN, Config::WIDTH_WIN);
-	fflush(stdout);
+	// printf("\033[8;%d;%dt", height, width);
+	// fflush(stdout);
+
+	(void) height;
+	(void) width;
 
 	::initscr();
 	::cbreak();
@@ -479,10 +540,21 @@ void CommandLineUI::setup(void)
 	this->tabs[CommandLineUI::OUTPUT_TAB] = std::make_unique<OutputTab>(LINES - 3, (COLS - 2) / 2, 2, (COLS - 2) / 2 + 1, 0);
 	this->tabs[CommandLineUI::OUTPUT_TAB]->appendContent("this is where the output is shown");
 
+	// this->setCurrentTab(CommandLineUI::FRAME_TAB);
 	this->setCurrentTab(CommandLineUI::INPUT_TAB);
 	this->getCurrentTab()->refresh();
 
 	LOG_DEBUG(LogContext::INTERFACE, "Setup for CommandLine interface done");
+}
+
+void CommandLineUI::resize(void)
+{
+	int32_t newHeight, newWidth;
+
+	getmaxyx(stdscr, newHeight, newWidth);
+
+	this->tabs[CommandLineUI::FRAME_TAB]->resize(newHeight, newWidth);
+
 }
 
 void CommandLineUI::clear(void) noexcept
@@ -498,13 +570,15 @@ void CommandLineUI::handleUserInput(void)
 	InputTab* inputTab = dynamic_cast<InputTab*>(this->getCurrentTab());
 	assert (inputTab != nullptr and "Using a tab which is not supposed to receive input");
 
-	int32_t inputChar = inputTab->getCharInput();
+	int32_t inputChar = ::wgetch(stdscr);
+	// int32_t inputChar = inputTab->getCharInput();
 
 	switch (inputChar)
 	{
-		case KEY_RESIZE:	// NB resize doesn't work
-			LOG_DEBUG(LogContext::INTERFACE, "Resize window callback");
-			break;
+		// case KEY_RESIZE:
+		// 	LOG_DEBUG(LogContext::INTERFACE, "resize");
+		// 	// this->resize();
+		// 	break;
 
 		case Config::COMMAND_TERM:
 			inputTab->forwardCommand();
@@ -524,6 +598,10 @@ void CommandLineUI::handleUserInput(void)
 
 		case KEY_BTAB:
 			this->switchBackwardTab();
+			break;
+
+		case KEY_HOME:
+		case KEY_END:
 			break;
 		
 		case KEY_DC:
@@ -546,7 +624,7 @@ void CommandLineUI::handleUserInput(void)
 			break;
 
 		default:
-			if (inputChar >= 32 && inputChar < 127)
+			if (inputChar >= 32 && inputChar < 127) {}
 				inputTab->storeCharInput(inputChar);
 			break;
 	}
