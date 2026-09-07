@@ -1,10 +1,14 @@
+# Project-specific build artifacts
+*.o
+*.exe
+tap-server
+
 # Prerequisites
 *.d
 
 # Compiled Object files
 *.slo
 *.lo
-*.o
 *.obj
 
 # Precompiled Headers
@@ -23,7 +27,6 @@
 *.dll
 *.so.*
 
-
 # Fortran module files
 *.mod
 *.smod
@@ -35,7 +38,6 @@
 *.lib
 
 # Executables
-*.exe
 *.out
 *.app
 
@@ -44,19 +46,21 @@ build/
 Build/
 build-*/
 
-# CMake generated files
+# CMake generated files (not used by this project, kept for safety)
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
-Makefile
 install_manifest.txt
 compile_commands.json
 
 # Temporary files
 *.tmp
-*.log
 *.bak
 *.swp
+
+# Runtime logs (the CLI client writes real log files under logs/)
+*.log
+logs/
 
 # vcpkg
 vcpkg_installed/
