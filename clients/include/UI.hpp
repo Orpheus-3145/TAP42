@@ -303,13 +303,15 @@ class InputTab : public BasicTab
 		void appendContent(std::string const& newContent) noexcept override;
 
 	private:
-		void startHintMode(void) noexcept;
-		void stopHintMode(void) noexcept;
+		void updateHints(void) noexcept;
+		void clearHints(void) noexcept;
+
+		void showInput(void) const noexcept;
 
 		int32_t sendCommandFd{-1};
 
-		HistoryCommands	history;
-		std::vector<const char*> hints;
+		HistoryCommands				history;
+		std::vector<const char*>	hints;
 
 		ssize_t			currentCommandIndex{-1L};
 		ssize_t			currentSuggestedIndex{-1L};
@@ -317,13 +319,11 @@ class InputTab : public BasicTab
 
 		size_t	bufferSize{0UL};
 		char	commandBuffer[Config::BUFF_SIZE];
-		// char	commandBuffer[Config::BUFF_SIZE + 1];		// NB set last char to 0 use it as c-strings ?
 
 		size_t	tmpBufferSize{0UL};
 		char	tmpCommandBuffer[Config::BUFF_SIZE];
 
 		bool autocompleteMode{false};
-
 };
 
 class OutputTab : public BasicTab
@@ -357,7 +357,7 @@ class CommandLineUI
 		void setup(void);
 		void show(void) noexcept { this->refresh(); }
 		void clear(void) noexcept;
-		void refresh(void) noexcept { this->getCurrentTab()->refresh(); ::doupdate(); }
+		void refresh(void) noexcept { ::doupdate(); }
 
 		void handleUserInput(void);
 		void handleResponse(std::string const& response);

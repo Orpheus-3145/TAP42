@@ -81,7 +81,9 @@ void BasicTab::appendContent(std::string const& newContent) noexcept
 
 	waddstr(this->main, newContent.data());
 	::wmove(this->main, y + 1, 0);
-	::wnoutrefresh(this->main);
+
+	this->_state.push_back(newContent);
+	this->refresh();
 }
 
 
@@ -149,8 +151,12 @@ void InputTab::deleteCharForward(void) noexcept
 	x -= this->startX;
 
 	::memmove(this->commandBuffer + x, this->commandBuffer + x + 1, static_cast<int32_t>(this->bufferSize) - x);
-	if (--(this->bufferSize) == 0UL)
-		this->stopHintMode();
+	this->bufferSize--;
+
+	if (this->bufferSize == 0UL)
+		this->clearHints();
+	else
+		this->updateHints();
 
 	this->refresh();
 }
@@ -169,8 +175,12 @@ void InputTab::deleteCharBack(void) noexcept
 	x -= this->startX;
 
 	::memmove(this->commandBuffer + x - 1, this->commandBuffer + x, static_cast<int32_t>(this->bufferSize) - x);
-	if (--(this->bufferSize) == 0UL)
-		this->stopHintMode();
+	this->bufferSize--;
+
+	if (this->bufferSize == 0UL)
+		this->clearHints();
+	else
+		this->updateHints();
 
 	this->refresh();
 }
@@ -217,29 +227,19 @@ void InputTab::storeCharInput(char input)
 
 	if (x < static_cast<int32_t>(bufferSize))
 		::memmove(this->commandBuffer + x + 1, this->commandBuffer + x, static_cast<int32_t>(this->bufferSize) - x);
+
 	this->commandBuffer[x] = input;
 	this->bufferSize++;
 
 	if (bufferSize == Config::BUFF_SIZE)
 		throw BufferOverflowException("Command buffer overflow");
 
-	this->startHintMode();		// got at least one input use hints now instead of history for suggestions
-
-	mvwaddstr(this->main, y, 0, Config::PROMPT);
-	waddnstr(this->main, this->commandBuffer, this->bufferSize);
-	wmove(this->main, y, x + this->startX + 1);		// reset the cursor pos in case it was in the middle of the command
-
-	this->refresh();
+	this->updateHints();		// got at least one input use hints now instead of history for suggestions
+	this->showInput();
 }
 
 void InputTab::suggestNextCommand(void) noexcept
 {
-	LOG_DEBUG(LogContext::INTERFACE, "mode: " + std::to_string(this->autocompleteMode));
-	LOG_DEBUG(LogContext::INTERFACE, "hints size: " + std::to_string(this->hints.size()));
-	LOG_DEBUG(LogContext::INTERFACE, "index: " + std::to_string(this->currentSuggestedIndex));
-	LOG_DEBUG(LogContext::INTERFACE, "input: " + std::string(this->commandBuffer, this->bufferSize) + " size: " + std::to_string(this->bufferSize));
-	LOG_DEBUG(LogContext::INTERFACE, "tmp: " + std::string(this->tmpCommandBuffer, this->tmpBufferSize));
-
 	if (this->autocompleteMode == false)
 	{
 		this->showPreviousCommand();
@@ -247,7 +247,7 @@ void InputTab::suggestNextCommand(void) noexcept
 	}
 	else if (this->hints.size() == 0UL)
 		return;
-	else if (this->currentSuggestedIndex == -1L)
+	else if (this->currentSuggestedIndex == -1L)	//I'm typing a command, store it in tmpCommandBuffer and fetch the first hint
 	{
 		this->tmpBufferSize = this->bufferSize;
 		::memcpy(this->tmpCommandBuffer, this->commandBuffer, this->tmpBufferSize);
@@ -256,25 +256,18 @@ void InputTab::suggestNextCommand(void) noexcept
 		this->currentSuggestedIndex++;
 
 	const char* suggestedCommand = this->hints.at(this->currentSuggestedIndex);
+
 	this->bufferSize = ::strlen(suggestedCommand); 
 	::memcpy(this->commandBuffer, suggestedCommand, this->bufferSize);
 
-	int32_t y, x;
-	(void)x;
-	getyx(this->main, y, x);
-
-	::wmove(this->main, y, 0);
-	::wclrtoeol(this->main);
-	mvwaddstr(this->main, y, 0, Config::PROMPT);
-	waddnstr(this->main, this->commandBuffer, this->bufferSize);
-	this->refresh();
+	this->showInput();
 }
 
 void InputTab::showPreviousCommand(void) noexcept
 {
 	if ((this->history.size() == 0UL) or (this->currentCommandIndex == static_cast<ssize_t>(this->history.size()) - 1))
 		return;
-	else if (this->currentCommandIndex == -1L)
+	else if (this->currentCommandIndex == -1L)	// I'm checking the last hint, now show the command I was typing stored in tmpCommandBuffer
 	{
 		this->tmpBufferSize = this->bufferSize;
 		::memcpy(this->tmpCommandBuffer, this->commandBuffer, this->tmpBufferSize);
@@ -287,26 +280,11 @@ void InputTab::showPreviousCommand(void) noexcept
 	this->bufferSize = preCommandSize; 
 	::memcpy(this->commandBuffer, preCommand, this->bufferSize);
 
-	int32_t y, x;
-	(void)x;
-	getyx(this->main, y, x);
-
-	::wmove(this->main, y, 0);
-	::wclrtoeol(this->main);
-	mvwaddstr(this->main, y, 0, Config::PROMPT);
-	waddnstr(this->main, this->commandBuffer, this->bufferSize);
-	this->refresh();
+	this->showInput();
 }
 
 void InputTab::suggestPastCommand(void) noexcept
 {
-	LOG_DEBUG(LogContext::INTERFACE, "mode: " + std::to_string(this->autocompleteMode));
-	LOG_DEBUG(LogContext::INTERFACE, "hints size: " + std::to_string(this->hints.size()));
-	LOG_DEBUG(LogContext::INTERFACE, "index: " + std::to_string(this->currentSuggestedIndex));
-	LOG_DEBUG(LogContext::INTERFACE, "input: " + std::string(this->commandBuffer, this->bufferSize) + " size: " + std::to_string(this->bufferSize));
-	LOG_DEBUG(LogContext::INTERFACE, "tmp: " + std::string(this->tmpCommandBuffer, this->tmpBufferSize));
-
-
 	if (this->autocompleteMode == false)
 	{
 		this->showFollowingCommand();
@@ -317,7 +295,6 @@ void InputTab::suggestPastCommand(void) noexcept
 	
 	if (this->currentSuggestedIndex > 0L)
 	{
-		LOG_DEBUG(LogContext::INTERFACE, "maior");
 		this->currentSuggestedIndex--;
 		
 		const char* suggestedCommand = this->hints.at(this->currentSuggestedIndex);
@@ -326,22 +303,13 @@ void InputTab::suggestPastCommand(void) noexcept
 	}
 	else
 	{
-		LOG_DEBUG(LogContext::INTERFACE, "minor");
-		this->currentCommandIndex = -1L;
+		this->currentSuggestedIndex = -1L;
 		this->bufferSize = this->tmpBufferSize;
 		::memcpy(this->commandBuffer, this->tmpCommandBuffer, this->bufferSize);
 		this->tmpBufferSize = 0UL;
 	}
 
-	int32_t y, x;
-	(void)x;
-	getyx(this->main, y, x);
-
-	::wmove(this->main, y, 0);
-	::wclrtoeol(this->main);
-	mvwaddstr(this->main, y, 0, Config::PROMPT);
-	waddnstr(this->main, this->commandBuffer, this->bufferSize);
-	this->refresh();
+	this->showInput();
 }
 
 void InputTab::showFollowingCommand(void) noexcept
@@ -364,49 +332,32 @@ void InputTab::showFollowingCommand(void) noexcept
 		::memcpy(this->commandBuffer, postCommand, this->bufferSize);
 	}
 
-	int32_t y, x;
-	(void)x;
-	getyx(this->main, y, x);
-
-	::wmove(this->main, y, 0);
-	::wclrtoeol(this->main);
-	mvwaddstr(this->main, y, 0, Config::PROMPT);
-	waddnstr(this->main, this->commandBuffer, this->bufferSize);
-	this->refresh();
+	this->showInput();
 }
 
 void InputTab::forwardCommand(void) noexcept
 {
-	// size_t& bufferSize = this->history.at(this->currentCommandIndex).first;
 	if (this->bufferSize == 0UL)
 		return;
 
-	// char* commandBuffer = this->history.at(this->currentCommandIndex).second.data();
-
-	this->history.emplace_front(this->bufferSize, std::array<char, Config::BUFF_SIZE>{});
-
-	::memcpy(this->history.front().second.data(), this->commandBuffer, this->bufferSize);
-
 	LOG_INFO(LogContext::INTERFACE, "Got new command: " + std::string(this->commandBuffer, this->bufferSize));
+
 	if (this->sendCommandFd != -1)
 		ioUtils::write(this->sendCommandFd, this->commandBuffer, this->bufferSize);
+
+	this->history.emplace_front(this->bufferSize, std::array<char, Config::BUFF_SIZE>{});
+	::memcpy(this->history.front().second.data(), this->commandBuffer, this->bufferSize);
+
 	this->bufferSize = 0UL;
 	// in case a command from history has been submitted reset the commandIndex to the last one inserted
 	this->currentCommandIndex = -1L;
-	this->stopHintMode();
+	this->clearHints();
 
-	// if (this->currentCommandIndex == this->history.size() - 1UL)	// forwarded a new command, not from past history of commands
-	// 	this->currentCommandIndex++;
-	// else		//means that I forwarded a command from the history, not the current one
-	// {
-	// 	this->history.pop_back();
-	// 	this->currentCommandIndex = this->history.size() - 1UL;
-	// }
-	// this->history.emplace_back(0UL, std::array<char, Config::BUFF_SIZE>{});
 	int32_t y, x;
 	getyx(this->main, y, x);
+	wmove(this->main, y + 1, 0);
 
-	mvwaddstr(this->main, y + 1, 0, Config::PROMPT);
+	this->showInput();
 }
 
 void InputTab::appendContent(std::string const& newContent) noexcept
@@ -422,12 +373,9 @@ void InputTab::appendContent(std::string const& newContent) noexcept
 	waddstr(this->main, Config::PROMPT);
 }
 
-void InputTab::startHintMode(void) noexcept
+void InputTab::updateHints(void) noexcept
 {
-	if (this->autocompleteMode == true)
-		return;
-
-	LOG_DEBUG(LogContext::INTERFACE, "started");
+	this->hints.clear();
 	for(const char* command : COMMANDS)
 	{
 		if (!::strncmp(command, this->commandBuffer, std::min(this->bufferSize, ::strlen(command))))
@@ -440,13 +388,25 @@ void InputTab::startHintMode(void) noexcept
 	this->currentSuggestedIndex = -1L;
 }
 
-void InputTab::stopHintMode(void) noexcept
+void InputTab::clearHints(void) noexcept
 {
 	LOG_DEBUG(LogContext::INTERFACE, "ended");
 	this->autocompleteMode = false;
 	this->hints.clear();
 }
 
+void InputTab::showInput(void) const noexcept
+{
+	int32_t y, x;
+	(void)x;
+	getyx(this->main, y, x);
+
+	::wmove(this->main, y, 0);
+	::wclrtoeol(this->main);
+	mvwaddstr(this->main, y, 0, Config::PROMPT);
+	waddnstr(this->main, this->commandBuffer, this->bufferSize);
+	this->refresh();
+}
 
 OutputTab::OutputTab(OutputTab&& other) noexcept :
 	BasicTab(std::move(other)),
@@ -520,6 +480,8 @@ void CommandLineUI::setup(void)
 	this->tabs[CommandLineUI::OUTPUT_TAB]->appendContent("this is where the output is shown");
 
 	this->setCurrentTab(CommandLineUI::INPUT_TAB);
+	this->getCurrentTab()->refresh();
+
 	LOG_DEBUG(LogContext::INTERFACE, "Setup for CommandLine interface done");
 }
 
@@ -533,8 +495,9 @@ void CommandLineUI::clear(void) noexcept
 
 void CommandLineUI::handleUserInput(void)
 {
-	// if (dynamic_cast<InputTab*>(ptr.get())) check?
-	InputTab* inputTab = dynamic_cast<InputTab*>(this->tabs[INPUT_TAB].get());
+	InputTab* inputTab = dynamic_cast<InputTab*>(this->getCurrentTab());
+	assert (inputTab != nullptr and "Using a tab which is not supposed to receive input");
+
 	int32_t inputChar = inputTab->getCharInput();
 
 	switch (inputChar)
@@ -587,7 +550,6 @@ void CommandLineUI::handleUserInput(void)
 				inputTab->storeCharInput(inputChar);
 			break;
 	}
-	::doupdate();
 }
 
 void CommandLineUI::handleResponse(std::string const& response)
