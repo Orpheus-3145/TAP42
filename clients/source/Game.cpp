@@ -13,10 +13,14 @@
 #include <unistd.h>
 
 
-GameInterface::GameInterface(int32_t commandFd) noexcept :
-	commandFd{commandFd}
+GameInterface::GameInterface(int32_t commandFd, int32_t height, int32_t width) noexcept :
+	commandFd{commandFd},
+	height{height},
+	width{width}
 {
 	assert(this->commandFd != -1 and "Invalid fd for writing commands provided");
+	assert(this->height > 0 and "Invalid height provided");
+	assert(this->width > 0 and "Invalid width writing commands provided");
 
 	LOG_INFO(LogContext::INTERFACE, "Done setup UI");
 }

@@ -83,49 +83,30 @@ void BasicTab::appendContent(std::string const& newContent) noexcept
 
 void BasicTab::resize(int32_t newHeight, int32_t newWidth, int32_t newY, int32_t newX)
 {
-	int32_t y, x, h, w;
+	assert((newHeight > 0) and (newWidth > 0) and "Invalid resizing size provided");
+	assert((newY > -1) and (newX > -1) and "Invalid resizing position provided");
+
 	if (this->border)
 	{
-		getmaxyx(this->border, h, w);
-		if ((h == newHeight) and (w == newWidth))
-			return;
-
 		::werase(this->border);
 		::wresize(this->border, newHeight, newWidth);
 
-		getbegyx(this->border, y, x);
-		if (((y != -1) or (x != -1)) and ((y != newY) or (x != newX)))
-			mvwin(this->border, newY, newX);
+		if ((newY > 0) or (newX > 0))
+			::mvwin(this->border, newY, newX);
 
 		::box(this->border, 0, 0);		// NB store border char
 		::wnoutrefresh(this->border);
 
-		getmaxyx(this->main, h, w);
-		// if ((h == newHeight) and (w == newWidth))
-		// 	return;
-
-		if (wresize(this->main, newHeight - 2, newWidth - 2) == ERR)
-		::werase(this->main);
-		getbegyx(this->main, y, x);
-
-		if ((y != newY + 1) or (x != newX + 1))
-			mvwin(this->main, newY + 1, newX + 1);
-	}
-	else
-	{
-		getmaxyx(this->main, h, w);
-		if ((h == newHeight) and (w == newWidth))
-			return;
-
-		wresize(this->main, newHeight, newWidth);
-		werase(this->main);
-		getbegyx(this->main, y, x);
-
-		if ((y != newY) or (x != newX))
-			mvwin(this->main, newY, newX);
+		newHeight -= 2, newWidth -= 2;
+		newY += 1, newX += 1;
 	}
 
-	wmove(this->main, 0, 0);
+	::werase(this->main);
+	::wresize(this->main, newHeight, newWidth);
+
+	if ((newY > 0) or (newX > 0))
+		::mvwin(this->main, newY, newX);
+
 	for (std::string const& line: this->_state)
 		this->printLine(line);
 }
@@ -299,6 +280,7 @@ void InputTab::setChar(int32_t input)
 		if (this->bufferSize == 0UL)
 			return;
 
+		this->_state.push_back(PROMPT + std::string(this->commandBuffer, this->bufferSize));
 		this->history.emplace_front(this->bufferSize, std::array<char, CMD_BUFFER_SIZE>{});
 		::memcpy(this->history.front().second.data(), this->commandBuffer, this->bufferSize);
 
@@ -422,6 +404,20 @@ void InputTab::appendContent(std::string const& newContent) noexcept
 		wmove(this->main, y, 0);			// else override the prompt
 	BasicTab::appendContent(newContent);
 	waddstr(this->main, PROMPT);
+}
+
+void InputTab::resize(int32_t newHeight, int32_t newWidth, int32_t newY, int32_t newX)
+{
+	BasicTab::resize(newHeight, newWidth, newY, newX);
+
+	::waddstr(this->main, PROMPT);
+	if (this->bufferSize > 0UL)
+		::waddnstr(this->main, this->commandBuffer, this->bufferSize);
+
+	// because resize is not handled by ncurses there might be some garbage to read, flush it
+	this->getChar();
+
+	::wnoutrefresh(this->main);
 }
 
 std::string InputTab::getLastInput(void) const noexcept

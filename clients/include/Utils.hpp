@@ -12,6 +12,7 @@ namespace ioUtils {
 
 using ::read;
 using ::write;
+using ::close;
 using ::poll;
 
 struct Address
@@ -27,9 +28,12 @@ int32_t	connectToServer(std::string const& host, uint32_t port, struct addrinfo*
 ssize_t read(int32_t fd, char* buffer, size_t size);
 ssize_t write(int32_t fd, const char* buffer, size_t size);
 
-ssize_t pipe(int32_t sourceFd, int32_t destFd);
 ssize_t readNonBlock(int32_t fd, char* buffer, size_t size);
 ssize_t writeNonBlock(int32_t fd, const char* buffer, size_t size);
+
+ssize_t pipe(int32_t sourceFd, int32_t destFd);
+
+int32_t createSignalRedirectFd(int32_t signal);
 
 struct SocketPair
 {

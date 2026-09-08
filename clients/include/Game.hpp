@@ -15,7 +15,7 @@ static constexpr const char* S_EVT = "EVT";
 class GameInterface
 {
 	public:
-		GameInterface(int32_t commandFd) noexcept;
+		GameInterface(int32_t commandFd, int32_t height, int32_t width) noexcept;
 
 		GameInterface(GameInterface const& other) = delete;
 		GameInterface& operator=(GameInterface const& other) = delete;
@@ -30,10 +30,13 @@ class GameInterface
 		virtual void forwardCommandToServer(std::string const& command);
 		
 	protected:
-		virtual void resize(void) = 0;
+		virtual void createWindow(int32_t height, int32_t width) = 0;
+		virtual void resize(int32_t height, int32_t width) = 0;
 		virtual void refresh(void) noexcept = 0;
 
 		int32_t commandFd;
+		int32_t height;
+		int32_t width;
 
 		bool KeepAlive{true};
 };

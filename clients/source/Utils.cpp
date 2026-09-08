@@ -18,6 +18,8 @@
 #include <arpa/inet.h>			// htons, htonl, ntohs, ntohl
 #include <sys/types.h>			// send, recv
 #include <sys/socket.h>			// send, recv
+#include <signal.h>
+#include <sys/signalfd.h>
 
 
 namespace ioUtils {
@@ -228,6 +230,29 @@ ssize_t pipe(int32_t sourceFd, int32_t destFd)
 		}
 	}
 	return (readSize);
+}
+
+int32_t createSignalRedirectFd(int32_t signal)
+{
+	sigset_t mask;
+	sigemptyset(&mask);
+	sigaddset(&mask, signal);				// create a filter that signal
+	sigprocmask(SIG_BLOCK, &mask, NULL);	// and use it to not block it
+	
+	int32_t fd = ::signalfd(-1, &mask, 0);
+	if (fd == -1)
+	{
+		LOG_ERROR(LogContext::INPUT_OUTPUT, "Failed to creare a file descriptor to redirect: " + std::to_string(signal));
+		throw IOException("Failed to creare a file descriptor to redirect: " + std::to_string(signal));
+	}
+
+	int32_t flags = fcntl(fd, F_GETFL, 0);
+	if (flags == -1)
+		throw InterfaceException("Failed to load flags for socket");
+	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+		throw InterfaceException("Failed to set socket as non-blocking");
+
+	return fd;
 }
 
 SocketPair createSocketPair(void)

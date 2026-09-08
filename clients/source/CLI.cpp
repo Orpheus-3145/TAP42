@@ -5,39 +5,13 @@
 #include <cassert>
 #include <signal.h>
 #include <sys/ioctl.h>
+#include <sys/signalfd.h>
 
 
-CLI::CLI(int32_t commandFd) :
-	GameInterface(commandFd),
+CLI::CLI(int32_t commandFd, int32_t height, int32_t width) :
+	GameInterface(commandFd, height, width),
 	resizeFd{ioUtils::createSignalRedirectFd(SIGWINCH)}
 {
-	// this->currentTabIndex = 0UL;
-
-	// adjust window size
-	// printf("\033[8;%d;%dt", height, width);
-	// fflush(stdout);
-
-	// (void) height;
-	// (void) width;
-
-	::initscr();
-	::cbreak();
-	::noecho();
-
-	this->frame = std::make_unique<BasicTab>(LINES, COLS, 0, 0, 0);
-	this->frame->appendContent("insert some shit, 'quit' to close");
-	
-	this->commandTab = std::make_unique<InputTab>(LINES - 3, (COLS - 2) / 2, 2, 1, 0);
-	this->commandTab->appendContent("this is where the input is shown");
-
-	this->responseTab = std::make_unique<OutputTab>((LINES - 3) / 2, (COLS - 2) / 2, 2, (COLS - 2) / 2 + 1, 0);
-	this->responseTab->appendContent("this is where responses are shown");
-
-	this->eventTab = std::make_unique<OutputTab>((LINES - 3) / 2, (COLS - 2) / 2, (LINES - 3) / 2 + 2, (COLS - 2) / 2 + 1, 0);
-	this->eventTab->appendContent("this is where events are shown");
-
-	this->commandTab->refresh();
-
 	this->_dispatcher[KEY_LEFT]      = [this] { this->commandTab->moveCursorLeft(); };
 	this->_dispatcher[KEY_RIGHT]     = [this] { this->commandTab->moveCursorRight(); };
 	// this->_dispatcher['\t']          = [this] { this->switchForwardTab(); };
@@ -49,24 +23,51 @@ CLI::CLI(int32_t commandFd) :
 	this->_dispatcher[KEY_UP]        = [this] { this->commandTab->suggestNextHint(); };
 	this->_dispatcher[KEY_DOWN]      = [this] { this->commandTab->suggestPastHint(); };
 
+	this->createWindow(height, width);
+
 	LOG_INFO(LogContext::INTERFACE, "Setup for CLI done");
 }
 
-CLI::~CLI(void) noexcept
+CLI::~CLI(void) noexcept		// NB check if it calls the parent destr.
 {
 	::endwin();
+	ioUtils::close(this->resizeFd);
 
 	LOG_INFO(LogContext::INTERFACE, "CLI stopped");
 }
 
 void CLI::loop(void)
 {
+	size_t nFds = 2;
+	std::vector<struct pollfd> pollFds(nFds);
+	// user input
+	pollFds[0].fd = STDIN_FILENO;
+	// resize signal redirect
+	pollFds[1].fd = this->resizeFd;
+
 	this->refresh();
 	while (this->KeepAlive == true)
 	{
-		int32_t input = this->commandTab->getChar();	// this is blocking
+		pollFds[0].events = POLLIN;
+		pollFds[0].revents = 0;
+		pollFds[1].events = POLLIN;
+		pollFds[1].revents = 0;
 
-		this->dispatchUserInput(input);
+		if (ioUtils::poll(pollFds.data(), nFds, -1) == -1)
+		{
+			if (errno == EINTR)
+				continue;
+			LOG_ERROR(LogContext::INTERFACE, "Poll failed: " + std::string(strerror(errno)));
+			throw InterfaceException("poll failed: " + std::string(strerror(errno)));
+		}
+
+		if (pollFds[0].revents & POLLIN)
+			this->dispatchUserInput();
+
+		// a POLLIN means there's been a resize (signal SIGWENCH)
+		if (pollFds[1].revents & POLLIN)
+			this->resize(-1, -1);
+
 		this->refresh();
 	}
 }
@@ -99,45 +100,82 @@ void CLI::forwardCommandToServer(std::string const& command)
 		this->KeepAlive = false;
 }
 
-// ioUtils::Pipe resizePipe = ioUtils::createPipe();
-// signal_handler_fn = [resizePipe.in](int sig) {
-// 	LOG_DEBUG(LogContext::INTERFACE, "(output) got resize callback");
-// 	write(resizePipe.in, "x", 1);
-//     // qui puoi usare catture, perché è uno std::function
-// };
-//
-// std::signal(SIGWINCH, signal_handler_wrapper);
-//
-// signal(SIGWINCH, [](int fd) {
-// });
-//
-// if (fds[0].revents & POLLIN)
-// 	this->interface->handleUserInput();
-//
-// if (fds[1].revents & POLLIN)
-// {
-// 	char tmp;
-// 	write(resizePipe.out, &tmp, 1);
-//
-// 	struct winsize ws;
-// 	ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
-// 	resizeterm(ws.ws_row, ws.ws_col);
-//
-// 	LOG_DEBUG(LogContext::INTERFACE, "(input) got resize callback");
-// 	this->interface->resize();
-// }
-
-void CLI::resize(void)
+void CLI::createWindow(int32_t height, int32_t width)
 {
-	// int32_t newHeight, newWidth;
+	// adjust window size
+	// printf("\033[8;%d;%dt", height, width);
+	// fflush(stdout);
 
-	// getmaxyx(stdscr, newHeight, newWidth);
+	::initscr();
+	::cbreak();
+	::noecho();
 
-	// this->inputTabs[CLI::FRAME_TAB]->resize(newHeight, newWidth);
+	int32_t winHeigth = (height % 2) == 0 ? height : height - 1;
+	int32_t winWidth = (width % 2) == 0 ? width : width - 1;
+	int32_t startx = 0;
+	int32_t starty = 0;
+	this->frame = std::make_unique<BasicTab>(winHeigth, winWidth, startx, starty, 0);
+
+	winHeigth -= 2;
+	winWidth = (winWidth - 2) / 2;
+	startx += 1;
+	starty += 1;
+	this->commandTab = std::make_unique<InputTab>(winHeigth, winWidth, startx, starty, 0);
+
+	winHeigth /= 2;
+	startx += winWidth;
+	this->responseTab = std::make_unique<OutputTab>(winHeigth, winWidth, starty, startx, 0);
+
+	starty += winHeigth;
+	this->eventTab = std::make_unique<OutputTab>(winHeigth, winWidth, starty, startx, 0);
+
+	this->commandTab->appendContent("Insert some shit, type 'quit' to close");
+	this->responseTab->appendContent("This is where responses are shown");
+	this->eventTab->appendContent("This is where events are shown");
+	this->commandTab->refresh();
 }
 
-void CLI::dispatchUserInput(int32_t inputChar)
+void CLI::resize(int32_t height, int32_t width)
 {
+	(void) height;
+	(void) width;
+
+	struct signalfd_siginfo si;
+	ioUtils::read(this->resizeFd, &si, sizeof(si));		// I don't care about the data, flush it
+
+	struct winsize ws;
+	::ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);	// get the size of the resized terminal
+	::resizeterm(ws.ws_row, ws.ws_col);
+
+	int32_t winHeigth = (ws.ws_row % 2) == 0 ? ws.ws_row : ws.ws_row - 1;
+	int32_t winWidth = (ws.ws_col % 2) == 0 ? ws.ws_col : ws.ws_col - 1;
+	int32_t startx = 0;
+	int32_t starty = 0;
+	this->frame->resize(winHeigth, winWidth, startx, starty);
+
+	winHeigth -= 2;
+	winWidth = (winWidth - 2) / 2;
+	startx += 1;
+	starty += 1;
+	this->commandTab->resize(winHeigth, winWidth, startx, starty);
+
+	winHeigth /= 2;
+	startx += winWidth;
+	this->responseTab->resize(winHeigth, winWidth, starty, startx);
+
+	starty += winHeigth;
+	this->eventTab->resize(winHeigth, winWidth, starty, startx);
+
+	this->commandTab->refresh();
+	// because resize is not handled by ncurses there might be some garbage to read, flush it
+	// this->commandTab->getChar();
+
+}
+
+void CLI::dispatchUserInput(void)
+{
+	int32_t inputChar = this->commandTab->getChar();	// this is blocking
+
 	auto it = this->_dispatcher.find(inputChar);
 	if (it != this->_dispatcher.end()) {
 		it->second();
