@@ -1,5 +1,7 @@
 #include "Game.hpp"
 #include "Utils.hpp"
+#include "CLI.hpp"
+#include "GUI.hpp"
 #include "Exceptions.hpp"
 
 #include <cstring>				// strerror, memchr, memeset, memmove
@@ -11,19 +13,31 @@
 #include <unistd.h>
 
 
-Game::Game(void) noexcept
+GameInterface::GameInterface(int32_t commandFd) noexcept :
+	commandFd{commandFd}
 {
-	this->wakeupPipe = ioUtils::createPipe();
+	assert(this->commandFd != -1 and "Invalid fd for writing commands provided");
 
+	LOG_INFO(LogContext::INTERFACE, "Done setup UI");
 }
 
-Game::~Game(void)
+GameInterface::~GameInterface(void) noexcept
 {
-	ioUtils::closePipe(this->wakeupPipe);
+	LOG_INFO(LogContext::INTERFACE, "UI stopped");
 }
+
+void GameInterface::forwardCommandToServer(std::string const& command)
+{
+	LOG_INFO(LogContext::INTERFACE, "Got new command: " + command);
+
+	ioUtils::write(this->commandFd, command.data(), command.size());
+}
+
 
 void Game::run(std::string const& host, uint32_t port)
 {
+	LOG_INFO(LogContext::GAME_CLIENT, "Game launched");
+
 	this->dataSize = 0UL;
 	this->commandLength = 0UL;
 	
@@ -33,7 +47,8 @@ void Game::run(std::string const& host, uint32_t port)
 	this->clientHTTP = std::make_unique<ClientHTTP>(host, port);
 	this->clientHTTP->startWorker(gameClientSockets.first);
 
-	this->interface = std::make_unique<CommandLineUI>(commandPipe.in);
+	// decide if use CLI or GUI
+	this->interface = std::make_unique<CLI>(commandPipe.in);
 
 	// Config::HEIGHT_WIN, Config::WIDTH_WIN
 	
@@ -46,12 +61,9 @@ void Game::run(std::string const& host, uint32_t port)
 	if (this->worker.joinable())	// ugly, put main thread asleep
 	{
 		this->worker.join();
-		LOG_DEBUG(LogContext::GAME_CLIENT, "Stopped worker");
+		LOG_DEBUG(LogContext::GAME_CLIENT, "Stopped game worker");
 	}
 	this->clientHTTP->stopWorker();
-
-	LOG_DEBUG(LogContext::GAME_CLIENT, "Stopped worker");
-
 	this->clientHTTP->disconnect();
 
 	LOG_INFO(LogContext::GAME_CLIENT, "Game stopped");
@@ -205,8 +217,8 @@ void Game::forwardCommandToServer(std::vector<struct pollfd>& pollFds)
 	}
 
 	pollFds[2].events = 0;
-	// handle graceful termination
-	if (this->commandLength >= ::strlen(QUIT) and !::strncmp(this->commandBuffer, QUIT, ::strlen(QUIT)))
-		this->keepAlive.store(false);
+	// NB handle graceful termination
+	// if (this->commandLength >= ::strlen(QUIT) and !::strncmp(this->commandBuffer, QUIT, ::strlen(QUIT)))
+	// 	this->keepAlive.store(false);
 	this->commandLength = 0UL;
 }

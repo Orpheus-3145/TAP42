@@ -1,14 +1,12 @@
-#include "UI.hpp"
+#include "CLI.hpp"
 #include "Exceptions.hpp"
-#include "ClientHTTP.hpp"
 
-#include <string>
 #include <cassert>
 
 
 BasicTab::BasicTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar)
 {
-	if (borderChar > -1)
+	if (borderChar != -1)
 	{
 		this->border = ::newwin(h, w, y, x);
 		if (this->border == nullptr)
@@ -274,7 +272,7 @@ int32_t InputTab::getChar(void) const noexcept
 
 void InputTab::setChar(int32_t input)
 {
-	if (input != '\n')		//append normal char to buffer
+	if (input != COMMAND_TERM)		// append normal char to buffer
 	{
 		int32_t y, x;
 		(void)y;
@@ -293,8 +291,11 @@ void InputTab::setChar(int32_t input)
 	
 		this->updateHints();		// got at least one input use hints now instead of history for suggestions
 	}
-	else if (this->bufferSize > 0UL)		// if got end msg and buffer is not empty store current command
+	else		// if got end msg and buffer is not empty store current command
 	{
+		if (this->bufferSize == 0UL)
+			return;
+
 		this->history.emplace_front(this->bufferSize, std::array<char, Config::BUFF_SIZE>{});
 		::memcpy(this->history.front().second.data(), this->commandBuffer, this->bufferSize);
 
@@ -429,10 +430,10 @@ std::string InputTab::getLastInput(void) const noexcept
 void InputTab::updateHints(void) noexcept
 {
 	this->hints.clear();
-	for(const char* command : COMMANDS)
+	for(const char* hintCommand : HINTS)
 	{
-		if (!::strncmp(command, this->commandBuffer, std::min(this->bufferSize, ::strlen(command))))
-			this->hints.push_back(command);
+		if (!::strncmp(hintCommand, this->commandBuffer, std::min(this->bufferSize, ::strlen(hintCommand))))
+			this->hints.push_back(hintCommand);
 	}
 	this->autocompleteMode = this->hints.empty() == false;
 	this->currentSuggestedIndex = -1L;
@@ -501,11 +502,8 @@ void OutputTab::appendContent(std::string const& newContent) noexcept
 }
 
 
-CommandLineUI::CommandLineUI(int32_t commandFd) :
-	commandFd{commandFd}
+CLI::CLI(int32_t commandFd) : GameInterface(commandFd)
 {
-	assert(this->commandFd != -1 and "Invalid fd from writing commands provided");
-
 	// this->currentTabIndex = 0UL;
 
 	// adjust window size
@@ -533,8 +531,6 @@ CommandLineUI::CommandLineUI(int32_t commandFd) :
 
 	this->commandTab->refresh();
 
-	LOG_DEBUG(LogContext::INTERFACE, "Setup for CommandLine interface done");
-
 	this->_dispatcher[KEY_LEFT]      = [this] { this->commandTab->moveCursorLeft(); };
 	this->_dispatcher[KEY_RIGHT]     = [this] { this->commandTab->moveCursorRight(); };
 	// this->_dispatcher['\t']          = [this] { this->switchForwardTab(); };
@@ -545,66 +541,95 @@ CommandLineUI::CommandLineUI(int32_t commandFd) :
 	this->_dispatcher[KEY_BACKSPACE] = [this] { this->commandTab->deleteCharBack(); };
 	this->_dispatcher[KEY_UP]        = [this] { this->commandTab->suggestNextHint(); };
 	this->_dispatcher[KEY_DOWN]      = [this] { this->commandTab->suggestPastHint(); };
+
+	LOG_INFO(LogContext::INTERFACE, "Setup for CLI done");
 }
 
-CommandLineUI::~CommandLineUI(void) noexcept
+CLI::~CLI(void) noexcept
 {
 	::endwin();
 
-	LOG_INFO(LogContext::INTERFACE, "UI stopped");
+	LOG_INFO(LogContext::INTERFACE, "CLI stopped");
 }
 
-	// ioUtils::Pipe resizePipe = ioUtils::createPipe();
-	// signal_handler_fn = [resizePipe.in](int sig) {
-	// 	LOG_DEBUG(LogContext::INTERFACE, "(output) got resize callback");
-	// 	write(resizePipe.in, "x", 1);
-    //     // qui puoi usare catture, perché è uno std::function
-    // };
-	//
-    // std::signal(SIGWINCH, signal_handler_wrapper);
-	//
-    // signal(SIGWINCH, [](int fd) {
-	// });
-	//
-	// if (fds[0].revents & POLLIN)
-	// 	this->interface->handleUserInput();
-	//
-	// if (fds[1].revents & POLLIN)
-	// {
-	// 	char tmp;
-	// 	write(resizePipe.out, &tmp, 1);
-	//
-	// 	struct winsize ws;
-	// 	ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
-	// 	resizeterm(ws.ws_row, ws.ws_col);
-	//
-	// 	LOG_DEBUG(LogContext::INTERFACE, "(input) got resize callback");
-	// 	this->interface->resize();
-	// }
-
-void CommandLineUI::loop(void)
+void CLI::loop(void)
 {
 	this->refresh();
 	while (this->KeepAlive == true)
 	{
-		int32_t input = this->commandTab->getChar();
+		int32_t input = this->commandTab->getChar();	// this is blocking
 
-		this->dispatch(input);
+		this->dispatchUserInput(input);
 		this->refresh();
 	}
 }
 
-void CommandLineUI::resize(void)
+void CLI::handleResponse(std::string const& response)
+{
+	{
+		std::lock_guard<std::mutex> lock(this->respMutex);
+		this->responseTab->appendContent(response);
+	}
+	this->commandTab->refresh();
+	this->refresh();		// manually refresh because main thread is polling
+}
+
+void CLI::handleEvent(std::string const& event)
+{
+	{
+		std::lock_guard<std::mutex> lock(this->eventMutex);
+		this->eventTab->appendContent(event);
+	}
+	this->commandTab->refresh();
+	this->refresh();		// manually refresh because main thread is polling
+}
+
+void CLI::forwardCommandToServer(std::string const& command)
+{
+	GameInterface::forwardCommandToServer(command);
+
+	if (command == QUIT)
+		this->KeepAlive = false;
+}
+
+// ioUtils::Pipe resizePipe = ioUtils::createPipe();
+// signal_handler_fn = [resizePipe.in](int sig) {
+// 	LOG_DEBUG(LogContext::INTERFACE, "(output) got resize callback");
+// 	write(resizePipe.in, "x", 1);
+//     // qui puoi usare catture, perché è uno std::function
+// };
+//
+// std::signal(SIGWINCH, signal_handler_wrapper);
+//
+// signal(SIGWINCH, [](int fd) {
+// });
+//
+// if (fds[0].revents & POLLIN)
+// 	this->interface->handleUserInput();
+//
+// if (fds[1].revents & POLLIN)
+// {
+// 	char tmp;
+// 	write(resizePipe.out, &tmp, 1);
+//
+// 	struct winsize ws;
+// 	ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
+// 	resizeterm(ws.ws_row, ws.ws_col);
+//
+// 	LOG_DEBUG(LogContext::INTERFACE, "(input) got resize callback");
+// 	this->interface->resize();
+// }
+
+void CLI::resize(void)
 {
 	// int32_t newHeight, newWidth;
 
 	// getmaxyx(stdscr, newHeight, newWidth);
 
-	// this->inputTabs[CommandLineUI::FRAME_TAB]->resize(newHeight, newWidth);
-
+	// this->inputTabs[CLI::FRAME_TAB]->resize(newHeight, newWidth);
 }
 
-void CommandLineUI::dispatch(int32_t inputChar)
+void CLI::dispatchUserInput(int32_t inputChar)
 {
 	auto it = this->_dispatcher.find(inputChar);
 	if (it != this->_dispatcher.end()) {
@@ -615,65 +640,37 @@ void CommandLineUI::dispatch(int32_t inputChar)
 	// Default handling
 	this->commandTab->setChar(inputChar);
 	if (inputChar == COMMAND_TERM)
-		this->forwardCommandToServer();
-}
-
-void CommandLineUI::forwardCommandToServer(void)
-{
-	std::string command = this->commandTab->getLastInput();
-	LOG_INFO(LogContext::INTERFACE, "Got new command: " + command);
-
-	ioUtils::write(this->commandFd, command.data(), command.size());
-
-	if (command == QUIT)
-		this->KeepAlive = false;
-
-}
-
-void CommandLineUI::handleResponse(std::string const& response)
-{
 	{
-		std::lock_guard<std::mutex> lock(this->respMutex);
-		this->responseTab->appendContent(response);
+		std::string command = this->commandTab->getLastInput();
+		this->forwardCommandToServer(command);
 	}
-	this->commandTab->refresh();
-	this->refresh();		// manually refresh because main thread is polling
 }
 
-void CommandLineUI::handleEvent(std::string const& event)
-{
-	{
-		std::lock_guard<std::mutex> lock(this->eventMutex);
-		this->eventTab->appendContent(event);
-	}
-	this->commandTab->refresh();
-	this->refresh();		// manually refresh because main thread is polling
-}
-
-// InputTab& CommandLineUI::getCurrentTab(void)
+// InputTab& CLI::getCurrentTab(void)
 // {
 // 	assert(this->currentTabIndex < this->inputTabs.size() and "index overflow whiele accessing input tabs");
 // 	return this->inputTabs.at(this->currentTabIndex);
 // }
 
-// void CommandLineUI::switchForwardTab(void) noexcept
+// void CLI::switchForwardTab(void) noexcept
 // {
-// 	if (this->currentTabIndex < CommandLineUI::N_TABS - 1)
+// 	if (this->currentTabIndex < CLI::N_TABS - 1)
 // 		this->currentTabIndex++;
 // 	else
 // 		this->currentTabIndex = 0UL;
 // }
 
-// void CommandLineUI::switchBackwardTab(void) noexcept
+// void CLI::switchBackwardTab(void) noexcept
 // {
 // 	if (this->currentTabIndex > 0UL)
 // 		this->currentTabIndex--;
 // 	else
-// 		this->currentTabIndex = CommandLineUI::N_TABS - 1;
+// 		this->currentTabIndex = CLI::N_TABS - 1;
 // }
 
-// void CommandLineUI::setCurrentTab(size_t newTabIndex) noexcept
+// void CLI::setCurrentTab(size_t newTabIndex) noexcept
 // {
-// 	assert(newTabIndex < CommandLineUI::N_TABS);
+// 	assert(newTabIndex < CLI::N_TABS);
 // 	this->currentTabIndex = newTabIndex;
 // }
+

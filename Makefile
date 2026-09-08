@@ -46,11 +46,11 @@ $(TARGET_CLIENT): $(OBJECTS)
 	$(CC) $(CPP_FLAGS) $(INCLUDE) $(OBJECTS) $(LIBS) -o $@
 
 $(OBJ_DIR)/client/%.o: $(CLIENT_SRC_DIR)/%.cpp
-	mkdir -p $(dir $@) $(dir $(DEPS_DIR)/client/$*.d)
+	@mkdir -p $(dir $@) $(dir $(DEPS_DIR)/client/$*.d)
 	$(CC) $(CPP_FLAGS) $(INCLUDE) $(DEPS_FLAGS) $(DEPS_DIR)/client/$*.d -c $< -o $@
 
 $(OBJ_DIR)/shared/%.o: $(SHARED_SRC_DIR)/%.cpp
-	mkdir -p $(dir $@) $(dir $(DEPS_DIR)/shared/$*.d)
+	@mkdir -p $(dir $@) $(dir $(DEPS_DIR)/shared/$*.d)
 	$(CC) $(CPP_FLAGS) $(INCLUDE) $(DEPS_FLAGS) $(DEPS_DIR)/shared/$*.d -c $< -o $@
 
 -include $(DEPS)
