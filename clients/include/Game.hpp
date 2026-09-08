@@ -7,6 +7,10 @@
 #include "UI.hpp"
 
 
+static constexpr const char* S_OK = "OK";
+static constexpr const char* S_ERR = "ERR";
+static constexpr const char* S_EVT = "EVT";
+
 class Game
 {
 	public:
@@ -21,26 +25,25 @@ class Game
 
 		void	run(std::string const& host, uint32_t port);
 		bool	isWorkerRunning(void) const noexcept { return this->keepAlive.load(); }
-		void	startWorker(int32_t gameSocket) noexcept;
 		void	stopWorker(void) noexcept;
 
 	private:
 		void wakeUpWorker(void) noexcept;
 		void flushPipe(void) const noexcept;
 
-		void pollLoop(int32_t clientSocket);
-		void forwardCommandToServer(int32_t clientSocket);
+		void pollLoop(int32_t clientSocket, int32_t commandPipeInput);
+		void readCommandFromUI(std::vector<struct pollfd>& pollFds);
 		void readDataFromServer(int32_t clientSocket);
 		void handleServerInput(void);
+		void forwardCommandToServer(std::vector<struct pollfd>& pollFds);
 
-		ioUtils::Pipe commandPipe;
-		ioUtils::Pipe wakeupPipe{-1, -1};		// pipe for pollwakeup the worker
+		ioUtils::Pipe wakeupPipe;		// pipe for pollwakeup the worker
 
 		std::unique_ptr<ClientHTTP> 	clientHTTP;
 		std::unique_ptr<CommandLineUI>	interface;		// later on might be a pointer for doing poly stuff
 
-		size_t	serverInputLength{0UL};
-		char	serverBuffer[Config::BUFF_SIZE];
+		size_t	dataSize{0UL};
+		char	serverData[Config::BUFF_SIZE];
 
 		size_t	commandLength{0UL};
 		char	commandBuffer[Config::BUFF_SIZE];

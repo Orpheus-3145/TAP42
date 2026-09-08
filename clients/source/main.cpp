@@ -15,7 +15,7 @@ void startLogging(void)
 	Logger::getInstance().setLogFile(logName);
 	Logger::getInstance().setMinLevel(Config::DEFAULT_LOG_LEVEL);
 	Logger::getInstance().setConsoleOutput(false);
-	Logger::getInstance().setFilter(LogContext::INTERFACE);
+	Logger::getInstance().setFilter(Logger::ALL_ENTRIES & ~LogContext::INPUT_OUTPUT);
 }
 
 int32_t main(int32_t argc, char** argv)

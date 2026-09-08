@@ -13,7 +13,7 @@
 class ClientHTTP
 {
 	public:
-		ClientHTTP(void);
+		ClientHTTP(std::string const& host, uint32_t port);
 
 		ClientHTTP(ClientHTTP const&) = delete;
 		ClientHTTP& operator=(ClientHTTP const&) = delete;
@@ -22,7 +22,6 @@ class ClientHTTP
 
 		~ClientHTTP(void);
 
-		void	connect(std::string const& host, uint32_t port);
 		void	disconnect(void) noexcept;
 		bool	isWorkerRunning(void) const noexcept { return this->keepAlive.load(); }
 		void	startWorker(int32_t gameSocket) noexcept;

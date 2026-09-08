@@ -19,9 +19,24 @@ class HTTPException : public AppException {
 		using AppException::AppException;
 };
 
-class CLIException : public AppException {
+class GameException : public AppException {
 	public:
 		using AppException::AppException;
+};
+
+class InterfaceException : public AppException {
+	public:
+		using AppException::AppException;
+};
+
+class CliException : public InterfaceException {
+	public:
+		using InterfaceException::InterfaceException;
+};
+
+class GuiException : public InterfaceException {
+	public:
+		using InterfaceException::InterfaceException;
 };
 
 class IOException : public AppException {

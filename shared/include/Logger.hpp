@@ -50,6 +50,11 @@ constexpr LogContext operator&(LogContext a, LogContext b) noexcept
 	);
 }
 
+constexpr LogContext operator~(LogContext a) noexcept
+{
+	return static_cast<LogContext>(~static_cast<uint32_t>(a));
+}
+
 std::ostream& operator<<(std::ostream& os, LogLevel level) noexcept;
 std::ostream& operator<<(std::ostream& os, LogContext context) noexcept;
 

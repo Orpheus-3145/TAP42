@@ -7,9 +7,12 @@
 #include "Logger.hpp"
 
 
-ClientHTTP::ClientHTTP(void)
+ClientHTTP::ClientHTTP(std::string const& host, uint32_t port)
 {
 	this->wakeupPipe = ioUtils::createPipe();
+	this->httpSocket = ioUtils::connectToServer(host, port, nullptr);
+
+	LOG_INFO(LogContext::HTTP_CLIENT, "Client HTTP connected to host: " + host + " - port: " + std::to_string(port));
 }
 
 ClientHTTP::~ClientHTTP(void)
@@ -18,18 +21,8 @@ ClientHTTP::~ClientHTTP(void)
 	ioUtils::closePipe(this->wakeupPipe);
 }
 
-void ClientHTTP::connect(std::string const& host, uint32_t port)
-{
-	this->httpSocket = ioUtils::connectToServer(host, port, nullptr);
-
-	LOG_INFO(LogContext::HTTP_CLIENT, "Client HTTP connected to host: " + host + " - port: " + std::to_string(port));
-}
-
 void ClientHTTP::disconnect(void) noexcept
 {
-	if (this->httpSocket == -1)
-		return;
-
 	this->stopWorker();
 	ioUtils::closeSocket(this->httpSocket);
 

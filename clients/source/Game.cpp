@@ -13,35 +13,37 @@
 
 Game::Game(void) noexcept
 {
-	this->commandPipe = ioUtils::createPipe();
 	this->wakeupPipe = ioUtils::createPipe();
 
-	this->clientHTTP = std::make_unique<ClientHTTP>();
-	this->interface = std::make_unique<CommandLineUI>(this->commandPipe);
 }
 
 Game::~Game(void)
 {
-	ioUtils::closePipe(this->commandPipe);
 	ioUtils::closePipe(this->wakeupPipe);
 }
 
 void Game::run(std::string const& host, uint32_t port)
 {
-	this->serverInputLength = 0UL;
+	this->dataSize = 0UL;
 	this->commandLength = 0UL;
-
+	
+	ioUtils::Pipe commandPipe = ioUtils::createPipe();
 	ioUtils::SocketPair gameClientSockets = ioUtils::createSocketPair();
 
-	// this->clientHTTP->connect(host, port);
-	// this->clientHTTP->startWorker(gameClientSockets.first);
-	(void) host;
-	(void) port;
-	this->interface->setup(Config::HEIGHT_WIN, Config::WIDTH_WIN);
-	this->interface->show();
+	this->clientHTTP = std::make_unique<ClientHTTP>(host, port);
+	this->clientHTTP->startWorker(gameClientSockets.first);
 
-	this->startWorker(gameClientSockets.second);
-	if (this->worker.joinable())
+	this->interface = std::make_unique<CommandLineUI>(commandPipe.in);
+
+	// Config::HEIGHT_WIN, Config::WIDTH_WIN
+	
+	this->worker = std::thread(&Game::pollLoop, this, gameClientSockets.second, commandPipe.out);
+	this->keepAlive.store(true);
+	LOG_INFO(LogContext::GAME_CLIENT, "Started game worker, listening to UNIX socket: " + std::to_string(gameClientSockets.second));
+
+	this->interface->loop();		// blocks here
+
+	if (this->worker.joinable())	// ugly, put main thread asleep
 	{
 		this->worker.join();
 		LOG_DEBUG(LogContext::GAME_CLIENT, "Stopped worker");
@@ -51,20 +53,11 @@ void Game::run(std::string const& host, uint32_t port)
 	LOG_DEBUG(LogContext::GAME_CLIENT, "Stopped worker");
 
 	this->clientHTTP->disconnect();
-	this->interface->clear();
 
 	LOG_INFO(LogContext::GAME_CLIENT, "Game stopped");
 
+	ioUtils::closePipe(commandPipe);
 	ioUtils::closePair(gameClientSockets);
-}
-
-void Game::startWorker(int32_t clientSocket) noexcept
-{
-	assert(clientSocket != -1 and "invalid game socket");
-
-	this->worker = std::thread(&Game::pollLoop, this, clientSocket);
-	this->keepAlive.store(true);
-	LOG_INFO(LogContext::GAME_CLIENT, "Started game worker, listening to UNIX socket: " + std::to_string(clientSocket));
 }
 
 void Game::stopWorker(void) noexcept
@@ -85,140 +78,87 @@ void Game::wakeUpWorker(void) noexcept
 	ioUtils::write(this->wakeupPipe.in, &byte, 1UL);
 }
 
+void Game::pollLoop(int32_t clientSocket, int32_t commandPipeInput)
+{
+	assert(clientSocket != -1 and "invalid client socket");
+	assert(commandPipeInput != -1 and "invalid command pipe");
+
+	size_t nFds = 3;
+	std::vector<struct pollfd> pollFds(nFds);
+
+	while (this->keepAlive.load())
+	{
+		// main thread calls, only read
+		pollFds[0].fd = this->wakeupPipe.out;
+		pollFds[0].events |= POLLIN;
+		pollFds[0].revents = 0;
+		// user commands, only read
+		pollFds[1].fd = commandPipeInput;
+		pollFds[1].events |= POLLIN;
+		pollFds[1].revents = 0;
+		// client socket, read and write
+		pollFds[2].fd = clientSocket;
+		pollFds[2].events |= POLLIN;
+		pollFds[2].revents = 0;
+
+		if (ioUtils::poll(pollFds.data(), nFds, -1) == -1)
+		{
+			if (errno == EINTR)
+				continue;
+			LOG_ERROR(LogContext::INTERFACE, "Poll failed: " + std::string(strerror(errno)));
+			throw GameException("poll failed: " + std::string(strerror(errno)));
+		}
+		if (pollFds[0].revents & POLLIN)	// worker awaken from main thread, flush pipe	NB use it to gracelly close the client when user closes session?
+			this->flushPipe();
+		
+		if (pollFds[1].revents & POLLIN)
+			this->readCommandFromUI(pollFds);
+		
+		if (pollFds[2].revents & POLLIN)
+			this->readDataFromServer(clientSocket);
+
+		if (pollFds[2].revents & POLLOUT)
+			this->forwardCommandToServer(pollFds);
+
+		// client closed connection (because server did so) (POLLHUP) or got an error (POLLERR | POLLNVAL)
+		if (pollFds[2].revents & (POLLHUP | POLLERR | POLLNVAL))
+		{
+			LOG_WARN(LogContext::INTERFACE, "Client unexpectedly terminated connection, closing session");
+			this->keepAlive.store(false);
+		}
+	}
+}
+
 void Game::flushPipe(void) const noexcept
 {
 	char tmp[64];
 	ioUtils::read(this->wakeupPipe.out, tmp, 64);
 }
 
-std::function<void(int)> signal_handler_fn;
-
-extern "C" void signal_handler_wrapper(int sig) {
-    if (signal_handler_fn) {
-        signal_handler_fn(sig);
-    }
-}
-
-void Game::pollLoop(int32_t clientSocket)
+void Game::readCommandFromUI(std::vector<struct pollfd>& pollFds)
 {
-	assert(clientSocket != -1 and "invalid client socket");
-
-	// ioUtils::Pipe resizePipe = ioUtils::createPipe();
-	// signal_handler_fn = [resizePipe.in](int sig) {
-	// 	LOG_DEBUG(LogContext::INTERFACE, "(output) got resize callback");
-	// 	write(resizePipe.in, "x", 1);
-    //     // qui puoi usare catture, perché è uno std::function
-    // };
-
-    // std::signal(SIGWINCH, signal_handler_wrapper);
-
-    // signal(SIGWINCH, [](int fd) {
-	// });
-
-	while (this->keepAlive.load())
-	{
-		struct pollfd fds[4];
-		// user input
-		fds[0].fd = STDIN_FILENO;
-		fds[0].events = POLLIN;
-		fds[0].revents = 0;
-		// main thread calls
-		fds[1].fd = this->wakeupPipe.out;
-		fds[1].events = POLLIN;
-		fds[1].revents = 0;
-		// user input
-		fds[2].fd = this->commandPipe.out;
-		fds[2].events = POLLIN;
-		fds[2].revents = 0;
-		// client socket
-		fds[3].fd = clientSocket;
-		fds[3].events = POLLIN;
-		fds[3].revents = 0;
-
-		if (ioUtils::poll(fds, 4, -1) == -1)
-		{
-			if (errno == EINTR)
-				continue;
-			LOG_ERROR(LogContext::INTERFACE, "Poll failed: " + std::string(strerror(errno)));
-			throw CLIException("poll failed: " + std::string(strerror(errno)));
-		}
-
-		if (fds[0].revents & POLLIN)
-			this->interface->handleUserInput();
-
-		// if (fds[1].revents & POLLIN)
-		// {
-		// 	char tmp;
-		// 	write(resizePipe.out, &tmp, 1);
-
-		// 	struct winsize ws;
-		// 	ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
-		// 	resizeterm(ws.ws_row, ws.ws_col);
-
-		// 	LOG_DEBUG(LogContext::INTERFACE, "(input) got resize callback");
-		// 	this->interface->resize();
-		// }
-
-		if (fds[1].revents & POLLIN)	// worker awaken from main thread, flush pipe	NB use it to gracelly close the client when user closes session?
-			this->flushPipe();
-		
-		if (fds[2].revents & POLLIN)
-			this->forwardCommandToServer(clientSocket);
-
-		if (fds[3].revents & POLLIN)
-			this->readDataFromServer(clientSocket);
-
-		// client closed connection (because server did so) (POLLHUP) or got an error (POLLERR | POLLNVAL)
-		if (fds[3].revents & (POLLHUP | POLLERR | POLLNVAL))
-		{
-			LOG_WARN(LogContext::INTERFACE, "Client unexpectedly terminated connection, closing session");
-			this->keepAlive.store(false);
-		}
-
-		this->interface->refresh();
-	}
-	// ioUtils::closePipe(resizePipe);
-}
-
-void Game::forwardCommandToServer(int32_t clientSocket)
-{
-	assert(clientSocket != -1 and "invalid client socket");
-
-	LOG_DEBUG(LogContext::INTERFACE, "Forwarding command to client");
-	this->commandLength = ioUtils::read(this->commandPipe.out, this->commandBuffer, Config::BUFF_SIZE);
+	this->commandLength = ioUtils::read(pollFds[1].fd, this->commandBuffer, Config::BUFF_SIZE);
 	
-	// if necessary parse/format command
-	
-	if (ioUtils::writeNonBlock(clientSocket, this->commandBuffer, this->commandLength) == -1)
-	{
-		LOG_WARN(LogContext::GAME_CLIENT, "Game-client socket is busy on write side");
-		// maybe add id it to polling until it's done?
-	}
-
-	// handle graceful termination
-	if (this->commandLength >= ::strlen(Config::QUIT) and !::strncmp(this->commandBuffer, Config::QUIT, ::strlen(Config::QUIT)))
-		this->keepAlive.store(false);
-	this->commandLength = 0UL;
+	LOG_DEBUG(LogContext::GAME_CLIENT, "Received command from UI: '" + std::string(this->commandBuffer, this->commandLength) + "'");
+	pollFds[2].events |= POLLOUT;
 }
 
 void Game::readDataFromServer(int32_t clientSocket)
 {
-	assert(clientSocket != -1 and "invalid client socket");
-
 	ssize_t n = 0L;
+
 	do	// while loop because buffer could overflow
 	{
-		n = ioUtils::readNonBlock(clientSocket, this->serverBuffer + this->serverInputLength, Config::BUFF_SIZE - this->serverInputLength);
+		n = ioUtils::readNonBlock(clientSocket, this->serverData + this->dataSize, Config::BUFF_SIZE - this->dataSize);
 
 		if (n > 0L)
 		{
-			this->serverInputLength += n;
-			LOG_DEBUG(LogContext::INTERFACE, "Reading game input from client");
+			this->dataSize += n;
 			this->handleServerInput();
 		}
 		else if (n == -1L)		// client closed connection
 		{
-			LOG_WARN(LogContext::INTERFACE, "Client unexpectedly terminated connection, closing session");
+			LOG_WARN(LogContext::GAME_CLIENT, "Client unexpectedly terminated connection, closing session");
 			this->keepAlive.store(false);
 		}
 	} while(n > 0L);
@@ -226,38 +166,47 @@ void Game::readDataFromServer(int32_t clientSocket)
 
 void Game::handleServerInput(void)
 {
-	char *startMsg = this->serverBuffer, *endMsg = nullptr;
+	char *startMsg = this->serverData, *endMsg = nullptr;
 	while (true)
 	{
-		endMsg = reinterpret_cast<char*>(::memchr(startMsg, Config::MSG_TERM, this->serverInputLength));
+		endMsg = reinterpret_cast<char*>(::memchr(startMsg, Config::MSG_TERM, this->dataSize));
 		if (endMsg == nullptr)
 			break;
-		
+
 		// NB better input parsing
 		ssize_t lenMsg = endMsg - startMsg;
-		if (lenMsg < 2)
-			throw CLIException("Bad server input: " + std::string(startMsg, lenMsg));
+		std::string serverInput = std::string(startMsg, lenMsg);
+		LOG_DEBUG(LogContext::GAME_CLIENT, "Received from server: '" + serverInput);
 
-		if (!::strncmp(startMsg, "OK", 2) or !::strncmp(startMsg, "ERR", 3))
-		{
-			LOG_INFO(LogContext::INTERFACE, "Got new response: '" + std::string(startMsg, lenMsg) + "'");
-			this->interface->handleResponse(std::string(startMsg, lenMsg));
-		}
-		else if (!::strncmp(startMsg, "EVT", 3))
-		{
-			LOG_INFO(LogContext::INTERFACE, "Got new event: '" + std::string(startMsg, lenMsg) + "'");
-			this->interface->handleEvent(std::string(startMsg, lenMsg));
-		}
+		if ((serverInput.find(S_OK) == 0UL) or (serverInput.find(S_ERR) == 0UL))
+			this->interface->handleResponse(serverInput);
+		else if (serverInput.find(S_EVT) == 0UL)
+			this->interface->handleEvent(serverInput);
 		else
-		{
-			LOG_WARN(LogContext::INTERFACE, "Unknown command: '" + std::string(startMsg, lenMsg) + "'");
-			// tmp, should throw error or send error to client
-			this->interface->handleEvent("UNKNWON - " + std::string(startMsg, lenMsg));
-		}
+			LOG_WARN(LogContext::INTERFACE, "Unknown server input: '" + serverInput + "'");
 
 		startMsg += lenMsg + 1UL;
-		this->serverInputLength -= lenMsg + 1UL;
+		this->dataSize -= lenMsg + 1UL;
 	}
-	if (this->serverInputLength > 0UL)
-		::memmove(this->serverBuffer, startMsg, this->serverInputLength);
+	if (this->dataSize > 0UL)
+		::memmove(this->serverData, startMsg, this->dataSize);
+}
+
+void Game::forwardCommandToServer(std::vector<struct pollfd>& pollFds)
+{
+	// if necessary parse/format command
+
+	LOG_DEBUG(LogContext::GAME_CLIENT, "Piping command to server");
+
+	if (ioUtils::writeNonBlock(pollFds[2].fd, this->commandBuffer, this->commandLength) == -1)
+	{
+		LOG_WARN(LogContext::GAME_CLIENT, "Client socket busy, trying again later");
+		return;
+	}
+
+	pollFds[2].events = 0;
+	// handle graceful termination
+	if (this->commandLength >= ::strlen(QUIT) and !::strncmp(this->commandBuffer, QUIT, ::strlen(QUIT)))
+		this->keepAlive.store(false);
+	this->commandLength = 0UL;
 }

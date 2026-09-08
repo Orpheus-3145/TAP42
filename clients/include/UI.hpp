@@ -3,11 +3,13 @@
 #include <ncurses.h>
 #include <queue>
 #include <vector>
-#include <map>
+#include <unordered_map>
 #include <array>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <cstring>
+#include <mutex>
 
 #include "Config.hpp"
 #include "Utils.hpp"
@@ -236,6 +238,9 @@
 // ===========================================================================================================================================================================
 
 
+static constexpr char const*	QUIT = "quit";
+static constexpr const char		COMMAND_TERM = '\n';
+
 static std::vector<const char*> COMMANDS{
 	"aaaaaaa",
 	"aaabbb",
@@ -249,6 +254,22 @@ static std::vector<const char*> COMMANDS{
 	"talk",
 	"look"
 };
+
+// "CONNECT"
+// "LOOK"
+// "MOVE"
+// "WHO"
+// "CHAT"
+// "TAKE"
+// "DROP"
+// "INVENTORY"
+// "TALK"
+// "ATTACK"
+// "STATUS"
+// "QUEST"
+// "QUESTS"
+// "GROUP"
+// "QUIT"
 
 
 class BasicTab
@@ -268,7 +289,7 @@ class BasicTab
 		virtual void refresh(void) const noexcept { ::wnoutrefresh(this->main); }
 		virtual void resize(int32_t newHeight, int32_t newWidth, int32_t newY = -1, int32_t newX = -1);
 
-		virtual void writeLine(std::string const& newContent) const noexcept;
+		void printLine(std::string const& newContent) const noexcept;
 	
 	protected:
 		WINDOW* border{nullptr};
@@ -279,13 +300,13 @@ class BasicTab
 
 class InputTab : public BasicTab
 {
-	using HistoryCommands = std::deque<std::pair<size_t,std::array<char,Config::BUFF_SIZE>>>;
+	using HistoryCommands = std::deque<std::pair<size_t,std::array<char,Config::BUFF_SIZE>>>;		// ugly, store it as dyn ptrs?
 
 	public:
 		using BasicTab::BasicTab;
 
-		InputTab(void) : InputTab::InputTab(90, 40, 0, 0, -1) {}
-		InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar = -1, int32_t sendCommandFd = -1);
+		InputTab(void);
+		InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar = -1);
 
 		InputTab(InputTab&&) noexcept;
 		InputTab& operator=(InputTab&&) noexcept;
@@ -296,17 +317,16 @@ class InputTab : public BasicTab
 		void moveCursorLeft(void) const noexcept;
 		void moveCursorRight(void) const noexcept;
 
-		int32_t getCharInput(void) const noexcept;
-		void storeCharInput(void);
-		void storeCharInput(char input);
+		void setChar(int32_t input);
+		std::string getLastInput(void) const noexcept;
+		int32_t getChar(void) const noexcept;
 
-		void suggestNextCommand(void) noexcept;
-		void suggestPastCommand(void) noexcept;
+		void suggestNextHint(void) noexcept;
+		void suggestPastHint(void) noexcept;
 
-		void showPreviousCommand(void) noexcept;
-		void showFollowingCommand(void) noexcept;
+		void showPrevious(void) noexcept;
+		void showFollowing(void) noexcept;
 
-		void forwardCommand(void) noexcept;
 		void appendContent(std::string const& newContent) noexcept override;
 
 	private:
@@ -314,8 +334,6 @@ class InputTab : public BasicTab
 		void clearHints(void) noexcept;
 
 		void showInput(void) const noexcept;
-
-		int32_t sendCommandFd{-1};
 
 		HistoryCommands				history;
 		std::vector<const char*>	hints;
@@ -348,47 +366,63 @@ class OutputTab : public BasicTab
 		size_t					firstLineToPrintIndex{0UL};
 };
 
-class CommandLineUI		// NB make parent UI class that does I/O with Game
+// parent class Interface, children CLI and GUI
+class CommandLineUI
 {
+	using TabVector = std::vector<std::unique_ptr<BasicTab>>;
+
 	public:
-		CommandLineUI(ioUtils::Pipe commandPipe) noexcept :
-			commandPipe{commandPipe} {}
+		CommandLineUI(int32_t commandFd);
 
 		CommandLineUI(CommandLineUI const& other) = delete;
 		CommandLineUI& operator=(CommandLineUI const& other) = delete;
 		CommandLineUI(CommandLineUI&& other) = delete;
 		CommandLineUI& operator=(CommandLineUI&& other) = delete;
 
-		~CommandLineUI(void);
+		~CommandLineUI(void) noexcept;
 		
-		void setup(int32_t height, int32_t width) noexcept;		// NB parent
-		void show(void) noexcept { this->refresh(); }
-		void clear(void) noexcept;
-		void refresh(void) noexcept { ::doupdate(); }
+		void loop(void);		// NB parent
 
-		void handleUserInput(void);		// NB parent
+		// void handleUserInput(std::vector<struct pollfd>& pollFds);		// NB parent
+		void forwardCommandToServer(void);
+
 		void handleResponse(std::string const& response);		// NB parent
 		void handleEvent(std::string const& event);		// NB parent
 
-		void switchForwardTab(void) noexcept;
-		void switchBackwardTab(void) noexcept;
-
-		BasicTab* getCurrentTab(void) { return this->tabs.at(this->currentTabIndex).get(); }
-		void setCurrentTab(size_t currentITabIndex) noexcept;
-		void resize(void);		// NB parent
-
 	private:
+		// InputTab& getCurrentTab(void);
+		void resize(void);		// NB parent
+		void refresh(void) noexcept { ::doupdate(); }
+
+		// void switchForwardTab(void) noexcept;
+		// void switchBackwardTab(void) noexcept;
+		// BasicTab* getCurrentTab(void) noexcept;
+		// void setCurrentTab(size_t currentITabIndex) noexcept;
+
+		void dispatch(int inputChar);
+
 		static constexpr size_t N_TABS = 3;
 		static constexpr size_t FRAME_TAB = 0;
-		static constexpr size_t INPUT_TAB = 1;
+		static constexpr size_t CMD_TAB = 1;
 		static constexpr size_t OUTPUT_TAB = 2;
 
-		std::vector<std::unique_ptr<BasicTab>> tabs;
-		size_t currentTabIndex{0UL};
+		std::mutex respMutex, eventMutex;
 
-		ioUtils::Pipe commandPipe;	// NB add poll loop in CommandLineUI that reads/write these pipes
-		ioUtils::Pipe responsePipe;
-		ioUtils::Pipe eventPipe;
+		ioUtils::Pipe resizePipe;
+		int32_t commandFd;
+
+		std::unique_ptr<BasicTab>	frame;
+		std::unique_ptr<InputTab>	commandTab;
+		std::unique_ptr<OutputTab>	responseTab, eventTab;
+
+		// TabVector	tabs;
+		// size_t		currentTabIndex{0UL};
+		// size_t					currentInTabIndex{0UL};
+		// size_t					currentOutTabIndex{0UL};
+
+		std::unordered_map<int32_t,std::function<void()>>	_dispatcher;
+
+		bool KeepAlive{true};
 };
 
 class GraphicUI

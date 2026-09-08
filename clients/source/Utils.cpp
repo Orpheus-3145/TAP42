@@ -62,7 +62,7 @@ int32_t	connectToServer(std::string const& host, uint32_t portNo, struct addrinf
 		filter = &defaultTCPfilter;
 
 	if (::getaddrinfo(host.data(), port.data(), filter, &list) != 0)
-		throw(HTTPException("Failed to find addresses for " + host + ":" + port));
+		throw HTTPException("Failed to find addresses for " + host + ":" + port);
 
 	for (tmp = list; tmp != nullptr; tmp = tmp->ai_next)
 	{
@@ -77,16 +77,16 @@ int32_t	connectToServer(std::string const& host, uint32_t portNo, struct addrinf
 	if (tmp == nullptr)
 	{
 		::freeaddrinfo(list);
-		throw(HTTPException("No available IP host found for port: " + port));
+		throw HTTPException("No available IP host found for port: " + port);
 	}
 	std::memcpy(&rawServerAddress, tmp->ai_addr, tmp->ai_addrlen);
 	::freeaddrinfo(list);
 
 	int32_t flags = ::fcntl(socket, F_GETFL, 0);
 	if (flags == -1)
-		throw(HTTPException("Failed to load flags for socket"));
+		throw HTTPException("Failed to load flags for socket");
 	if (::fcntl(socket, F_SETFL, flags | O_NONBLOCK) == -1)
-		throw(HTTPException("Failed to set socket as non-blocking"));
+		throw HTTPException("Failed to set socket as non-blocking");
 
 	return socket;
 }
@@ -235,15 +235,15 @@ SocketPair createSocketPair(void)
 	int sockets[2];
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1)
-		throw CLIException("Error while creating io socket: " + std::string(strerror(errno)));
+		throw InterfaceException("Error while creating io socket: " + std::string(strerror(errno)));
 
 	for (int32_t fd : {sockets[0], sockets[1]})
 	{
 		int32_t flags = fcntl(fd, F_GETFL, 0);
 		if (flags == -1)
-			throw(CLIException("Failed to load flags for socket"));
+			throw InterfaceException("Failed to load flags for socket");
 		if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-			throw(CLIException("Failed to set socket as non-blocking"));
+			throw InterfaceException("Failed to set socket as non-blocking");
 	}
 	LOG_DEBUG(LogContext::INPUT_OUTPUT, "Created socket pair: [" + std::to_string(sockets[0]) + " " + std::to_string(sockets[1]) + "]");
 	return SocketPair{sockets[0], sockets[1]};
@@ -268,15 +268,15 @@ Pipe createPipe(void)
 {
 	int32_t _pipe[2] = {-1, -1};		// pipe for pollwakeup of worker
 	if (::pipe(_pipe) == -1)
-		throw(HTTPException("Failed to create wakeup pipe: " + std::string(strerror(errno))));
+		throw HTTPException("Failed to create wakeup pipe: " + std::string(strerror(errno)));
 
 	for (int32_t fd : {_pipe[0], _pipe[1]})
 	{
 		int32_t flags = ::fcntl(fd, F_GETFL, 0);
 		if (flags == -1)
-			throw(HTTPException("Failed to load flags for socket"));
+			throw HTTPException("Failed to load flags for socket");
 		if (::fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-			throw(HTTPException("Failed to set socket as non-blocking"));
+			throw HTTPException("Failed to set socket as non-blocking");
 	}
 	LOG_DEBUG(LogContext::INPUT_OUTPUT, "Created pipe: [" + std::to_string(_pipe[0]) + " " + std::to_string(_pipe[1]) + "]");
 	return Pipe{_pipe[1], _pipe[0]};
