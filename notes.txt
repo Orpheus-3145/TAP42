@@ -1,0 +1,15 @@
+TODO:
+OK	1. resize callback
+	2. graceful termination
+	3. fixing buffer size
+	4. exception handling
+	4. check consts and noexcepts
+OK	5. unify history and _state
+	6. bug moving cursor and delete chars
+OK	7. bug command after resize
+	9. make clientHTTP RAII
+	10. wrap nc functions into throwable namespace
+OK	11. overlapped tabs
+	12. Heigth vs Height
+	13.		InputTab::showInput --> change
+			InputTab::suggestPastHint --> suggestPrevious

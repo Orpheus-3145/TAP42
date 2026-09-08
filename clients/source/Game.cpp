@@ -13,27 +13,12 @@
 #include <unistd.h>
 
 
-GameInterface::GameInterface(int32_t commandFd, int32_t height, int32_t width) noexcept :
-	commandFd{commandFd},
-	height{height},
-	width{width}
+UI::~UI(void) noexcept
 {
-	assert(this->commandFd != -1 and "Invalid fd for writing commands provided");
-	assert(this->height > 0 and "Invalid height provided");
-	assert(this->width > 0 and "Invalid width writing commands provided");
-
-	LOG_INFO(LogContext::INTERFACE, "Done setup UI");
 }
 
-GameInterface::~GameInterface(void) noexcept
+void UI::forwardCommandToServer(std::string const& command)
 {
-	LOG_INFO(LogContext::INTERFACE, "UI stopped");
-}
-
-void GameInterface::forwardCommandToServer(std::string const& command)
-{
-	LOG_INFO(LogContext::INTERFACE, "Got new command: " + command);
-
 	ioUtils::write(this->commandFd, command.data(), command.size());
 }
 
@@ -44,36 +29,41 @@ void Game::run(std::string const& host, uint32_t port)
 
 	this->dataSize = 0UL;
 	this->commandLength = 0UL;
-	
+
 	ioUtils::Pipe commandPipe = ioUtils::createPipe();
 	ioUtils::SocketPair gameClientSockets = ioUtils::createSocketPair();
 
-	this->clientHTTP = std::make_unique<ClientHTTP>(host, port);
-	this->clientHTTP->startWorker(gameClientSockets.first);
+	(void)host;
+	(void)port;
+	// this->clientHTTP = std::make_unique<ClientHTTP>(host, port);
+	// this->clientHTTP->startWorker(gameClientSockets.first);
 
 	// decide if use CLI or GUI
 	this->interface = std::make_unique<CLI>(commandPipe.in);
-
-	// Config::HEIGHT_WIN, Config::WIDTH_WIN
 	
-	this->worker = std::thread(&Game::pollLoop, this, gameClientSockets.second, commandPipe.out);
-	this->keepAlive.store(true);
-	LOG_INFO(LogContext::GAME_CLIENT, "Started game worker, listening to UNIX socket: " + std::to_string(gameClientSockets.second));
+	this->startWorker(gameClientSockets.second, commandPipe.out);
 
-	this->interface->loop();		// blocks here
+	this->interface->loop();		// blocks here, NB if exceptions happen here they must be caught and terminate the running threads
+	LOG_INFO(LogContext::GAME_CLIENT, "Ended game loop");
+	this->stopWorker();
 
-	if (this->worker.joinable())	// ugly, put main thread asleep
-	{
-		this->worker.join();
-		LOG_DEBUG(LogContext::GAME_CLIENT, "Stopped game worker");
-	}
-	this->clientHTTP->stopWorker();
-	this->clientHTTP->disconnect();
+	// this->clientHTTP->stopWorker();
+	// this->clientHTTP->disconnect();
 
 	LOG_INFO(LogContext::GAME_CLIENT, "Game stopped");
 
 	ioUtils::closePipe(commandPipe);
 	ioUtils::closePair(gameClientSockets);
+}
+
+void Game::startWorker(int32_t clientSocket, int32_t commandFd) noexcept
+{
+	assert(clientSocket != -1 and "invalid game socket");
+	assert(commandFd != -1 and "invalid command file descriptor");
+
+	this->worker = std::thread(&Game::pollLoop, this, clientSocket, commandFd);
+	this->keepAlive.store(true);
+	LOG_INFO(LogContext::GAME_CLIENT, "Started game worker, listening to UNIX socket: " + std::to_string(clientSocket));
 }
 
 void Game::stopWorker(void) noexcept
@@ -211,6 +201,7 @@ void Game::handleServerInput(void)
 void Game::forwardCommandToServer(std::vector<struct pollfd>& pollFds)
 {
 	// if necessary parse/format command
+	// LOG_INFO(LogContext::INTERFACE, "Got new command: " + command);		NB and print this debug msg
 
 	LOG_DEBUG(LogContext::GAME_CLIENT, "Piping command to server");
 
@@ -221,8 +212,5 @@ void Game::forwardCommandToServer(std::vector<struct pollfd>& pollFds)
 	}
 
 	pollFds[2].events = 0;
-	// NB handle graceful termination
-	// if (this->commandLength >= ::strlen(QUIT) and !::strncmp(this->commandBuffer, QUIT, ::strlen(QUIT)))
-	// 	this->keepAlive.store(false);
 	this->commandLength = 0UL;
 }

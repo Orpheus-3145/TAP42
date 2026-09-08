@@ -93,10 +93,10 @@ int32_t	connectToServer(std::string const& host, uint32_t portNo, struct addrinf
 	return socket;
 }
 
-ssize_t read(int32_t fd, char* buffer, size_t size)
+size_t read(int32_t fd, char* buffer, size_t size)
 {
 	if (size == 0UL)
-		return 0L;
+		return 0UL;
 	
 	size_t	offset = 0UL;
 	while (true)
@@ -119,10 +119,10 @@ ssize_t read(int32_t fd, char* buffer, size_t size)
 	return offset;
 }
 
-ssize_t write(int32_t fd, const char* buffer, size_t size)
+size_t write(int32_t fd, const char* buffer, size_t size)
 {
 	if (size == 0UL)
-		return 0L;
+		return 0UL;
 
 	size_t	offset = 0UL;
 	while (true)

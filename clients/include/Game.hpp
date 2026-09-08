@@ -12,31 +12,29 @@ static constexpr const char* S_OK = "OK";
 static constexpr const char* S_ERR = "ERR";
 static constexpr const char* S_EVT = "EVT";
 
-class GameInterface
+class UI
 {
 	public:
-		GameInterface(int32_t commandFd, int32_t height, int32_t width) noexcept;
+		UI(int32_t commandFd) noexcept : commandFd{commandFd} {}
 
-		GameInterface(GameInterface const& other) = delete;
-		GameInterface& operator=(GameInterface const& other) = delete;
-		GameInterface(GameInterface&& other) = delete;
-		GameInterface& operator=(GameInterface&& other) = delete;
+		UI(UI const& other) = delete;
+		UI& operator=(UI const& other) = delete;
+		UI(UI&& other) = delete;
+		UI& operator=(UI&& other) = delete;
 
-		virtual ~GameInterface(void) noexcept;
+		virtual ~UI(void) noexcept;
 
 		virtual void loop(void) = 0;
 		virtual void handleResponse(std::string const& response) = 0;
 		virtual void handleEvent(std::string const& event) = 0;
 		virtual void forwardCommandToServer(std::string const& command);
+		virtual void stop(void ) noexcept { this->KeepAlive = false; }
 		
 	protected:
-		virtual void createWindow(int32_t height, int32_t width) = 0;
 		virtual void resize(int32_t height, int32_t width) = 0;
 		virtual void refresh(void) noexcept = 0;
 
 		int32_t commandFd;
-		int32_t height;
-		int32_t width;
 
 		bool KeepAlive{true};
 };
@@ -55,6 +53,7 @@ class Game
 
 		void	run(std::string const& host, uint32_t port);
 		bool	isWorkerRunning(void) const noexcept { return this->keepAlive.load(); }
+		void	startWorker(int32_t clientSocket, int32_t commandFd) noexcept;
 		void	stopWorker(void) noexcept;
 
 	private:
@@ -70,7 +69,7 @@ class Game
 		ioUtils::Pipe wakeupPipe;		// pipe for pollwakeup the worker
 
 		std::unique_ptr<ClientHTTP> clientHTTP;
-		std::unique_ptr<GameInterface>	interface;		// later on might be a pointer for doing poly stuff
+		std::unique_ptr<UI>	interface;		// later on might be a pointer for doing poly stuff
 
 		size_t	dataSize{0UL};
 		char	serverData[Config::BUFF_SIZE];

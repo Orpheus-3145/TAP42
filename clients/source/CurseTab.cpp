@@ -7,45 +7,14 @@
 #include <cassert>
 
 
-BasicTab::BasicTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar)
-{
-	if (borderChar != -1)
-	{
-		this->border = ::newwin(h, w, y, x);
-		if (this->border == nullptr)
-		{
-			LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
-			throw CliException("Failed to create window");
-		}
-		::box(this->border, borderChar, borderChar);
-		::wnoutrefresh(this->border);
-
-		h -= 2, w -= 2;
-		y += 1, x += 1;
-	}
-
-	this->main = ::newwin(h, w, y, x);
-	if (this->main == nullptr)
-	{
-		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
-		throw CliException("Failed to create window");
-	}
-	::keypad(this->main, true);
-
-	::wnoutrefresh(this->main);
-}
-
 BasicTab::BasicTab(BasicTab&& other) noexcept :
 	border{other.border},
 	main{other.main},
+	borderChar{other.borderChar},
 	_state{std::move(other._state)}
 {
 	other.border = nullptr;
 	other.main = nullptr;
-
-	if (this->border)
-		::wnoutrefresh(this->border);
-	::wnoutrefresh(this->main);
 }
 
 BasicTab& BasicTab::operator=(BasicTab&& other) noexcept
@@ -61,54 +30,14 @@ BasicTab& BasicTab::operator=(BasicTab&& other) noexcept
 
 		other.border = nullptr;
 		other.main = nullptr;
-
-		if (this->border)
-			::wnoutrefresh(this->border);
-		::wnoutrefresh(this->main);
 	}
 	return *this;
-}
-
-BasicTab::~BasicTab(void)
-{
-	if (this->main) ::delwin(this->main);
-	if (this->border) ::delwin(this->border);
 }
 
 void BasicTab::appendContent(std::string const& newContent) noexcept
 {
 	this->_state.push_back(newContent);
 	this->printLine(newContent);
-}
-
-void BasicTab::resize(int32_t newHeight, int32_t newWidth, int32_t newY, int32_t newX)
-{
-	assert((newHeight > 0) and (newWidth > 0) and "Invalid resizing size provided");
-	assert((newY > -1) and (newX > -1) and "Invalid resizing position provided");
-
-	if (this->border)
-	{
-		::werase(this->border);
-		::wresize(this->border, newHeight, newWidth);
-
-		if ((newY > 0) or (newX > 0))
-			::mvwin(this->border, newY, newX);
-
-		::box(this->border, 0, 0);		// NB store border char
-		::wnoutrefresh(this->border);
-
-		newHeight -= 2, newWidth -= 2;
-		newY += 1, newX += 1;
-	}
-
-	::werase(this->main);
-	::wresize(this->main, newHeight, newWidth);
-
-	if ((newY > 0) or (newX > 0))
-		::mvwin(this->main, newY, newX);
-
-	for (std::string const& line: this->_state)
-		this->printLine(line);
 }
 
 void BasicTab::printLine(std::string const& newContent) const noexcept
@@ -123,27 +52,35 @@ void BasicTab::printLine(std::string const& newContent) const noexcept
 	this->refresh();
 }
 
-
-InputTab::InputTab(void) : BasicTab()
+void BasicTab::clear(void) noexcept
 {
-	::keypad(this->main, true);
-	::waddstr(this->main, PROMPT);
-
-	::wnoutrefresh(this->main);
+	if (this->main)
+	{
+		::wrefresh(this->main); 
+		::wclear(this->main);
+		::delwin(this->main);
+		this->main = nullptr;
+	}
+	if (this->border)
+	{
+		::wrefresh(this->border);
+		::wclear(this->border);
+		::delwin(this->border);
+		this->border = nullptr;
+	}
 }
 
-InputTab::InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar) :
-	BasicTab(h, w, y, x, borderChar)
-{
-	::keypad(this->main, true);
-	::waddstr(this->main, PROMPT);
 
-	::wnoutrefresh(this->main);
+InputTab::InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar)
+{
+	this->borderChar = borderChar;
+
+	this->draw(h, w, y, x);
 }
 
 InputTab::InputTab(InputTab&& other) noexcept :
 	BasicTab(std::move(other)),
-	history{std::move(other.history)},
+	// history{std::move(other.history)},
 	hints{std::move(other.hints)},
 	currentCommandIndex{other.currentCommandIndex},
 	currentSuggestedIndex{other.currentSuggestedIndex},
@@ -161,7 +98,7 @@ InputTab& InputTab::operator=(InputTab&& other) noexcept
 	{
 		BasicTab::operator=(std::move(other));
 
-		this->history = std::move(other.history);
+		// this->history = std::move(other.history);
 		this->hints = std::move(other.hints);
 
 		this->currentCommandIndex = other.currentCommandIndex;
@@ -280,9 +217,9 @@ void InputTab::setChar(int32_t input)
 		if (this->bufferSize == 0UL)
 			return;
 
+		std::string command = std::string(this->commandBuffer, this->bufferSize);
 		this->_state.push_back(PROMPT + std::string(this->commandBuffer, this->bufferSize));
-		this->history.emplace_front(this->bufferSize, std::array<char, CMD_BUFFER_SIZE>{});
-		::memcpy(this->history.front().second.data(), this->commandBuffer, this->bufferSize);
+		this->history.emplace_front(std::move(command));
 
 		this->bufferSize = 0UL;
 		// in case a command from history has been submitted reset move commandIndex as the most recent command 
@@ -332,11 +269,9 @@ void InputTab::showPrevious(void) noexcept
 	}
 	this->currentCommandIndex++;
 
-	size_t& preCommandSize = this->history.at(this->currentCommandIndex).first;
-	char* preCommand = this->history.at(this->currentCommandIndex).second.data();
-
-	this->bufferSize = preCommandSize; 
-	::memcpy(this->commandBuffer, preCommand, this->bufferSize);
+	std::string const& previousCommand = this->history.at(this->currentCommandIndex);
+	this->bufferSize = previousCommand.size(); 
+	::memcpy(this->commandBuffer, previousCommand.data(), this->bufferSize);
 
 	this->showInput();
 }
@@ -383,11 +318,9 @@ void InputTab::showFollowing(void) noexcept
 	{
 		this->currentCommandIndex--;
 
-		size_t& postCommandSize = this->history.at(this->currentCommandIndex).first;
-		char* postCommand = this->history.at(this->currentCommandIndex).second.data();
-
-		this->bufferSize = postCommandSize; 
-		::memcpy(this->commandBuffer, postCommand, this->bufferSize);
+		std::string const& previousCommand = this->history.at(this->currentCommandIndex);
+		this->bufferSize = previousCommand.size(); 
+		::memcpy(this->commandBuffer, previousCommand.data(), this->bufferSize);
 	}
 
 	this->showInput();
@@ -399,31 +332,74 @@ void InputTab::appendContent(std::string const& newContent) noexcept
 	getyx(this->main, y, x);
 
 	if (x > this->startX)
-		wmove(this->main, y + 1, 0);		// if there's some input go newline
+		wmove(this->main, y + 1, 0);		// if there's some input go to newline
 	else
 		wmove(this->main, y, 0);			// else override the prompt
+
 	BasicTab::appendContent(newContent);
 	waddstr(this->main, PROMPT);
 }
 
 void InputTab::resize(int32_t newHeight, int32_t newWidth, int32_t newY, int32_t newX)
 {
-	BasicTab::resize(newHeight, newWidth, newY, newX);
+	assert((newHeight > 0) and (newWidth > 0) and "Invalid resizing size provided");
+	assert((newY > -1) and (newX > -1) and "Invalid resizing position provided");
 
+	this->clear();
+	this->draw(newHeight, newWidth, newY, newX);
+}
+
+void InputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
+{
+	if (this->borderChar != -1)
+	{
+		this->border = ::newwin(h, w, y, x);
+		if (this->border == nullptr)
+		{
+			LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
+			throw CliException("Failed to create window");
+		}
+		::wborder(
+			this->border,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar
+		);
+		::wnoutrefresh(this->border);
+
+		h -= 2, w -= 2;
+		y += 1, x += 1;
+	}
+
+	this->main = ::newwin(h, w, y, x);
+	if (this->main == nullptr)
+	{
+		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
+		throw CliException("Failed to create window");
+	}
+	::keypad(this->main, true);
+
+	for (std::string const& line: this->_state)
+		this->printLine(line);
 	::waddstr(this->main, PROMPT);
+
 	if (this->bufferSize > 0UL)
 		::waddnstr(this->main, this->commandBuffer, this->bufferSize);
-
-	// because resize is not handled by ncurses there might be some garbage to read, flush it
-	this->getChar();
 
 	::wnoutrefresh(this->main);
 }
 
 std::string InputTab::getLastInput(void) const noexcept
 {
-	assert(this->history.empty() == false and "no input stored in history");
-	return std::string(this->history.front().second.data(), this->history.back().first);
+	if (this->history.empty() == true)
+		return "";
+
+	return this->history.front();
 }
 
 void InputTab::updateHints(void) noexcept
@@ -458,6 +434,13 @@ void InputTab::showInput(void) const noexcept
 }
 
 
+OutputTab::OutputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar)
+{
+	this->borderChar = borderChar;
+
+	this->draw(h, w, y, x);
+}
+
 OutputTab::OutputTab(OutputTab&& other) noexcept :
 	BasicTab(std::move(other)),
 	content{std::move(other.content)},
@@ -487,6 +470,7 @@ void OutputTab::appendContent(std::string const& newContent) noexcept
 
 	if (static_cast<int32_t>(this->content.size()) > h)
 	{
+		// reached the end of the tab, remove the latest input and print the newer ones
 		this->firstLineToPrintIndex++;
 
 		::wmove(this->main, 0, 0);
@@ -498,4 +482,53 @@ void OutputTab::appendContent(std::string const& newContent) noexcept
 	}
 	else
 		BasicTab::appendContent(newContent);
+}
+
+void OutputTab::resize(int32_t newHeight, int32_t newWidth, int32_t newY, int32_t newX)
+{
+	assert((newHeight > 0) and (newWidth > 0) and "Invalid resizing size provided");
+	assert((newY > -1) and (newX > -1) and "Invalid resizing position provided");
+
+	this->clear();
+	this->draw(newHeight, newWidth, newY, newX);
+}
+
+void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
+{
+	if (this->borderChar != -1)
+	{
+		this->border = ::newwin(h, w, y, x);
+		if (this->border == nullptr)
+		{
+			LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
+			throw CliException("Failed to create window");
+		}
+		::wborder(
+			this->border,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar
+		);
+		::wnoutrefresh(this->border);
+
+		h -= 2, w -= 2;
+		y += 1, x += 1;
+	}
+
+	this->main = ::newwin(h, w, y, x);
+	if (this->main == nullptr)
+	{
+		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
+		throw CliException("Failed to create window");
+	}
+
+	for (std::string const& line: this->_state)
+		this->printLine(line);
+
+	::wnoutrefresh(this->main);
 }

@@ -36,37 +36,37 @@ static std::vector<const char*> HINTS
 class BasicTab
 {
 	public:
-		BasicTab(void) : BasicTab::BasicTab(90, 40, 0, 0) {}
-		BasicTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar = -1);
-
+		BasicTab(void) noexcept = default;
 		BasicTab(BasicTab const& other) noexcept = delete;
 		BasicTab& operator=(BasicTab const& other) noexcept = delete;
 		BasicTab(BasicTab&&) noexcept;
 		BasicTab& operator=(BasicTab&&) noexcept;
 
-		virtual ~BasicTab(void);
+		virtual ~BasicTab(void) { this->clear(); }
 
-		virtual void appendContent(std::string const& newContent) noexcept;
+		virtual void appendContent(std::string const& newContent) noexcept;		// NB same of printLine ?
 		virtual void refresh(void) const noexcept { ::wnoutrefresh(this->main); }
-		virtual void resize(int32_t newHeight, int32_t newWidth, int32_t newY = -1, int32_t newX = -1);
+		virtual void resize(int32_t newHeight, int32_t newWidth, int32_t newY = 0, int32_t newX = 0) = 0;
 
 		void printLine(std::string const& newContent) const noexcept;
 	
 	protected:
+		virtual void draw(int32_t h, int32_t w, int32_t y, int32_t x) = 0;
+		virtual void clear(void) noexcept;
+		
 		WINDOW* border{nullptr};
 		WINDOW* main{nullptr};
+
+		int32_t borderChar{-1};
 
 		std::vector<std::string> _state;
 };
 
 class InputTab : public BasicTab
 {
-	using HistoryCommands = std::deque<std::pair<size_t,std::array<char,CMD_BUFFER_SIZE>>>;		// ugly, store it as dyn ptrs?
-
 	public:
 		using BasicTab::BasicTab;
 
-		InputTab(void);
 		InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar = -1);
 
 		InputTab(InputTab&&) noexcept;
@@ -89,14 +89,17 @@ class InputTab : public BasicTab
 		void showFollowing(void) noexcept;
 
 		void appendContent(std::string const& newContent) noexcept override;
+		void resize(int32_t newHeight, int32_t newWidth, int32_t newY = 0, int32_t newX = 0) override;
 
 	private:
+		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
+
 		void updateHints(void) noexcept;
 		void clearHints(void) noexcept;
 
 		void showInput(void) const noexcept;
 
-		HistoryCommands				history;
+		std::deque<std::string>		history;
 		std::vector<const char*>	hints;
 
 		ssize_t			currentCommandIndex{-1L};
@@ -116,13 +119,18 @@ class OutputTab : public BasicTab
 {
 	public:
 		using BasicTab::BasicTab;
+		
+		OutputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar = -1);
 
 		OutputTab(OutputTab&&) noexcept;
 		OutputTab& operator=(OutputTab&&) noexcept;
 
 		void appendContent(std::string const& newContent) noexcept override;
+		void resize(int32_t newHeight, int32_t newWidth, int32_t newY = 0, int32_t newX = 0) override;
 
 	private:
+		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
+
 		std::deque<std::string> content;
 		size_t					firstLineToPrintIndex{0UL};
 };

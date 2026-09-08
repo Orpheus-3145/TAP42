@@ -25,8 +25,8 @@ struct Address
 Address	getAddress(const struct sockaddr_storage*) noexcept;
 int32_t	connectToServer(std::string const& host, uint32_t port, struct addrinfo* filter);
 
-ssize_t read(int32_t fd, char* buffer, size_t size);
-ssize_t write(int32_t fd, const char* buffer, size_t size);
+size_t read(int32_t fd, char* buffer, size_t size);
+size_t write(int32_t fd, const char* buffer, size_t size);
 
 ssize_t readNonBlock(int32_t fd, char* buffer, size_t size);
 ssize_t writeNonBlock(int32_t fd, const char* buffer, size_t size);

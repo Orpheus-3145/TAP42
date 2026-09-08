@@ -127,7 +127,8 @@
 // 		4, 19,   		<- maxRow and maxCol of dest to copy data to
 // 		true/false)	    <- true: copy only non-space chars, false: copy every char
 //
-//	werase(inw)								<-- cleans the content of the win (i..e fill win buffer with ' ')
+//	werase(win)								<-- cleans the content of the win (i..e fill win buffer with ' '), and does a differential update next frame
+//	wclear(win)								<-- like above but also calls wclearok(win, TRUE) which fprces a full update from scratch instead of differential
 // ===========================================================================================================================================================================
 // Borders: to separate windows
 //	box(win, vertLineChar, horLineChar)						<-- draws a box around the window, putting vertLineChar
@@ -235,23 +236,23 @@
 // ===========================================================================================================================================================================
 
 
-class CLI : public GameInterface
+class CLI : public UI
 {
 	// using TabVector = std::vector<std::unique_ptr<BasicTab>>;
 
 	public:
-		using GameInterface::GameInterface;
-		CLI(int32_t commandFd, int32_t height, int32_t width);
+		using UI::UI;
+		CLI(int32_t commandFd);
 
 		virtual ~CLI(void) noexcept override;
 		
 		void loop(void) override;
 		void handleResponse(std::string const& response) override;
 		void handleEvent(std::string const& event) override;
-		void forwardCommandToServer(std::string const& command) override;
 
 	private:
-		void createWindow(int32_t height, int32_t width) override;
+		void createWindow(void);
+		void handleResizeEvent(void);
 		void resize(int32_t height, int32_t width) override;
 		void refresh(void) noexcept override { ::doupdate(); }
 
@@ -264,16 +265,16 @@ class CLI : public GameInterface
 
 		void dispatchUserInput(void);
 
-		static constexpr size_t N_TABS = 3;
-		static constexpr size_t FRAME_TAB = 0;
-		static constexpr size_t CMD_TAB = 1;
-		static constexpr size_t OUTPUT_TAB = 2;
+		// static constexpr size_t N_TABS = 3;
+		// static constexpr size_t FRAME_TAB = 0;
+		// static constexpr size_t CMD_TAB = 1;
+		// static constexpr size_t OUTPUT_TAB = 2;
 
 		std::mutex respMutex, eventMutex;
 
 		int32_t resizeFd;
 
-		std::unique_ptr<BasicTab>	frame;
+		std::unique_ptr<OutputTab>	frame;
 		std::unique_ptr<InputTab>	commandTab;
 		std::unique_ptr<OutputTab>	responseTab, eventTab;
 

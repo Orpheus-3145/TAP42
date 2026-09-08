@@ -8,8 +8,8 @@
 #include <sys/signalfd.h>
 
 
-CLI::CLI(int32_t commandFd, int32_t height, int32_t width) :
-	GameInterface(commandFd, height, width),
+CLI::CLI(int32_t commandFd) :
+	UI(commandFd),
 	resizeFd{ioUtils::createSignalRedirectFd(SIGWINCH)}
 {
 	this->_dispatcher[KEY_LEFT]      = [this] { this->commandTab->moveCursorLeft(); };
@@ -23,9 +23,13 @@ CLI::CLI(int32_t commandFd, int32_t height, int32_t width) :
 	this->_dispatcher[KEY_UP]        = [this] { this->commandTab->suggestNextHint(); };
 	this->_dispatcher[KEY_DOWN]      = [this] { this->commandTab->suggestPastHint(); };
 
-	this->createWindow(height, width);
+	::initscr();
+	::cbreak();
+	::noecho();
 
-	LOG_INFO(LogContext::INTERFACE, "Setup for CLI done");
+	this->createWindow();
+
+	LOG_INFO(LogContext::INTERFACE, "Done setup CLI");
 }
 
 CLI::~CLI(void) noexcept		// NB check if it calls the parent destr.
@@ -61,15 +65,19 @@ void CLI::loop(void)
 			throw InterfaceException("poll failed: " + std::string(strerror(errno)));
 		}
 
+		// user key input
 		if (pollFds[0].revents & POLLIN)
 			this->dispatchUserInput();
 
-		// a POLLIN means there's been a resize (signal SIGWENCH)
+		// means there's been a resize (signal SIGWENCH)
+		// redisrected to a fd, hence the POLLIN
 		if (pollFds[1].revents & POLLIN)
-			this->resize(-1, -1);
+			this->handleResizeEvent();
 
 		this->refresh();
 	}
+	LOG_INFO(LogContext::GAME_CLIENT, "Ended UI loop");
+
 }
 
 void CLI::handleResponse(std::string const& response)
@@ -92,84 +100,82 @@ void CLI::handleEvent(std::string const& event)
 	this->refresh();		// manually refresh because main thread is polling
 }
 
-void CLI::forwardCommandToServer(std::string const& command)
+void CLI::createWindow(void)
 {
-	GameInterface::forwardCommandToServer(command);
+	int32_t height = (LINES % 2) == 0 ? LINES : LINES - 1;
+	int32_t width = (COLS % 2) != 0 ? COLS : COLS - 1;
+	int32_t starty = 0;
+	int32_t startx = 0;
+	this->frame = std::make_unique<OutputTab>(height, width, starty, startx, 0);
 
-	if (command == QUIT)
-		this->KeepAlive = false;
+	height -= 2;
+	width = (width - 5) / 2;
+	startx += 2;
+	starty += 1;
+	this->commandTab = std::make_unique<InputTab>(height, width, starty, startx, 0);
+	this->commandTab->appendContent("This is where the input is shown");
+
+	height /= 2;
+	startx += width + 1;
+	{
+		std::lock_guard<std::mutex> lock(this->respMutex);
+		this->responseTab = std::make_unique<OutputTab>(height, width, starty, startx, 0);
+		this->responseTab->appendContent("This is where responses are shown");
+	}
+
+	starty += height;
+	{
+		std::lock_guard<std::mutex> lock(this->eventMutex);
+		this->eventTab = std::make_unique<OutputTab>(height, width, starty, startx, 0);
+		this->eventTab->appendContent("This is where events are shown");
+	}
+	this->commandTab->refresh();
 }
 
-void CLI::createWindow(int32_t height, int32_t width)
+void CLI::handleResizeEvent(void)
 {
-	// adjust window size
-	// printf("\033[8;%d;%dt", height, width);
-	// fflush(stdout);
+	struct signalfd_siginfo si;
+	ioUtils::read(this->resizeFd, &si, sizeof(si));		// I don't care about the data, flush it
 
-	::initscr();
-	::cbreak();
-	::noecho();
+	struct winsize windowSize;
+	::ioctl(STDOUT_FILENO, TIOCGWINSZ, &windowSize);	// get the size of the resized terminal
 
-	int32_t winHeigth = (height % 2) == 0 ? height : height - 1;
-	int32_t winWidth = (width % 2) == 0 ? width : width - 1;
-	int32_t startx = 0;
-	int32_t starty = 0;
-	this->frame = std::make_unique<BasicTab>(winHeigth, winWidth, startx, starty, 0);
-
-	winHeigth -= 2;
-	winWidth = (winWidth - 2) / 2;
-	startx += 1;
-	starty += 1;
-	this->commandTab = std::make_unique<InputTab>(winHeigth, winWidth, startx, starty, 0);
-
-	winHeigth /= 2;
-	startx += winWidth;
-	this->responseTab = std::make_unique<OutputTab>(winHeigth, winWidth, starty, startx, 0);
-
-	starty += winHeigth;
-	this->eventTab = std::make_unique<OutputTab>(winHeigth, winWidth, starty, startx, 0);
-
-	this->commandTab->appendContent("Insert some shit, type 'quit' to close");
-	this->responseTab->appendContent("This is where responses are shown");
-	this->eventTab->appendContent("This is where events are shown");
-	this->commandTab->refresh();
+	this->resize(windowSize.ws_row, windowSize.ws_col);
 }
 
 void CLI::resize(int32_t height, int32_t width)
 {
-	(void) height;
-	(void) width;
+	LOG_DEBUG(LogContext::INTERFACE, "called resize");
 
-	struct signalfd_siginfo si;
-	ioUtils::read(this->resizeFd, &si, sizeof(si));		// I don't care about the data, flush it
-
-	struct winsize ws;
-	::ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);	// get the size of the resized terminal
-	::resizeterm(ws.ws_row, ws.ws_col);
-
-	int32_t winHeigth = (ws.ws_row % 2) == 0 ? ws.ws_row : ws.ws_row - 1;
-	int32_t winWidth = (ws.ws_col % 2) == 0 ? ws.ws_col : ws.ws_col - 1;
-	int32_t startx = 0;
+	height = (height % 2) == 0 ? height : height - 1;
+	width = (width % 2) != 0 ? width : width - 1;
 	int32_t starty = 0;
-	this->frame->resize(winHeigth, winWidth, startx, starty);
+	int32_t startx = 0;
+	::resizeterm(height, width);
+	this->frame->resize(height, width, starty, startx);
 
-	winHeigth -= 2;
-	winWidth = (winWidth - 2) / 2;
-	startx += 1;
+	height -= 2;
+	width = (width - 5) / 2;
+	startx += 2;
 	starty += 1;
-	this->commandTab->resize(winHeigth, winWidth, startx, starty);
+	this->commandTab->resize(height, width, starty, startx);
 
-	winHeigth /= 2;
-	startx += winWidth;
-	this->responseTab->resize(winHeigth, winWidth, starty, startx);
+	height /= 2;
+	startx += width + 1;
+	{
+		std::lock_guard<std::mutex> lock(this->respMutex);
+		this->responseTab->resize(height, width, starty, startx);
+	}
 
-	starty += winHeigth;
-	this->eventTab->resize(winHeigth, winWidth, starty, startx);
-
+	starty += height;
+	{
+		std::lock_guard<std::mutex> lock(this->eventMutex);
+		this->eventTab->resize(height, width, starty, startx);
+	}
 	this->commandTab->refresh();
-	// because resize is not handled by ncurses there might be some garbage to read, flush it
-	// this->commandTab->getChar();
 
+	// because resize is not handled by ncurses there might be some garbage to read, flush it
+	::flushinp();
 }
 
 void CLI::dispatchUserInput(void)
@@ -184,11 +190,16 @@ void CLI::dispatchUserInput(void)
 
 	// Default handling
 	this->commandTab->setChar(inputChar);
-	if (inputChar == COMMAND_TERM)
-	{
-		std::string command = this->commandTab->getLastInput();
-		this->forwardCommandToServer(command);
-	}
+	if (inputChar != COMMAND_TERM)
+		return;
+
+	std::string command = this->commandTab->getLastInput();
+	if (command.empty() == true)
+		return;
+
+	this->forwardCommandToServer(command);
+	if (command == QUIT)
+		this->KeepAlive = false;
 }
 
 // InputTab& CLI::getCurrentTab(void)
