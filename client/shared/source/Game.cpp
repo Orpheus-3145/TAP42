@@ -143,7 +143,7 @@ void Game::flushPipe(void) const noexcept
 
 void Game::readCommandFromUI(std::vector<struct pollfd>& pollFds)
 {
-	this->commandLength = ioUtils::read(pollFds[1].fd, this->commandBuffer, Config::BUFF_SIZE);
+	this->commandLength = ioUtils::read(pollFds[1].fd, this->commandBuffer, Config::CMD_BUFFER_SIZE);
 	
 	LOG_DEBUG(LogContext::GAME_CLIENT, "Received command from UI: '" + std::string(this->commandBuffer, this->commandLength) + "'");
 	pollFds[2].events |= POLLOUT;

@@ -70,3 +70,4 @@ Testing/
 # specific to the project
 **/build
 client
+!client/

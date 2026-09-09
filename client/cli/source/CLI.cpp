@@ -20,8 +20,8 @@ CLI::CLI(int32_t commandFd) :
 	this->_dispatcher[KEY_DC]        = [this] { this->commandTab->deleteCharForward(); };
 	this->_dispatcher[127]           = [this] { this->commandTab->deleteCharBack(); };
 	this->_dispatcher[KEY_BACKSPACE] = [this] { this->commandTab->deleteCharBack(); };
-	this->_dispatcher[KEY_UP]        = [this] { this->commandTab->suggestNextHint(); };
-	this->_dispatcher[KEY_DOWN]      = [this] { this->commandTab->suggestPastHint(); };
+	this->_dispatcher[KEY_UP]        = [this] { this->commandTab->suggestPrevious(); };
+	this->_dispatcher[KEY_DOWN]      = [this] { this->commandTab->suggestNext(); };
 
 	::initscr();
 	::cbreak();

@@ -66,7 +66,7 @@ class Game
 		void handleServerInput(void);
 		void forwardCommandToServer(std::vector<struct pollfd>& pollFds);
 
-		ioUtils::Pipe wakeupPipe;		// pipe for pollwakeup the worker
+		ioUtils::Pipe wakeupPipe;		// pipe for pollwakeup worker
 
 		std::unique_ptr<ClientHTTP> clientHTTP;
 		std::unique_ptr<UI>	interface;		// later on might be a pointer for doing poly stuff
@@ -75,7 +75,7 @@ class Game
 		char	serverData[Config::BUFF_SIZE];
 
 		size_t	commandLength{0UL};
-		char	commandBuffer[Config::BUFF_SIZE];
+		char	commandBuffer[Config::CMD_BUFFER_SIZE];
 
 		std::thread	worker;
 

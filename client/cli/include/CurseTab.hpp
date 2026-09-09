@@ -8,11 +8,12 @@
 #include <deque>
 #include <cstring>
 
+#include <Config.hpp>
+
 
 static constexpr char const*	PROMPT = "-> ";
 static constexpr char const*	QUIT = "quit";
 static constexpr const char		COMMAND_TERM = '\n';
-static constexpr const size_t	CMD_BUFFER_SIZE = 128UL;
 
 static std::vector<const char*> HINTS
 {
@@ -82,11 +83,11 @@ class InputTab : public BasicTab
 		std::string getLastInput(void) const noexcept;
 		int32_t getChar(void) const noexcept;
 
-		void suggestNextHint(void) noexcept;
-		void suggestPastHint(void) noexcept;
-
+		void suggestPrevious(void) noexcept;
 		void showPrevious(void) noexcept;
-		void showFollowing(void) noexcept;
+		
+		void suggestNext(void) noexcept;
+		void showNext(void) noexcept;
 
 		void appendContent(std::string const& newContent) noexcept override;
 		void resize(int32_t newHeight, int32_t newWidth, int32_t newY = 0, int32_t newX = 0) override;
@@ -97,7 +98,7 @@ class InputTab : public BasicTab
 		void updateHints(void) noexcept;
 		void clearHints(void) noexcept;
 
-		void showInput(void) const noexcept;
+		void overwriteLine(void) const noexcept;
 
 		std::deque<std::string>		history;
 		std::vector<const char*>	hints;
@@ -107,10 +108,10 @@ class InputTab : public BasicTab
 		const int32_t	startX{::strlen(PROMPT)};
 
 		size_t	bufferSize{0UL};
-		char	commandBuffer[CMD_BUFFER_SIZE];
+		char	commandBuffer[Config::CMD_BUFFER_SIZE];
 
 		size_t	tmpBufferSize{0UL};
-		char	tmpCommandBuffer[CMD_BUFFER_SIZE];
+		char	tmpCommandBuffer[Config::CMD_BUFFER_SIZE];
 
 		bool autocompleteMode{false};
 };

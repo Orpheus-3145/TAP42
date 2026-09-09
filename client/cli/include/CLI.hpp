@@ -11,7 +11,6 @@
 #include "CurseTab.hpp"
 
 
-
 // NCURSES:
 // Usually for every function there are 3 more versions:
 // 		Fun(string)         			<-- perform action on stdscr window

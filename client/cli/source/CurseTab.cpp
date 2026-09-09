@@ -207,7 +207,7 @@ void InputTab::setChar(int32_t input)
 		this->commandBuffer[x] = static_cast<char>(input);		// could overflow if not ASCII value
 		this->bufferSize++;
 	
-		if (this->bufferSize == CMD_BUFFER_SIZE)
+		if (this->bufferSize == Config::CMD_BUFFER_SIZE)
 			throw CliException("Command buffer overflow");
 	
 		this->updateHints();		// got at least one input use hints now instead of history for suggestions
@@ -230,10 +230,10 @@ void InputTab::setChar(int32_t input)
 		getyx(this->main, y, x);
 		wmove(this->main, y + 1, 0);
 	}
-	this->showInput();
+	this->overwriteLine();
 }
 
-void InputTab::suggestNextHint(void) noexcept
+void InputTab::suggestPrevious(void) noexcept
 {
 	if (this->autocompleteMode == false)
 	{
@@ -255,7 +255,7 @@ void InputTab::suggestNextHint(void) noexcept
 	this->bufferSize = ::strlen(suggestedCommand); 
 	::memcpy(this->commandBuffer, suggestedCommand, this->bufferSize);
 
-	this->showInput();
+	this->overwriteLine();
 }
 
 void InputTab::showPrevious(void) noexcept
@@ -273,14 +273,14 @@ void InputTab::showPrevious(void) noexcept
 	this->bufferSize = previousCommand.size(); 
 	::memcpy(this->commandBuffer, previousCommand.data(), this->bufferSize);
 
-	this->showInput();
+	this->overwriteLine();
 }
 
-void InputTab::suggestPastHint(void) noexcept
+void InputTab::suggestNext(void) noexcept
 {
 	if (this->autocompleteMode == false)
 	{
-		this->showFollowing();
+		this->showNext();
 		return;
 	}
 	else if ((this->hints.size() == 0UL) or (this->currentSuggestedIndex == -1L))
@@ -302,10 +302,10 @@ void InputTab::suggestPastHint(void) noexcept
 		this->tmpBufferSize = 0UL;
 	}
 
-	this->showInput();
+	this->overwriteLine();
 }
 
-void InputTab::showFollowing(void) noexcept
+void InputTab::showNext(void) noexcept
 {
 	if (this->currentCommandIndex <= 0L)
 	{
@@ -323,7 +323,7 @@ void InputTab::showFollowing(void) noexcept
 		::memcpy(this->commandBuffer, previousCommand.data(), this->bufferSize);
 	}
 
-	this->showInput();
+	this->overwriteLine();
 }
 
 void InputTab::appendContent(std::string const& newContent) noexcept
@@ -420,7 +420,7 @@ void InputTab::clearHints(void) noexcept
 	this->hints.clear();
 }
 
-void InputTab::showInput(void) const noexcept
+void InputTab::overwriteLine(void) const noexcept
 {
 	int32_t y, x;
 	(void)x;
