@@ -79,7 +79,7 @@ void CLI::loop(void)
 
 }
 
-void CLI::handleResponse(std::string const& response)
+void CLI::handleResponse(std::string const& response) noexcept
 {
 	{
 		std::lock_guard<std::mutex> lock(this->respMutex);
@@ -89,7 +89,7 @@ void CLI::handleResponse(std::string const& response)
 	this->refresh();		// manually refresh because main thread is polling
 }
 
-void CLI::handleEvent(std::string const& event)
+void CLI::handleEvent(std::string const& event) noexcept
 {
 	{
 		std::lock_guard<std::mutex> lock(this->eventMutex);
@@ -199,32 +199,3 @@ void CLI::dispatchUserInput(void)
 	if (command == QUIT)
 		this->KeepAlive = false;
 }
-
-// InputTab& CLI::getCurrentTab(void)
-// {
-// 	assert(this->currentTabIndex < this->inputTabs.size() and "index overflow whiele accessing input tabs");
-// 	return this->inputTabs.at(this->currentTabIndex);
-// }
-
-// void CLI::switchForwardTab(void) noexcept
-// {
-// 	if (this->currentTabIndex < CLI::N_TABS - 1)
-// 		this->currentTabIndex++;
-// 	else
-// 		this->currentTabIndex = 0UL;
-// }
-
-// void CLI::switchBackwardTab(void) noexcept
-// {
-// 	if (this->currentTabIndex > 0UL)
-// 		this->currentTabIndex--;
-// 	else
-// 		this->currentTabIndex = CLI::N_TABS - 1;
-// }
-
-// void CLI::setCurrentTab(size_t newTabIndex) noexcept
-// {
-// 	assert(newTabIndex < CLI::N_TABS);
-// 	this->currentTabIndex = newTabIndex;
-// }
-

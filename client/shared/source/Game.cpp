@@ -14,15 +14,6 @@
 #include <unistd.h>
 
 
-UI::~UI(void) noexcept
-{
-}
-
-void UI::forwardCommandToServer(std::string const& command)
-{
-	ioUtils::write(this->commandFd, command.data(), command.size());
-}
-
 
 void Game::run(std::string const& host, uint32_t port)
 {

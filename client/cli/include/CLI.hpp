@@ -7,7 +7,7 @@
 
 #include "Config.hpp"
 #include "Utils.hpp"
-#include "Game.hpp"
+#include "UI.hpp"
 #include "CurseTab.hpp"
 
 
@@ -237,8 +237,6 @@
 
 class CLI : public UI
 {
-	// using TabVector = std::vector<std::unique_ptr<BasicTab>>;
-
 	public:
 		using UI::UI;
 		CLI(int32_t commandFd);
@@ -246,8 +244,8 @@ class CLI : public UI
 		virtual ~CLI(void) noexcept override;
 		
 		void loop(void) override;
-		void handleResponse(std::string const& response) override;
-		void handleEvent(std::string const& event) override;
+		void handleResponse(std::string const& response) noexcept override;
+		void handleEvent(std::string const& event) noexcept override;
 
 	private:
 		void createWindow(void);
@@ -255,19 +253,7 @@ class CLI : public UI
 		void resize(int32_t height, int32_t width) override;
 		void refresh(void) noexcept override { ::doupdate(); }
 
-		// InputTab& getCurrentTab(void);
-
-		// void switchForwardTab(void) noexcept;
-		// void switchBackwardTab(void) noexcept;
-		// BasicTab* getCurrentTab(void) noexcept;
-		// void setCurrentTab(size_t currentITabIndex) noexcept;
-
 		void dispatchUserInput(void);
-
-		// static constexpr size_t N_TABS = 3;
-		// static constexpr size_t FRAME_TAB = 0;
-		// static constexpr size_t CMD_TAB = 1;
-		// static constexpr size_t OUTPUT_TAB = 2;
 
 		std::mutex respMutex, eventMutex;
 
@@ -276,11 +262,6 @@ class CLI : public UI
 		std::unique_ptr<OutputTab>	frame;
 		std::unique_ptr<InputTab>	commandTab;
 		std::unique_ptr<OutputTab>	responseTab, eventTab;
-
-		// TabVector	tabs;
-		// size_t		currentTabIndex{0UL};
-		// size_t					currentInTabIndex{0UL};
-		// size_t					currentOutTabIndex{0UL};
 
 		std::unordered_map<int32_t,std::function<void()>>	_dispatcher;
 };
