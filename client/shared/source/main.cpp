@@ -37,20 +37,21 @@ void run(std::string const& host, uint32_t port)
 
 int32_t main(int32_t argc, char** argv)
 {
-	try {
-		startLogging();
+	startLogging();
+	Flags options;
 
-		Flags options = parseArguments(argc, argv);
-		if (options.helpmode == true) {
+	try {
+		options = parseArguments(argc, argv);
+		if (options.helpmode == true)
+		{
 			std::cout << HOW_TO << std::endl;
 			return (EXIT_SUCCESS);
 		}
-
-		run(options.host, options.port);
-
-	} catch (AppException& err) {
-		std::cerr << err.what() << std::endl;
+	} catch (ParsingException& err) {
+		std::cout << HOW_TO << std::endl;
 		return (EXIT_FAILURE);
 	}
+
+	run(options.host, options.port);
 	return (EXIT_SUCCESS);
 }

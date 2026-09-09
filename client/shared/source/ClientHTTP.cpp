@@ -111,9 +111,17 @@ void ClientHTTP::pipeCommandToServer(void)
 	int32_t serverSocket = this->pollFds[ClientHTTP::I_SERVER].fd;
 
 	LOG_DEBUG(LogContext::HTTP_CLIENT, "Got command from game");
-	if (ioUtils::pipe(gameSocket, serverSocket) == -1L)
+	try
 	{
-		LOG_INFO(LogContext::HTTP_CLIENT, "Game stopped, closing session");
+		if (ioUtils::pipe(gameSocket, serverSocket) == -1L)
+		{
+			LOG_INFO(LogContext::HTTP_CLIENT, "Game stopped, closing session");
+			this->exitPoll();
+		}
+	}
+	catch(const IOException& e)
+	{
+		LOG_ERROR(LogContext::HTTP_CLIENT, std::format("I/O error in worker thread: '{}'", e.what()));
 		this->exitPoll();
 	}
 }
@@ -124,10 +132,18 @@ void ClientHTTP::pipeServerInputToGame(void)
 	int32_t serverSocket = this->pollFds[ClientHTTP::I_SERVER].fd;
 
 	LOG_DEBUG(LogContext::HTTP_CLIENT, "Got response/event from server");
-	if (ioUtils::pipe(serverSocket, gameSocket) == -1L)
+	try
 	{
-		LOG_WARN(LogContext::HTTP_CLIENT, "Server terminated connection, closing session");
-		// NB should keep going and try to reconnect
+		if (ioUtils::pipe(serverSocket, gameSocket) == -1L)
+		{
+			LOG_WARN(LogContext::HTTP_CLIENT, "Server terminated connection, closing session");
+			// NB should keep going and try to reconnect
+			this->exitPoll();
+		}
+	}
+	catch(const std::exception& e)
+	{
+		LOG_ERROR(LogContext::HTTP_CLIENT, std::format("I/O error in worker thread: '{}'", e.what()));
 		this->exitPoll();
 	}
 }

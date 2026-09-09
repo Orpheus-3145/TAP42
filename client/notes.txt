@@ -1,8 +1,8 @@
 TODO:
 OK	1. resize callback
-	2. graceful termination
+OK	2. graceful termination
 OK	3. fixing buffer size
-	4. exception handling
+OK	4. exception handling
 OK	4. check consts and noexcepts
 OK	5. unify history and _state
 OK	6. bug moving cursor and delete chars
