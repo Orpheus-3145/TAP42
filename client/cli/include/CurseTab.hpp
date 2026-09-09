@@ -73,6 +73,8 @@ class InputTab : public BasicTab
 		InputTab(InputTab&&) noexcept;
 		InputTab& operator=(InputTab&&) noexcept;
 
+		~InputTab(void) { ::keypad(this->main, false); }
+
 		void deleteCharForward(void) noexcept;
 		void deleteCharBack(void) noexcept;
 

@@ -32,9 +32,16 @@ CLI::CLI(int32_t commandFd) :
 	LOG_INFO(LogContext::INTERFACE, "Done setup CLI");
 }
 
-CLI::~CLI(void) noexcept		// NB check if it calls the parent destr.
+CLI::~CLI(void) noexcept
 {
-	::endwin();
+	// empty memory manually because endwin has to be last
+	// ncurses function to be called
+	this->frame.reset();
+	this->commandTab.reset();
+	this->responseTab.reset();
+	this->eventTab.reset();
+
+	nc	::endwin();
 	ioUtils::close(this->resizeFd);
 
 	LOG_INFO(LogContext::INTERFACE, "CLI stopped");
