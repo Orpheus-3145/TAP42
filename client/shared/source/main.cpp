@@ -1,12 +1,12 @@
 #include <iostream>
-#include <queue>
 
-#include "Exceptions.hpp"
 #include "ArgParser.hpp"
-#include "Game.hpp"
+#include "ClientHTTP.hpp"
+#include "CLI.hpp"
 #include "Logger.hpp"
 #include "Utils.hpp"
 #include "Config.hpp"
+#include "Exceptions.hpp"
 
 
 void startLogging(void)
@@ -16,6 +16,24 @@ void startLogging(void)
 	Logger::getInstance().setMinLevel(Config::DEFAULT_LOG_LEVEL);
 	Logger::getInstance().setConsoleOutput(false);
 	Logger::getInstance().setFilter(Logger::ALL_ENTRIES & ~LogContext::INPUT_OUTPUT);
+}
+
+void run(std::string const& host, uint32_t port)
+{
+	ioUtils::SocketPair gameClientSockets = ioUtils::createSocketPair();
+
+	ClientHTTP clientHTTP = ClientHTTP(host, port);
+	clientHTTP.startWorker(gameClientSockets.first);
+
+	// decide if use CLI or GUI
+	CLI interface = CLI(gameClientSockets.second);
+	
+	interface.loop();		// blocks here, NB if exceptions happen here they must be caught and terminate the running threads
+
+	clientHTTP.stopWorker();
+	clientHTTP.disconnect();
+
+	ioUtils::closePair(gameClientSockets);
 }
 
 int32_t main(int32_t argc, char** argv)
@@ -29,8 +47,7 @@ int32_t main(int32_t argc, char** argv)
 			return (EXIT_SUCCESS);
 		}
 
-		Game client;
-		client.run(options.host, options.port);
+		run(options.host, options.port);
 
 	} catch (AppException& err) {
 		std::cerr << err.what() << std::endl;

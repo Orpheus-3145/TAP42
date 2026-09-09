@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <functional>
 #include <memory>
+#include <array>
 
 #include "Config.hpp"
 #include "Utils.hpp"
@@ -164,7 +165,7 @@
 //
 // ===========================================================================================================================================================================
 // Appendix:
-// To switch temporarly to normal tty mode and stop ncurses:
+// To switch temporarly to normal tty mode and exitLoop ncurses:
 // 		initscr();
 // 		... do something
 // 		def_prog_mode();			<-- save ncurses state
@@ -237,31 +238,37 @@
 
 class CLI : public UI
 {
+	using InputDispatcher = std::unordered_map<int32_t,std::function<void()>>;
+
 	public:
 		using UI::UI;
-		CLI(int32_t commandFd);
+		CLI(int32_t clientSocket);
 
 		virtual ~CLI(void) noexcept override;
 		
 		void loop(void) override;
-		void handleResponse(std::string const& response) noexcept override;
-		void handleEvent(std::string const& event) noexcept override;
 
 	private:
 		void createWindow(void);
+		void refresh(void) noexcept override { ::doupdate(); }
+		void handleCommand(void) override;
+		void handleResponse(std::string const& response) noexcept override;
+		void handleEvent(std::string const& event) noexcept override;
+
 		void handleResizeEvent(void);
 		void resize(int32_t height, int32_t width) override;
-		void refresh(void) noexcept override { ::doupdate(); }
+		
+		void handleUserInput(void);
 
-		void dispatchUserInput(void);
-
-		std::mutex respMutex, eventMutex;
-
-		int32_t resizeFd;
+		static constexpr size_t POLL_SIZE = 3UL;
+		static constexpr size_t STDIN_INDEX = 0UL;
+		static constexpr size_t RES_INDEX = 1UL;
+		static constexpr size_t SOCK_INDEX = 2UL;
 
 		std::unique_ptr<OutputTab>	frame;
 		std::unique_ptr<InputTab>	commandTab;
 		std::unique_ptr<OutputTab>	responseTab, eventTab;
 
-		std::unordered_map<int32_t,std::function<void()>>	_dispatcher;
+		struct pollfd	pollFds[POLL_SIZE];
+		InputDispatcher	dispatcher;
 };
