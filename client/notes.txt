@@ -5,7 +5,7 @@ OK	3. fixing buffer size
 	4. exception handling
 	4. check consts and noexcepts
 OK	5. unify history and _state
-	6. bug moving cursor and delete chars
+OK	6. bug moving cursor and delete chars
 OK	7. bug command after resize
 OK	9. make clientHTTP RAII
 	10. wrap nc functions into throwable namespace
@@ -15,3 +15,6 @@ OK	13.		InputTab::showInput --> change
 OK			InputTab::suggestPastHint --> suggestPrevious
 	14. convert makefile into cmake with 2 builds (cli and gui)
 	16. after terminating program stdout is still weird
+	17. remove poll loop in Game ?
+	18. std::format for log/throw messages
+	19. leak test

@@ -182,6 +182,7 @@ void CLI::dispatchUserInput(void)
 {
 	int32_t inputChar = this->commandTab->getChar();	// this is blocking
 
+	// special characters handling
 	auto it = this->_dispatcher.find(inputChar);
 	if (it != this->_dispatcher.end()) {
 		it->second();

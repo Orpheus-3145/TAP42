@@ -80,7 +80,7 @@ InputTab::InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderCha
 
 InputTab::InputTab(InputTab&& other) noexcept :
 	BasicTab(std::move(other)),
-	// history{std::move(other.history)},
+	history{std::move(other.history)},
 	hints{std::move(other.hints)},
 	currentCommandIndex{other.currentCommandIndex},
 	currentSuggestedIndex{other.currentSuggestedIndex},
@@ -98,7 +98,7 @@ InputTab& InputTab::operator=(InputTab&& other) noexcept
 	{
 		BasicTab::operator=(std::move(other));
 
-		// this->history = std::move(other.history);
+		this->history = std::move(other.history);
 		this->hints = std::move(other.hints);
 
 		this->currentCommandIndex = other.currentCommandIndex;
@@ -121,11 +121,10 @@ void InputTab::deleteCharForward(void) noexcept
 	(void)y;
 	getyx(this->main, y, x);
 
-	if (x == this->startX + static_cast<int32_t>(this->bufferSize))
+	if (x == this->startX + static_cast<int32_t>(this->bufferSize))		// end of the line can't do delete
 		return;
 
 	mvwdelch(this->main, y, x);
-	::wmove(this->main, y, x);
 
 	x -= this->startX;
 
@@ -145,11 +144,10 @@ void InputTab::deleteCharBack(void) noexcept
 	int32_t y, x;
 	getyx(this->main, y, x);
 
-	if (x == this->startX)
+	if (x == this->startX)			// start of the line cant't do backspace
 		return;
 
 	mvwdelch(this->main, y, x - 1);
-	::wmove(this->main, y, x - 1);
 
 	x -= this->startX;
 
@@ -172,7 +170,10 @@ void InputTab::moveCursorLeft(void) const noexcept
 	getyx(this->main, y, x);
 
 	if (x > this->startX)
+	{
 		::wmove(this->main, y, x - 1);
+		this->refresh();
+	}
 }
 
 void InputTab::moveCursorRight(void) const noexcept
@@ -183,7 +184,10 @@ void InputTab::moveCursorRight(void) const noexcept
 	getyx(this->main, y, x);
 
 	if (x < static_cast<int32_t>(this->startX + this->bufferSize))
+	{
 		::wmove(this->main, y, x + 1);
+		this->refresh();
+	}
 }
 
 int32_t InputTab::getChar(void) const noexcept
