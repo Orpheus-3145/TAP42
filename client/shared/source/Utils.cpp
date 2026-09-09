@@ -8,6 +8,7 @@
 #include <chrono>
 #include <sstream>
 #include <mutex>
+#include <filesystem>
 
 #include <cstring>
 #include <ctime>
@@ -331,7 +332,7 @@ void printMutated(std::string const& content) noexcept
 	std::cout << content << std::endl;
 }
 
-std::string createLogPath(const char* logFolder) noexcept
+std::string createLogPath(const char* logFolder)
 {
 	auto now = std::chrono::system_clock::now();
 	std::time_t nowTimeT = std::chrono::system_clock::to_time_t(now);
@@ -342,7 +343,11 @@ std::string createLogPath(const char* logFolder) noexcept
 	std::ostringstream oss;
 	oss << std::put_time(&tmBuf, "%d-%m-%y");  // DD-mm-AA (anno a 2 cifre)
 
-	return std::format("{}/{}_logfile.log", logFolder, oss.str());
+	std::filesystem::path logPath = std::filesystem::current_path() / logFolder;
+	if (std::filesystem::is_directory(logPath) == false)
+		throw AppException(std::format("Folder: '{}' doesn't exist", logPath.string()));
+
+	return std::format("{}/{}_logfile.log", logPath.string(), oss.str());
 }
 
 std::string escapeNewLine(const char* buffer, size_t size) noexcept
