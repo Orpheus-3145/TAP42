@@ -16,5 +16,5 @@ OK			InputTab::suggestPastHint --> suggestPrevious
 	14. convert makefile into cmake with 2 builds (cli and gui)
 OK	16. after terminating program stdout is still weird
 	17. remove poll loop in Game ?
-	18. std::format for log/throw messages
+OK	18. std::format for log/throw messages
 	19. leak test

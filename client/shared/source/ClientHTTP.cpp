@@ -1,5 +1,6 @@
 #include <cerrno>
 #include <cassert>
+#include <format>
 #include <cstring>				// strerror, memchr, memeset, memmove
 
 #include "ClientHTTP.hpp"
@@ -12,7 +13,7 @@ ClientHTTP::ClientHTTP(std::string const& host, uint32_t port)
 	this->wakeupPipe = ioUtils::createPipe();
 	this->httpSocket = ioUtils::connectToServer(host, port, nullptr);
 
-	LOG_INFO(LogContext::HTTP_CLIENT, "Client HTTP connected to host: " + host + " - port: " + std::to_string(port));
+	LOG_INFO(LogContext::HTTP_CLIENT, std::format("Client HTTP connected to host: {} - port: {}", host, port));
 }
 
 ClientHTTP::~ClientHTTP(void)
@@ -35,7 +36,7 @@ void ClientHTTP::startWorker(int32_t gameSocket) noexcept
 
 	this->worker = std::thread(&ClientHTTP::pollLoop, this, gameSocket);
 	this->keepAlive.store(true);
-	LOG_INFO(LogContext::HTTP_CLIENT, "Started HTTP_CLIENT worker, listening to UNIX socket: " + std::to_string(gameSocket));
+	LOG_INFO(LogContext::HTTP_CLIENT, std::format("Started HTTP_CLIENT worker, listening to UNIX socket: {}", gameSocket));
 }
 
 void ClientHTTP::stopWorker(void) noexcept
@@ -85,8 +86,8 @@ void ClientHTTP::pollLoop(int32_t gameSocket)
 		{
 			if (errno == EINTR)
 				continue;
-			LOG_ERROR(LogContext::HTTP_CLIENT, "Poll failed: " + std::string(strerror(errno)));
-			break;
+			LOG_ERROR(LogContext::HTTP_CLIENT, std::format("Poll failed: {}", strerror(errno)));
+			throw HTTPException(std::format("Poll failed: {}", strerror(errno)));
 		}
 
 		if (fds[0].revents & POLLIN)	// worker awaken from main thread, flush pipe	NB use it to gracelly close the client when user closes session?

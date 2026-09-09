@@ -65,7 +65,7 @@ int32_t	connectToServer(std::string const& host, uint32_t portNo, struct addrinf
 		filter = &defaultTCPfilter;
 
 	if (::getaddrinfo(host.data(), port.data(), filter, &list) != 0)
-		throw HTTPException("Failed to find addresses for " + host + ":" + port);
+		throw HTTPException(std::format("Failed to find addresses for {}:{}", host, port));
 
 	for (tmp = list; tmp != nullptr; tmp = tmp->ai_next)
 	{
@@ -80,7 +80,7 @@ int32_t	connectToServer(std::string const& host, uint32_t portNo, struct addrinf
 	if (tmp == nullptr)
 	{
 		::freeaddrinfo(list);
-		throw HTTPException("No available IP host found for port: " + port);
+		throw HTTPException(std::format("No available IP host found for port: {}", port));
 	}
 	std::memcpy(&rawServerAddress, tmp->ai_addr, tmp->ai_addrlen);
 	::freeaddrinfo(list);
@@ -105,14 +105,14 @@ size_t read(int32_t fd, char* buffer, size_t size)
 		ssize_t n = ::read(fd, buffer + offset, size - offset);
 		if (n > 0L)
 		{
-			LOG_DEBUG(LogContext::INPUT_OUTPUT, "Read " + std::to_string(n) + " bytes from fd: " + std::to_string(fd));
-			LOG_DEBUG(LogContext::INPUT_OUTPUT, "Read: '" + escapeNewLine(buffer + offset, n) + "'");
+			LOG_DEBUG(LogContext::INPUT_OUTPUT, std::format("Read {} bytes from fd {}", n, fd));
+			LOG_DEBUG(LogContext::INPUT_OUTPUT, std::format("Content: '{}'", escapeNewLine(buffer + offset, n)));
 			offset += n;
 		}
 		if (n < 0L)
 		{
-			LOG_ERROR(LogContext::INTERFACE, "Read failed: " + std::string(strerror(errno)));
-			throw ReadException("Read failed: " + std::string(strerror(errno)));
+			LOG_ERROR(LogContext::INTERFACE, std::format("Read failed: {}", strerror(errno)));
+			throw ReadException(std::format("Read failed: {}", strerror(errno)));
 		}
 		else
 			break;
@@ -131,14 +131,14 @@ size_t write(int32_t fd, const char* buffer, size_t size)
 		ssize_t n = ::write(fd, buffer + offset, size - offset);
 		if (n > 0L)
 		{
-			LOG_DEBUG(LogContext::INPUT_OUTPUT, "Write " + std::to_string(n) + " bytes from fd: " + std::to_string(fd));
-			LOG_DEBUG(LogContext::INPUT_OUTPUT, "Write: '" + escapeNewLine(buffer + offset, n) + "'");
+			LOG_DEBUG(LogContext::INPUT_OUTPUT, std::format("Written {} bytes from fd {}", n, fd));
+			LOG_DEBUG(LogContext::INPUT_OUTPUT, std::format("Content: '{}'", escapeNewLine(buffer + offset, n)));
 			offset += n;
 		}
 		if (n < 0L)
 		{
-			LOG_ERROR(LogContext::INTERFACE, "Write failed: " + std::string(strerror(errno)));
-			throw ReadException("Write failed: " + std::string(strerror(errno)));
+			LOG_ERROR(LogContext::INTERFACE, std::format("Write failed: {}", strerror(errno)));
+			throw ReadException(std::format("Write failed: {}", strerror(errno)));
 		}
 		else
 			break;
@@ -158,8 +158,8 @@ ssize_t readNonBlock(int32_t fd, char* buffer, size_t size)
 		
 		if (n > 0)
 		{
-			LOG_DEBUG(LogContext::INPUT_OUTPUT, "Read " + std::to_string(n) + " bytes from fd: " + std::to_string(fd));
-			LOG_DEBUG(LogContext::INPUT_OUTPUT, "Read: '" + escapeNewLine(buffer + offset, n) + "'");
+			LOG_DEBUG(LogContext::INPUT_OUTPUT, std::format("Read {} bytes from fd {}", n, fd));
+			LOG_DEBUG(LogContext::INPUT_OUTPUT, std::format("Content: '{}'", escapeNewLine(buffer + offset, n)));
 			offset += n;
 			if (static_cast<size_t>(offset) == size)		// overflow
 				break;
@@ -173,8 +173,8 @@ ssize_t readNonBlock(int32_t fd, char* buffer, size_t size)
 		if (errno == EINTR)
 			continue;
 
-		LOG_ERROR(LogContext::INPUT_OUTPUT, "Recv failed: " + std::string(strerror(errno)));
-		throw ReadException("Recv failed: " + std::string(strerror(errno)));
+		LOG_ERROR(LogContext::INTERFACE, std::format("Read failed: {}", strerror(errno)));
+		throw ReadException(std::format("Read failed: {}", strerror(errno)));
 	}
 	return offset;
 }
@@ -191,8 +191,8 @@ ssize_t writeNonBlock(int32_t fd, const char* buffer, size_t size)
 		
 		if (n > 0)
 		{
-			LOG_DEBUG(LogContext::INPUT_OUTPUT, "Written " + std::to_string(n) + " bytes on fd: " + std::to_string(fd));
-			LOG_DEBUG(LogContext::INPUT_OUTPUT, "Written: '" + escapeNewLine(buffer + offset, size - offset) + "'");
+			LOG_DEBUG(LogContext::INPUT_OUTPUT, std::format("Sent {} bytes from fd {}", n, fd));
+			LOG_DEBUG(LogContext::INPUT_OUTPUT, std::format("Content: '{}'", escapeNewLine(buffer + offset, n)));
 			offset += n;
 			if (static_cast<size_t>(offset) == size)
 				break;
@@ -207,8 +207,8 @@ ssize_t writeNonBlock(int32_t fd, const char* buffer, size_t size)
 		if (errno == EINTR)
 			continue;
 
-		LOG_ERROR(LogContext::INPUT_OUTPUT, "Send failed: " + std::string(strerror(errno)));
-		throw WriteException("Send failed: " + std::string(strerror(errno)));
+		LOG_ERROR(LogContext::INTERFACE, std::format("Send failed: {}", strerror(errno)));
+		throw ReadException(std::format("Send failed: {}", strerror(errno)));
 	}
 	return offset;
 }
@@ -243,8 +243,8 @@ int32_t createSignalRedirectFd(int32_t signal)
 	int32_t fd = ::signalfd(-1, &mask, 0);
 	if (fd == -1)
 	{
-		LOG_ERROR(LogContext::INPUT_OUTPUT, "Failed to creare a file descriptor to redirect: " + std::to_string(signal));
-		throw IOException("Failed to creare a file descriptor to redirect: " + std::to_string(signal));
+		LOG_ERROR(LogContext::INPUT_OUTPUT, std::format("Failed to creare a file descriptor to redirect: {}", signal));
+		throw IOException(std::format("Failed to creare a file descriptor to redirect: {}", signal));
 	}
 
 	int32_t flags = fcntl(fd, F_GETFL, 0);
@@ -261,7 +261,7 @@ SocketPair createSocketPair(void)
 	int sockets[2];
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1)
-		throw InterfaceException("Error while creating io socket: " + std::string(strerror(errno)));
+		throw InterfaceException(std::format("Failed to create socket: {}", strerror(errno)));
 
 	for (int32_t fd : {sockets[0], sockets[1]})
 	{
@@ -271,7 +271,7 @@ SocketPair createSocketPair(void)
 		if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
 			throw InterfaceException("Failed to set socket as non-blocking");
 	}
-	LOG_DEBUG(LogContext::INPUT_OUTPUT, "Created socket pair: [" + std::to_string(sockets[0]) + " " + std::to_string(sockets[1]) + "]");
+	LOG_DEBUG(LogContext::INPUT_OUTPUT, std::format("Created socket pair: [{} {}]", sockets[0], sockets[1]));
 	return SocketPair{sockets[0], sockets[1]};
 }
 
@@ -294,7 +294,7 @@ Pipe createPipe(void)
 {
 	int32_t _pipe[2] = {-1, -1};		// pipe for pollwakeup of worker
 	if (::pipe(_pipe) == -1)
-		throw HTTPException("Failed to create wakeup pipe: " + std::string(strerror(errno)));
+		throw InterfaceException(std::format("Failed to create pipe: {}", strerror(errno)));
 
 	for (int32_t fd : {_pipe[0], _pipe[1]})
 	{
@@ -304,7 +304,7 @@ Pipe createPipe(void)
 		if (::fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
 			throw HTTPException("Failed to set socket as non-blocking");
 	}
-	LOG_DEBUG(LogContext::INPUT_OUTPUT, "Created pipe: [" + std::to_string(_pipe[0]) + " " + std::to_string(_pipe[1]) + "]");
+	LOG_DEBUG(LogContext::INPUT_OUTPUT, std::format("Created pipe: [{} {}]", _pipe[0], _pipe[1]));
 	return Pipe{_pipe[1], _pipe[0]};
 }
 

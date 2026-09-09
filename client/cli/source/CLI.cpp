@@ -41,7 +41,7 @@ CLI::~CLI(void) noexcept
 	this->responseTab.reset();
 	this->eventTab.reset();
 
-	nc	::endwin();
+	::endwin();
 	ioUtils::close(this->resizeFd);
 
 	LOG_INFO(LogContext::INTERFACE, "CLI stopped");
@@ -68,8 +68,8 @@ void CLI::loop(void)
 		{
 			if (errno == EINTR)
 				continue;
-			LOG_ERROR(LogContext::INTERFACE, "Poll failed: " + std::string(strerror(errno)));
-			throw InterfaceException("poll failed: " + std::string(strerror(errno)));
+			LOG_ERROR(LogContext::INTERFACE, std::format("Poll failed: {}", strerror(errno)));
+			throw InterfaceException(std::format("Poll failed: {}", strerror(errno)));
 		}
 
 		// user key input
@@ -152,8 +152,6 @@ void CLI::handleResizeEvent(void)
 
 void CLI::resize(int32_t height, int32_t width)
 {
-	LOG_DEBUG(LogContext::INTERFACE, "called resize");
-
 	height = (height % 2) == 0 ? height : height - 1;
 	width = (width % 2) != 0 ? width : width - 1;
 	int32_t starty = 0;

@@ -1,5 +1,6 @@
 #include <map>
 #include <functional>
+#include <format>
 
 #include "ArgParser.hpp"
 #include "Exceptions.hpp"
@@ -24,12 +25,12 @@ static void setPort( Flags& input, std::string const& port ) {
 	try {
 		input.port = std::stoul(port);
 	} catch (std::invalid_argument const&) {
-		throw ParsingException("Wrong number input: " + port);
+		throw ParsingException(std::format("Wrong number input: {}", port));
 	} catch (std::out_of_range const&) {
-		throw ParsingException("Out of range: " + port);
+		throw ParsingException(std::format("Out of range: {}", port));
 	}
 	if (input.port > 65535)
-		throw ParsingException("Port number too big: " + port);
+		throw ParsingException(std::format("Port number too big: {}", port));
 }
 
 static void setHelpMode( Flags& input, std::string const& optValue )
@@ -62,13 +63,13 @@ Flags parseArguments(int32_t argc, char* argv[])
 	{
 		flagKey = argv[i];
 		if (flagKey[0] != '-')
-			throw ParsingException("Flag not well formatted: " + flagKey);
+			throw ParsingException(std::format("Flag not well formatted: {}", flagKey));
 
 		size_t eqPos = flagKey.find('=');
 		if (eqPos != std::string::npos) // if it is --key=value
 		{
 			if (eqPos == flagKey.size() - 1)
-				throw ParsingException("Invalid argument with value: " + flagKey);
+				throw ParsingException(std::format("Invalid argument with value: {}", flagKey));
 
 			flagValue = flagKey.substr(eqPos + 1);
 			flagKey = flagKey.substr(0, eqPos);
@@ -77,7 +78,7 @@ Flags parseArguments(int32_t argc, char* argv[])
 		try {
 			flag = flagsMap.at(flagKey);
 		} catch(const std::out_of_range& e) {
-			throw ParsingException("Unknown argument: " + flagKey);
+			throw ParsingException(std::format("Unknown argument: {}", flagKey));
 		}
 		checkFlags = checkFlags | flag;
 
@@ -90,7 +91,7 @@ Flags parseArguments(int32_t argc, char* argv[])
 			else
 			{
 				if ((i + 1 == argc))
-					throw ParsingException("No argument provided for flag: " + flagKey);
+					throw ParsingException(std::format("No argument provided for flag: {}", flagKey));
 
 				flagValue = argv[++i];
 			}
@@ -99,7 +100,7 @@ Flags parseArguments(int32_t argc, char* argv[])
 		try {
 			action = flagActions.at(flag);
 		} catch(const std::out_of_range& e) {
-			throw ParsingException("No action linked to: " + flagKey);
+			throw ParsingException(std::format("No action linked to: {}", flagKey));
 		}
 
 		action(arguments, flagValue);

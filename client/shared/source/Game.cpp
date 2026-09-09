@@ -7,6 +7,7 @@
 #include <cstring>				// strerror, memchr, memeset, memmove
 #include <cassert>
 #include <functional>
+#include <format>
 
 #include <csignal>
 #include <sys/ioctl.h>
@@ -63,7 +64,7 @@ void Game::startWorker(int32_t clientSocket, int32_t commandFd) noexcept
 
 	this->worker = std::thread(&Game::pollLoop, this, clientSocket, commandFd);
 	this->keepAlive.store(true);
-	LOG_INFO(LogContext::GAME_CLIENT, "Started game worker, listening to UNIX socket: " + std::to_string(clientSocket));
+	LOG_INFO(LogContext::GAME_CLIENT, std::format("Started game worker, listening to UNIX socket: {}", clientSocket));
 }
 
 void Game::stopWorker(void) noexcept
@@ -111,8 +112,8 @@ void Game::pollLoop(int32_t clientSocket, int32_t commandPipeInput)
 		{
 			if (errno == EINTR)
 				continue;
-			LOG_ERROR(LogContext::INTERFACE, "Poll failed: " + std::string(strerror(errno)));
-			throw GameException("poll failed: " + std::string(strerror(errno)));
+			LOG_ERROR(LogContext::INTERFACE, std::format("Poll failed: {}", strerror(errno)));
+			throw GameException(std::format("Poll failed: {}", strerror(errno)));
 		}
 		if (pollFds[0].revents & POLLIN)	// worker awaken from main thread, flush pipe	NB use it to gracelly close the client when user closes session?
 			this->flushPipe();
@@ -144,8 +145,8 @@ void Game::flushPipe(void) const noexcept
 void Game::readCommandFromUI(std::vector<struct pollfd>& pollFds)
 {
 	this->commandLength = ioUtils::read(pollFds[1].fd, this->commandBuffer, Config::CMD_BUFFER_SIZE);
-	
-	LOG_DEBUG(LogContext::GAME_CLIENT, "Received command from UI: '" + std::string(this->commandBuffer, this->commandLength) + "'");
+
+	LOG_DEBUG(LogContext::GAME_CLIENT, std::format("Received command from UI: '{}'", std::string(this->commandBuffer, this->commandLength)));
 	pollFds[2].events |= POLLOUT;
 }
 
@@ -182,14 +183,14 @@ void Game::handleServerInput(void)
 		// NB better input parsing
 		ssize_t lenMsg = endMsg - startMsg;
 		std::string serverInput = std::string(startMsg, lenMsg);
-		LOG_DEBUG(LogContext::GAME_CLIENT, "Received from server: '" + serverInput);
+		LOG_DEBUG(LogContext::GAME_CLIENT, std::format("Received from server: '{}'", serverInput));
 
 		if ((serverInput.find(S_OK) == 0UL) or (serverInput.find(S_ERR) == 0UL))
 			this->interface->handleResponse(serverInput);
 		else if (serverInput.find(S_EVT) == 0UL)
 			this->interface->handleEvent(serverInput);
 		else
-			LOG_WARN(LogContext::INTERFACE, "Unknown server input: '" + serverInput + "'");
+			LOG_WARN(LogContext::GAME_CLIENT, std::format("Unknown server input: '{}'", serverInput));
 
 		startMsg += lenMsg + 1UL;
 		this->dataSize -= lenMsg + 1UL;
