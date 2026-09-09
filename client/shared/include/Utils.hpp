@@ -13,7 +13,6 @@ namespace ioUtils {
 using ::read;
 using ::write;
 using ::close;
-using ::poll;
 
 struct Address
 {
@@ -24,6 +23,7 @@ struct Address
 
 Address	getAddress(const struct sockaddr_storage*) noexcept;
 int32_t	connectToServer(std::string const& host, uint32_t port, struct addrinfo* filter);
+int		poll(pollfd *fds, size_t nfds, int32_t timeout);
 
 size_t read(int32_t fd, char* buffer, size_t size);
 size_t write(int32_t fd, const char* buffer, size_t size);

@@ -94,6 +94,20 @@ int32_t	connectToServer(std::string const& host, uint32_t portNo, struct addrinf
 	return socket;
 }
 
+int32_t poll(pollfd *fds, size_t nfds, int32_t timeout)
+{
+	int32_t fdsReady = ::poll(fds, nfds, timeout);
+	if (fdsReady != -1)
+		return fdsReady;
+	else if (errno == EINTR)
+		return 0;
+	else
+	{
+		LOG_ERROR(LogContext::HTTP_CLIENT, std::format("Poll failed: {}", strerror(errno)));
+		throw HTTPException(std::format("Poll failed: {}", strerror(errno)));
+	}
+}
+
 size_t read(int32_t fd, char* buffer, size_t size)
 {
 	if (size == 0UL)

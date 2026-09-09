@@ -1,6 +1,7 @@
 #include <cerrno>
 #include <cassert>
 #include <format>
+#include <vector>
 #include <cstring>				// strerror, memchr, memeset, memmove
 
 #include "ClientHTTP.hpp"
@@ -51,7 +52,7 @@ void ClientHTTP::stopWorker(void) noexcept
 	}
 }
 
-void ClientHTTP::wakeUpWorker(void) noexcept
+void ClientHTTP::wakeUpWorker(void) const noexcept
 {
 	char byte = 'x';
 	ioUtils::write(this->wakeupPipe.in, &byte, 1UL);
@@ -67,64 +68,67 @@ void ClientHTTP::pollLoop(int32_t gameSocket)
 {
 	assert(gameSocket != -1 and "invalid game socket");
 
+	std::vector<struct pollfd> pollFds(3);
+	// to awake manually the thread
+	pollFds[0].fd = this->wakeupPipe.out;
+	// game commands
+	pollFds[1].fd = gameSocket;
+	// read server data
+	pollFds[2].fd = this->httpSocket;
+
 	while (this->keepAlive.load())
 	{
-		struct pollfd fds[3];
-		// to awake manually the thread
-		fds[0].fd = this->wakeupPipe.out;
-		fds[0].events = POLLIN;
-		fds[0].revents = 0;
-		// game socket
-		fds[1].fd = gameSocket;
-		fds[1].events = POLLIN;
-		fds[1].revents = 0;
-		// server socket
-		fds[2].fd = this->httpSocket;
-		fds[2].events = POLLIN;
-		fds[2].revents = 0;
-		if (ioUtils::poll(fds, 3, -1) == -1)
-		{
-			if (errno == EINTR)
-				continue;
-			LOG_ERROR(LogContext::HTTP_CLIENT, std::format("Poll failed: {}", strerror(errno)));
-			throw HTTPException(std::format("Poll failed: {}", strerror(errno)));
-		}
+		pollFds[0].events = POLLIN;
+		pollFds[0].revents = 0;
+		pollFds[1].events = POLLIN;
+		pollFds[1].revents = 0;
+		pollFds[2].events = POLLIN;
+		pollFds[2].revents = 0;
+		ioUtils::poll(pollFds.data(), pollFds.size(), -1);
 
-		if (fds[0].revents & POLLIN)	// worker awaken from main thread, flush pipe	NB use it to gracelly close the client when user closes session?
+		if (pollFds[0].revents & POLLIN)	// worker awaken from main thread, flush pipe	NB use it to gracelly close the client when user closes session?
 			this->flushPipe();
 		
-		if (fds[1].revents & POLLIN)	// request from Game -> send to server
-		{
-			LOG_DEBUG(LogContext::HTTP_CLIENT, "Got command from game");
-			if (ioUtils::pipe(gameSocket, this->httpSocket) == -1L)
-			{
-				LOG_INFO(LogContext::HTTP_CLIENT, "Game stopped, closing session");
-				this->keepAlive.store(false);
-			}
-		}
+		if (pollFds[1].revents & POLLIN)	// request from Game -> send to server
+			pipeCommandToServer(gameSocket);
 
 		// game closed connection (POLLHUP) or got an error (POLLERR | POLLNVAL)
-		if (fds[1].revents & (POLLHUP | POLLERR | POLLNVAL))
+		if (pollFds[1].revents & (POLLHUP | POLLERR | POLLNVAL))
 		{
 			LOG_INFO(LogContext::HTTP_CLIENT, "Game stopped, closing session");
 			this->keepAlive.store(false);
 		}
 
-		if (fds[2].revents & POLLIN)	// response or event from server -> send to game
-		{
-			LOG_DEBUG(LogContext::HTTP_CLIENT, "Got response/event from server");
-			if (ioUtils::pipe(this->httpSocket, gameSocket) == -1L)
-			{
-				LOG_INFO(LogContext::HTTP_CLIENT, "Server terminated connection, closing session");
-				this->keepAlive.store(false);
-			}
-		}
+		if (pollFds[2].revents & POLLIN)	// response or event from server -> send to game
+			this->pipeServerInputToGame(gameSocket);
 
 		// server closed connection (POLLHUP) or got an error (POLLERR | POLLNVAL)
-		if (fds[2].revents & (POLLHUP | POLLERR | POLLNVAL))
+		if (pollFds[2].revents & (POLLHUP | POLLERR | POLLNVAL))
 		{
 			LOG_INFO(LogContext::HTTP_CLIENT, "Server terminated connection, closing session");
 			this->keepAlive.store(false);
 		}
 	}
 }
+
+void ClientHTTP::pipeCommandToServer(int32_t gameSocket)
+{
+	LOG_DEBUG(LogContext::HTTP_CLIENT, "Got command from game");
+	if (ioUtils::pipe(gameSocket, this->httpSocket) == -1L)
+	{
+		LOG_INFO(LogContext::HTTP_CLIENT, "Game stopped, closing session");
+		this->keepAlive.store(false);
+	}
+}
+
+void ClientHTTP::pipeServerInputToGame(int32_t gameSocket)
+{
+	LOG_DEBUG(LogContext::HTTP_CLIENT, "Got response/event from server");
+	if (ioUtils::pipe(this->httpSocket, gameSocket) == -1L)
+	{
+		LOG_INFO(LogContext::HTTP_CLIENT, "Server terminated connection, closing session");
+		this->keepAlive.store(false);
+	}
+
+}
+

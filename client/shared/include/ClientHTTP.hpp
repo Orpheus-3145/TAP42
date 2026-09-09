@@ -28,10 +28,13 @@ class ClientHTTP
 		void	stopWorker(void) noexcept;
 
 	private:
-		void	wakeUpWorker(void) noexcept;
+		void	wakeUpWorker(void) const noexcept;
 		void	flushPipe(void) const noexcept;
 
 		void	pollLoop(int32_t gameSocket);
+		void 	pipeCommandToServer(int32_t gameSocket);
+		void 	pipeServerInputToGame(int32_t gameSocket);
+
 
 		int32_t			gameSocket{-1};
 		ioUtils::Pipe	wakeupPipe{-1, -1};		// pipe for pollwakeup the worker	

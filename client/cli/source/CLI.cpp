@@ -49,8 +49,7 @@ CLI::~CLI(void) noexcept
 
 void CLI::loop(void)
 {
-	size_t nFds = 2;
-	std::vector<struct pollfd> pollFds(nFds);
+	std::vector<struct pollfd> pollFds(2);
 	// user input
 	pollFds[0].fd = STDIN_FILENO;
 	// resize signal redirect
@@ -63,14 +62,7 @@ void CLI::loop(void)
 		pollFds[0].revents = 0;
 		pollFds[1].events = POLLIN;
 		pollFds[1].revents = 0;
-
-		if (ioUtils::poll(pollFds.data(), nFds, -1) == -1)
-		{
-			if (errno == EINTR)
-				continue;
-			LOG_ERROR(LogContext::INTERFACE, std::format("Poll failed: {}", strerror(errno)));
-			throw InterfaceException(std::format("Poll failed: {}", strerror(errno)));
-		}
+		ioUtils::poll(pollFds.data(), pollFds.size(), -1);
 
 		// user key input
 		if (pollFds[0].revents & POLLIN)

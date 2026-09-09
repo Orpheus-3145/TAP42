@@ -90,31 +90,24 @@ void Game::pollLoop(int32_t clientSocket, int32_t commandPipeInput)
 	assert(clientSocket != -1 and "invalid client socket");
 	assert(commandPipeInput != -1 and "invalid command pipe");
 
-	size_t nFds = 3;
-	std::vector<struct pollfd> pollFds(nFds);
+	std::vector<struct pollfd> pollFds(3);
+	// main thread calls, only read
+	pollFds[0].fd = this->wakeupPipe.out;
+	// user commands, only read
+	pollFds[1].fd = commandPipeInput;
+	// client socket, read and write
+	pollFds[2].fd = clientSocket;
 
 	while (this->keepAlive.load())
 	{
-		// main thread calls, only read
-		pollFds[0].fd = this->wakeupPipe.out;
 		pollFds[0].events |= POLLIN;
 		pollFds[0].revents = 0;
-		// user commands, only read
-		pollFds[1].fd = commandPipeInput;
 		pollFds[1].events |= POLLIN;
 		pollFds[1].revents = 0;
-		// client socket, read and write
-		pollFds[2].fd = clientSocket;
 		pollFds[2].events |= POLLIN;
 		pollFds[2].revents = 0;
+		ioUtils::poll(pollFds.data(), pollFds.size(), -1);
 
-		if (ioUtils::poll(pollFds.data(), nFds, -1) == -1)
-		{
-			if (errno == EINTR)
-				continue;
-			LOG_ERROR(LogContext::INTERFACE, std::format("Poll failed: {}", strerror(errno)));
-			throw GameException(std::format("Poll failed: {}", strerror(errno)));
-		}
 		if (pollFds[0].revents & POLLIN)	// worker awaken from main thread, flush pipe	NB use it to gracelly close the client when user closes session?
 			this->flushPipe();
 		
