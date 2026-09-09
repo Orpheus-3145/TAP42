@@ -22,16 +22,15 @@ void run(std::string const& host, uint32_t port)
 {
 	ioUtils::SocketPair gameClientSockets = ioUtils::createSocketPair();
 
-	ClientHTTP clientHTTP = ClientHTTP(host, port);
-	clientHTTP.startWorker(gameClientSockets.first);
+	ClientHTTP clientHTTP = ClientHTTP(host, port, gameClientSockets.first);
 
 	// decide if use CLI or GUI
 	CLI interface = CLI(gameClientSockets.second);
 	
+	clientHTTP.startWorker();
 	interface.loop();		// blocks here, NB if exceptions happen here they must be caught and terminate the running threads
 
 	clientHTTP.stopWorker();
-	clientHTTP.disconnect();
 
 	ioUtils::closePair(gameClientSockets);
 }
