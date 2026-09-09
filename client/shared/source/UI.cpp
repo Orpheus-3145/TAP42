@@ -39,7 +39,7 @@ void UI::handleServerInput(void)
 		else if (serverInput.find(S_EVT) == 0UL)
 			this->handleEvent(serverInput);
 		else
-			LOG_WARN(LogContext::INTERFACE, std::format("Unknown server input: '{}'", serverInput));
+			LOG_WARN(LogContext::INTERFACE, std::format("Unknown input"));
 
 		startMsg += lenMsg + 1UL;
 		this->bufferSize -= lenMsg + 1UL;
@@ -57,8 +57,8 @@ bool UI::forwardDataToServer(int32_t fd, std::string const& command)
 		LOG_WARN(LogContext::INTERFACE, "Client socket busy, trying again later");
 		return false;
 	}
-	
+
 	if (command == G_QUIT)
-		this->exitLoop();
+		this->exitLoop();		// should tell that specifically to graceful terminate after game session
 	return true;
 }

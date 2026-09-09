@@ -261,9 +261,9 @@ class CLI : public UI
 		void handleUserInput(void);
 
 		static constexpr size_t POLL_SIZE = 3UL;
-		static constexpr size_t STDIN_INDEX = 0UL;
-		static constexpr size_t RES_INDEX = 1UL;
-		static constexpr size_t SOCK_INDEX = 2UL;
+		static constexpr size_t I_STDIN = 0UL;
+		static constexpr size_t I_RESIZE = 1UL;
+		static constexpr size_t I_CLIENT = 2UL;
 
 		std::unique_ptr<OutputTab>	frame;
 		std::unique_ptr<InputTab>	commandTab;

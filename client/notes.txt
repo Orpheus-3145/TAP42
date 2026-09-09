@@ -19,5 +19,5 @@ OK	17. remove poll loop in Game ?
 OK	18. std::format for log/throw messages
 	19. leak test
 OK	20. fix init
-	21. redo logging
-	22. shorten HTTPclient
+OK	21. redo logging
+OK	22. shorten HTTPclient

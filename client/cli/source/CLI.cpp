@@ -2,6 +2,7 @@
 #include "Logger.hpp"
 #include "Exceptions.hpp"
 
+#include <format>
 #include <cassert>
 #include <signal.h>
 #include <sys/ioctl.h>
@@ -12,9 +13,9 @@ CLI::CLI(int32_t clientSocket) :
 	UI(clientSocket)
 {
 	::memset(this->pollFds, 0, CLI::POLL_SIZE * sizeof(struct pollfd));
-	this->pollFds[CLI::STDIN_INDEX].fd = STDIN_FILENO;
-	this->pollFds[CLI::RES_INDEX].fd = ioUtils::createSignalRedirectFd(SIGWINCH);
-	this->pollFds[CLI::SOCK_INDEX].fd = clientSocket;
+	this->pollFds[CLI::I_STDIN].fd = STDIN_FILENO;
+	this->pollFds[CLI::I_RESIZE].fd = ioUtils::createSignalRedirectFd(SIGWINCH);
+	this->pollFds[CLI::I_CLIENT].fd = clientSocket;
 
 	this->dispatcher[KEY_LEFT]      = [this] { this->commandTab->moveCursorLeft(); };
 	this->dispatcher[KEY_RIGHT]     = [this] { this->commandTab->moveCursorRight(); };
@@ -35,6 +36,7 @@ CLI::CLI(int32_t clientSocket) :
 	this->refresh();
 
 	LOG_INFO(LogContext::INTERFACE, "Done setup CLI");
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Listening to client socket: {}", this->pollFds[CLI::I_CLIENT].fd));
 }
 
 CLI::~CLI(void) noexcept
@@ -47,44 +49,42 @@ CLI::~CLI(void) noexcept
 	this->eventTab.reset();
 
 	::endwin();
-	ioUtils::close(this->pollFds[CLI::RES_INDEX]. fd);
-
-	LOG_INFO(LogContext::INTERFACE, "CLI stopped");
+	ioUtils::close(this->pollFds[CLI::I_RESIZE]. fd);
 }
 
 void CLI::loop(void)
 {
 	while (this->keepAlive == true)
 	{
-		this->pollFds[CLI::STDIN_INDEX].events |= POLLIN;
-		this->pollFds[CLI::STDIN_INDEX].revents = 0;
-		this->pollFds[CLI::RES_INDEX].events |= POLLIN;
-		this->pollFds[CLI::RES_INDEX].revents = 0;
-		this->pollFds[CLI::SOCK_INDEX].events |= POLLIN;
-		this->pollFds[CLI::SOCK_INDEX].revents = 0;
+		this->pollFds[CLI::I_STDIN].events |= POLLIN;
+		this->pollFds[CLI::I_STDIN].revents = 0;
+		this->pollFds[CLI::I_RESIZE].events |= POLLIN;
+		this->pollFds[CLI::I_RESIZE].revents = 0;
+		this->pollFds[CLI::I_CLIENT].events |= POLLIN;
+		this->pollFds[CLI::I_CLIENT].revents = 0;
 		ioUtils::poll(this->pollFds, POLL_SIZE, -1);
 
-		if (pollFds[STDIN_INDEX].revents & POLLIN)
+		if (pollFds[I_STDIN].revents & POLLIN)
 			this->handleUserInput();
 
-		if (pollFds[RES_INDEX].revents & POLLIN)
+		if (pollFds[I_RESIZE].revents & POLLIN)
 			this->handleResizeEvent();
 
-		if (pollFds[SOCK_INDEX].revents & POLLIN)
-			this->readDataFromServer(this->pollFds[CLI::SOCK_INDEX].fd);
+		if (pollFds[I_CLIENT].revents & POLLIN)
+			this->readDataFromServer(this->pollFds[CLI::I_CLIENT].fd);
 
-		if (pollFds[SOCK_INDEX].revents & POLLOUT)
+		if (pollFds[I_CLIENT].revents & POLLOUT)
 			this->handleCommand();
 
 		// client closed connection (because server did so) (POLLHUP) or got an error (POLLERR | POLLNVAL)
-		if (pollFds[SOCK_INDEX].revents & (POLLHUP | POLLERR | POLLNVAL))
+		if (pollFds[I_CLIENT].revents & (POLLHUP | POLLERR | POLLNVAL))
 		{
 			LOG_WARN(LogContext::INTERFACE, "Client HTTP unexpectedly terminated connection, closing session");
 			this->exitLoop();
 		}
 		this->refresh();
 	}
-	LOG_INFO(LogContext::INTERFACE, "Ended CLI loop");
+	LOG_INFO(LogContext::INTERFACE, "CLI stopped");
 }
 
 void CLI::createWindow(void)
@@ -111,6 +111,8 @@ void CLI::createWindow(void)
 	this->eventTab = std::make_unique<OutputTab>(height, width, starty, startx, 0);
 	this->eventTab->appendContent("This is where events are shown");
 	this->commandTab->refresh();
+
+	LOG_DEBUG(LogContext::INTERFACE, std::format("CLI window size h: {}, w: {}", height, width));
 }
 
 void CLI::handleCommand(void)
@@ -120,8 +122,8 @@ void CLI::handleCommand(void)
 		return;
 
 	// if necessary parse/format command
-	if (this->forwardDataToServer(this->pollFds[CLI::SOCK_INDEX].fd, command) == true)
-		this->pollFds[CLI::SOCK_INDEX].events = 0;			// is everything has been sent stop poll for writing
+	if (this->forwardDataToServer(this->pollFds[CLI::I_CLIENT].fd, command) == true)
+		this->pollFds[CLI::I_CLIENT].events = 0;			// is everything has been sent stop poll for writing
 }
 
 void CLI::handleResponse(std::string const& response) noexcept
@@ -139,7 +141,7 @@ void CLI::handleEvent(std::string const& event) noexcept
 void CLI::handleResizeEvent(void)
 {
 	struct signalfd_siginfo si;
-	ioUtils::read(this->pollFds[CLI::RES_INDEX].fd, &si, sizeof(si));		// I don't care about the data, flush it
+	ioUtils::read(this->pollFds[CLI::I_RESIZE].fd, &si, sizeof(si));		// I don't care about the data, flush it
 
 	struct winsize windowSize;
 	::ioctl(STDOUT_FILENO, TIOCGWINSZ, &windowSize);	// get the size of the resized terminal
@@ -172,6 +174,8 @@ void CLI::resize(int32_t height, int32_t width)
 
 	// because resize is not handled by ncurses there might be some garbage to read, flush it
 	::flushinp();
+
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Window resized to h: {}, w: {}", height, width));
 }
 
 void CLI::handleUserInput(void)
@@ -191,5 +195,5 @@ void CLI::handleUserInput(void)
 		return;
 
 	if (this->commandTab->getLastInput().empty() == false)
-		this->pollFds[CLI::SOCK_INDEX].events |= POLLOUT;
+		this->pollFds[CLI::I_CLIENT].events |= POLLOUT;
 }
