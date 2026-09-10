@@ -13,7 +13,7 @@ struct Config
 	static constexpr const char MSG_TERM = '\n';
 	static constexpr const char MSG_SP = ' ';
 	
-	static constexpr char const* LOG_DIR = "client/logs";
+	static constexpr char const* LOG_DIR = "logs";
 	static constexpr LogLevel DEFAULT_LOG_LEVEL = LogLevel::DEBUG;
 
 	static constexpr int32_t WIDTH_WIN = 100;
