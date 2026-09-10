@@ -448,7 +448,7 @@ OutputTab::OutputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderC
 OutputTab::OutputTab(OutputTab&& other) noexcept :
 	BasicTab(std::move(other)),
 	content{std::move(other.content)},
-	firstLineToPrintIndex{firstLineToPrintIndex}
+	firstLineToPrintIndex{other.firstLineToPrintIndex}
 {
 }
 
@@ -459,7 +459,7 @@ OutputTab& OutputTab::operator=(OutputTab&& other) noexcept
 		BasicTab::operator=(std::move(other));
 
 		this->content = std::move(other.content);
-		this->firstLineToPrintIndex = firstLineToPrintIndex;
+		this->firstLineToPrintIndex = other.firstLineToPrintIndex;
 	}
 	return *this;
 }

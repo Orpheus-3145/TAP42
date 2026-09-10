@@ -53,13 +53,3 @@ class WriteException : public IOException {
 	public:
 		using IOException::IOException;
 };
-
-class BufferOverflowException : public IOException {
-	public:
-		using IOException::IOException;
-};
-
-class ConnClosedException : public IOException {
-	public:
-		using IOException::IOException;
-};

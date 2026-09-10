@@ -3,7 +3,7 @@
 #include <string>
 #include <cstdint>
 #include <netdb.h> 		// gai_strerror, getaddrinfo, freeaddrinfo
-#include <fcntl.h>		// fcntl, macros for I/O
+#include <fcntl.h>		// fcntl, macros for I/O, execve, dup, dup2, pipe, fork, access, close
 #include <unistd.h>		// read, write, open
 #include <poll.h>
 

@@ -107,7 +107,7 @@ class InputTab : public BasicTab
 
 		ssize_t			currentCommandIndex{-1L};
 		ssize_t			currentSuggestedIndex{-1L};
-		const int32_t	startX{::strlen(PROMPT)};
+		const int32_t	startX{static_cast<int32_t>(::strlen(PROMPT))};
 
 		size_t	bufferSize{0UL};
 		char	commandBuffer[Config::CMD_BUFFER_SIZE];
