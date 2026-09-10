@@ -60,9 +60,11 @@ bool UI::forwardDataToServer(int32_t fd, std::string const& command)
 {
 	LOG_INFO(LogContext::INTERFACE, "Got new command: " + command);
 
+	// parse command into HTTP request
+	std::string request = command + "\n";
 	try
 	{
-		if (ioUtils::writeNonBlock(fd, command.data(), command.size()) == -1)
+		if (ioUtils::writeNonBlock(fd, request.data(), request.size()) == -1)
 		{
 			LOG_WARN(LogContext::INTERFACE, "Client socket busy, trying again later");
 			return false;

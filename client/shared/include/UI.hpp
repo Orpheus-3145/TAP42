@@ -13,7 +13,7 @@
 static constexpr const char* S_OK = "OK";
 static constexpr const char* S_ERR = "ERR";
 static constexpr const char* S_EVT = "EVT";
-static constexpr const char* G_QUIT = "quit";
+static constexpr const char* G_QUIT = "QUIT";
 
 class UI
 {
