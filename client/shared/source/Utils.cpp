@@ -1,0 +1,363 @@
+#include "Utils.hpp"
+#include "Exceptions.hpp"
+
+#include <iostream>
+#include <format>
+#include <iomanip>
+#include <chrono>
+#include <sstream>
+#include <mutex>
+#include <filesystem>
+
+#include <cstring>
+#include <ctime>
+#include <cassert>				// strerror, memchr, memeset, memmove
+#include <sys/socket.h>			// socketpair, htons, htonl, ntohs, ntohl, select
+#include <netinet/in.h>			// socket, accept, listen, bind, connect
+#include <arpa/inet.h>			// htons, htonl, ntohs, ntohl
+#include <sys/types.h>			// send, recv
+#include <sys/socket.h>			// send, recv
+#include <signal.h>
+#include <sys/signalfd.h>
+
+
+namespace ioUtils {
+
+static constexpr size_t BUFF_SIZE = 1024UL;
+
+Address	getAddress(struct sockaddr_storage const& addr) noexcept
+{
+	Address address{};
+	address.rawAddress = addr;
+
+	if (address.rawAddress.ss_family == AF_INET)
+	{
+		char ipv4[INET_ADDRSTRLEN];
+		struct sockaddr_in *addr_v4 = reinterpret_cast<struct sockaddr_in*>(&address.rawAddress);
+		inet_ntop(addr_v4->sin_family, &(addr_v4->sin_addr), ipv4, sizeof(ipv4));
+		address.host = std::string(ipv4);
+		address.port = ntohs(addr_v4->sin_port);
+	}
+	else if (address.rawAddress.ss_family == AF_INET6)
+	{
+		char ipv6[INET6_ADDRSTRLEN];
+		struct sockaddr_in6 *addr_v6 = reinterpret_cast<struct sockaddr_in6*>(&address.rawAddress);
+		inet_ntop(addr_v6->sin6_family, &(addr_v6->sin6_addr), ipv6, sizeof(ipv6));
+		address.host = std::string(ipv6);
+		address.port = ntohs(addr_v6->sin6_port);
+	}
+	return (address);
+}
+
+int32_t	connectToServer(std::string const& host, uint32_t portNo, struct addrinfo* filter)
+{
+	struct addrinfo *list, *tmp, defaultTCPfilter{};
+	defaultTCPfilter.ai_family = AF_UNSPEC;
+	defaultTCPfilter.ai_protocol = IPPROTO_TCP;
+	defaultTCPfilter.ai_socktype = SOCK_STREAM;
+
+	struct sockaddr_storage rawServerAddress{};
+	std::string port = std::to_string(portNo);
+
+	int32_t socket = -1;
+
+	if (filter == nullptr)
+		filter = &defaultTCPfilter;
+
+	if (::getaddrinfo(host.data(), port.data(), filter, &list) != 0)
+		throw HTTPException(std::format("Failed to find addresses for {}:{}", host, port));
+
+	for (tmp = list; tmp != nullptr; tmp = tmp->ai_next)
+	{
+		socket = ::socket(tmp->ai_family, tmp->ai_socktype, tmp->ai_protocol);
+		if (socket == -1)
+			continue;
+		if (::connect(socket, tmp->ai_addr, tmp->ai_addrlen) == 0)
+			break;
+		::shutdown(socket, SHUT_RDWR);
+		::close(socket);
+	}
+	if (tmp == nullptr)
+	{
+		::freeaddrinfo(list);
+		throw HTTPException(std::format("No available IP host found for port: {}", port));
+	}
+	std::memcpy(&rawServerAddress, tmp->ai_addr, tmp->ai_addrlen);
+	::freeaddrinfo(list);
+
+	int32_t flags = ::fcntl(socket, F_GETFL, 0);
+	if (flags == -1)
+		throw HTTPException("Failed to load flags for socket");
+	if (::fcntl(socket, F_SETFL, flags | O_NONBLOCK) == -1)
+		throw HTTPException("Failed to set socket as non-blocking");
+
+	return socket;
+}
+
+int32_t poll(pollfd *fds, size_t nfds, int32_t timeout)
+{
+	int32_t fdsReady = ::poll(fds, nfds, timeout);
+	if (fdsReady != -1)
+		return fdsReady;
+	else if (errno == EINTR)
+		return 0;
+	else
+		throw HTTPException(std::format("Poll failed: {}", strerror(errno)));
+}
+
+size_t read(int32_t fd, char* buffer, size_t size)
+{
+	if (size == 0UL)
+		return 0UL;
+	
+	size_t	offset = 0UL;
+	while (true)
+	{
+		ssize_t n = ::read(fd, buffer + offset, size - offset);
+		if (n > 0L)
+			offset += n;
+		if (n < 0L)
+			throw ReadException(std::format("Read failed: {}", strerror(errno)));
+		else
+			break;
+	}
+	return offset;
+}
+
+size_t write(int32_t fd, const char* buffer, size_t size)
+{
+	if (size == 0UL)
+		return 0UL;
+
+	size_t	offset = 0UL;
+	while (true)
+	{
+		ssize_t n = ::write(fd, buffer + offset, size - offset);
+		if (n > 0L)
+			offset += n;
+		if (n < 0L)
+			throw ReadException(std::format("Write failed: {}", strerror(errno)));
+		else
+			break;
+	}
+	return offset;
+}
+
+ssize_t readNonBlock(int32_t fd, char* buffer, size_t size)
+{
+	if (size == 0UL)
+		return 0L;
+
+	ssize_t offset = 0L;
+	while (true)
+	{
+		ssize_t n = ::recv(fd, buffer + offset, size - offset, 0);
+		
+		if (n > 0)
+		{
+			offset += n;
+			if (static_cast<size_t>(offset) == size)		// overflow
+				break;
+			continue;
+		}
+		else if (n == 0)	// connection closed by peer
+			return -1L;
+
+		if (errno == EAGAIN || errno == EWOULDBLOCK)  // nothing else to read for now
+			break;
+		if (errno == EINTR)
+			continue;
+
+		throw ReadException(std::format("Read failed: {}", strerror(errno)));
+	}
+	return offset;
+}
+
+ssize_t writeNonBlock(int32_t fd, const char* buffer, size_t size)
+{
+	if (size == 0UL)
+		return 0L;
+
+	ssize_t offset = 0L;
+	while (true)
+	{
+		ssize_t n = ::send(fd, buffer + offset, size - offset, 0);
+		
+		if (n > 0)
+		{
+			offset += n;
+			if (static_cast<size_t>(offset) == size)
+				break;
+			continue;
+		}
+
+		if (errno == EAGAIN || errno == EWOULDBLOCK)	// buffer full, wait for next pollout
+			return -1L;
+		if (errno == EINTR)
+			continue;
+
+		throw ReadException(std::format("Send failed: {}", strerror(errno)));
+	}
+	return offset;
+}
+
+ssize_t pipe(int32_t sourceFd, int32_t destFd)
+{
+	char	inputBuffer[BUFF_SIZE];
+	ssize_t	readSize = 0L;
+
+	while (true)
+	{
+		readSize = readNonBlock(sourceFd, inputBuffer, BUFF_SIZE);
+		if (readSize <= 0L)		// if other peer disconnected or there's nothing else to read
+			break;
+		if (writeNonBlock(destFd, inputBuffer, readSize) == -1L)
+			throw IOException("Couldn't write on destination fd, piping failed");
+	}
+	return (readSize);
+}
+
+int32_t createSignalRedirectFd(int32_t signal)
+{
+	sigset_t mask;
+	sigemptyset(&mask);
+	sigaddset(&mask, signal);				// create a filter that signal
+	sigprocmask(SIG_BLOCK, &mask, NULL);	// and use it to not block it
+	
+	int32_t fd = ::signalfd(-1, &mask, 0);
+	if (fd == -1)
+		throw IOException(std::format("Failed to creare a file descriptor to redirect: {}", signal));
+
+	int32_t flags = fcntl(fd, F_GETFL, 0);
+	if (flags == -1)
+		throw InterfaceException("Failed to load flags for socket");
+	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+		throw InterfaceException("Failed to set socket as non-blocking");
+
+	return fd;
+}
+
+SocketPair createSocketPair(void)
+{
+	int sockets[2];
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1)
+		throw InterfaceException(std::format("Failed to create socket: {}", strerror(errno)));
+
+	for (int32_t fd : {sockets[0], sockets[1]})
+	{
+		int32_t flags = fcntl(fd, F_GETFL, 0);
+		if (flags == -1)
+			throw InterfaceException("Failed to load flags for socket");
+		if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+			throw InterfaceException("Failed to set socket as non-blocking");
+	}
+
+	return SocketPair{sockets[0], sockets[1]};
+}
+
+void closeSocket(int32_t& socket) noexcept
+{
+	if (socket == -1)
+		return;
+	::shutdown(socket, SHUT_RDWR);
+	::close(socket);
+	socket = -1;
+}
+
+void closePair(SocketPair& pair) noexcept
+{
+	closeSocket(pair.first);
+	closeSocket(pair.second);
+}
+
+Pipe createPipe(void)
+{
+	int32_t _pipe[2] = {-1, -1};		// pipe for pollwakeup of worker
+	if (::pipe(_pipe) == -1)
+		throw InterfaceException(std::format("Failed to create pipe: {}", strerror(errno)));
+
+	for (int32_t fd : {_pipe[0], _pipe[1]})
+	{
+		int32_t flags = ::fcntl(fd, F_GETFL, 0);
+		if (flags == -1)
+			throw HTTPException("Failed to load flags for socket");
+		if (::fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+			throw HTTPException("Failed to set socket as non-blocking");
+	}
+
+	return Pipe{_pipe[1], _pipe[0]};
+}
+
+void closePipe(Pipe& pipe) noexcept
+{
+	if (pipe.in != -1)
+	{
+		::close(pipe.in);
+		pipe.in = -1;
+	}
+	if (pipe.out != -1)
+	{
+		::close(pipe.out);
+		pipe.out = -1;
+	}
+}
+
+};
+
+void printMutated(std::string const& content) noexcept
+{
+	static std::mutex printMutex;
+
+	std::lock_guard<std::mutex> lock(printMutex);
+	std::cout << content << std::endl;
+}
+
+std::string createLogPath(const char* logFolder)
+{
+	auto now = std::chrono::system_clock::now();
+	std::time_t nowTimeT = std::chrono::system_clock::to_time_t(now);
+
+	std::tm tmBuf;
+	localtime_r(&nowTimeT, &tmBuf);  // versione thread-safe di localtime (POSIX)
+
+	std::ostringstream oss;
+	oss << std::put_time(&tmBuf, "%d-%m-%y");  // DD-mm-AA (anno a 2 cifre)
+
+	std::filesystem::path logPath = std::filesystem::current_path() / logFolder;
+	if (std::filesystem::is_directory(logPath) == false)
+		throw AppException(std::format("Folder: '{}' doesn't exist", logPath.string()));
+
+	return std::format("{}/{}_logfile.log", logPath.string(), oss.str());
+}
+
+std::string escapeNewLine(const char* buffer, size_t size) noexcept
+{
+	assert(buffer != nullptr and "null buffer pointer");
+	std::string escaped;
+
+	for (size_t i = 0UL; i < size; i++)
+	{
+		if (buffer[i] != '\n')
+			escaped.push_back(buffer[i]);
+		else
+		{
+			escaped.push_back('\\');
+			escaped.push_back('n');
+		}
+	}
+	return escaped;
+}
+
+bool timerElapsed(int32_t intervalSeconds)
+{
+	static auto lastRun = std::chrono::steady_clock::now();
+
+	auto now = std::chrono::steady_clock::now();
+	if (now - lastRun >= std::chrono::seconds(intervalSeconds))
+	{
+		lastRun = now;
+		return true;
+	}
+	return false;
+}

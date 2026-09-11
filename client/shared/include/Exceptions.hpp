@@ -1,0 +1,55 @@
+#pragma once
+
+#include <string>
+#include <stdexcept>
+
+
+class AppException : public std::runtime_error {
+	public:
+		explicit AppException(std::string const& error ) : std::runtime_error(error) {};
+};
+
+class ParsingException : public AppException {
+	public:
+		using AppException::AppException;
+};
+
+class HTTPException : public AppException {
+	public:
+		using AppException::AppException;
+};
+
+class GameException : public AppException {
+	public:
+		using AppException::AppException;
+};
+
+class InterfaceException : public AppException {
+	public:
+		using AppException::AppException;
+};
+
+class CliException : public InterfaceException {
+	public:
+		using InterfaceException::InterfaceException;
+};
+
+class GuiException : public InterfaceException {
+	public:
+		using InterfaceException::InterfaceException;
+};
+
+class IOException : public AppException {
+	public:
+		using AppException::AppException;
+};
+
+class ReadException : public IOException {
+	public:
+		using IOException::IOException;
+};
+
+class WriteException : public IOException {
+	public:
+		using IOException::IOException;
+};
