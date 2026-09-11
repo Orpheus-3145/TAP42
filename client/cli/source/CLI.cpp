@@ -197,3 +197,8 @@ void CLI::handleUserInput(void)
 	if (this->commandTab->getLastInput().empty() == false)
 		this->pollFds[CLI::I_CLIENT].events |= POLLOUT;
 }
+
+std::unique_ptr<UI> factoryUI(int32_t clientSocket)
+{
+	return std::make_unique<CLI>(clientSocket);
+}

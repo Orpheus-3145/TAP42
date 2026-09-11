@@ -4,6 +4,7 @@
 #include <string>
 #include <cassert>
 #include <vector>
+#include <memory>
 #include <cassert>
 
 #include "Utils.hpp"
@@ -28,14 +29,14 @@ class UI
 		virtual ~UI(void) noexcept {};
 
 		virtual void loop(void) = 0;
-		virtual void exitLoop(void ) noexcept { this->keepAlive = false; }
+		virtual void exitLoop(void ) noexcept { this->keepAlive = false; }		// move to CLI.hpp
 
 	protected:
 		virtual void handleCommand(void) = 0;
 		virtual void handleResponse(std::string const& response) noexcept = 0;
 		virtual void handleEvent(std::string const& event) noexcept = 0;
 		virtual void resize(int32_t height, int32_t width) = 0;
-		virtual void refresh(void) noexcept = 0;
+		virtual void refresh(void) noexcept = 0;		// move to CLI.hpp
 
 		void readDataFromServer(int32_t fd);
 		void handleServerInput(void);
@@ -44,5 +45,7 @@ class UI
 		size_t	bufferSize{0UL};
 		char	serverBuffer[Config::BUFF_SIZE];
 
-		bool keepAlive{true};
+		bool keepAlive{true};		// move to CLI.hpp
 };
+
+std::unique_ptr<UI> factoryUI(int32_t clientSocket);
