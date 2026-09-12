@@ -255,10 +255,13 @@ class CLI : public UI
 		void refresh(void) noexcept { ::doupdate(); }
 		void handleResizeEvent(void);
 		void handleUserInput(void);
+		void handleServerData(void);
+		void handleError(void) noexcept;
 
 		void handleCommand(std::string const& command) override;
 		void handleResponse(std::string const& response) noexcept override;
 		void handleEvent(std::string const& event) noexcept override;
+		void handleServerDisconnect(void) noexcept override;
 
 		static constexpr size_t POLL_SIZE = 3UL;
 		static constexpr size_t I_STDIN = 0UL;

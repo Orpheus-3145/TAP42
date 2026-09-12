@@ -30,9 +30,12 @@ class GUI : public QObject, public UI
 		void resize(int32_t height, int32_t width) override { this->gameWin->resize(width, height); }
 		
 	private:
+		void handleServerData(void);
+
 		void handleCommand(std::string const& command) override;
 		void handleResponse(std::string const& response) noexcept override;
 		void handleEvent(std::string const& event) noexcept override;
+		void handleServerDisconnect(void) noexcept override;
 
 		std::unique_ptr<QApplication>	app;
 		std::unique_ptr<GameWindow>		gameWin;

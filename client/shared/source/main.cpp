@@ -28,7 +28,7 @@ void run(std::string const& host, uint32_t port)
 
 	std::unique_ptr<UI> interface = uiFactory(gameClientSockets.second);
 
-	interface->startUI();		// blocks here, NB if exceptions happen here they must be caught and terminate the running threads
+	interface->startUI();		// blocks here
 
 	clientHTTP->stopWorker();
 

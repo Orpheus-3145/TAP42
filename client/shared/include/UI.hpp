@@ -14,7 +14,7 @@
 static constexpr const char* S_OK = "OK";
 static constexpr const char* S_ERR = "ERR";
 static constexpr const char* S_EVT = "EVT";
-static constexpr const char* G_QUIT = "QUIT";
+static constexpr const char* QUIT_RESPONSE = "OK bye";
 
 class UI
 {
@@ -38,6 +38,7 @@ class UI
 		virtual void handleCommand(std::string const& command) = 0;
 		virtual void handleResponse(std::string const& response) noexcept = 0;
 		virtual void handleEvent(std::string const& event) noexcept = 0;
+		virtual void handleServerDisconnect(void) noexcept = 0;
 
 		void readDataFromServer(void);
 		void handleServerInput(void);

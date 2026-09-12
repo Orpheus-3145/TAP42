@@ -1,4 +1,6 @@
 #include "GUI.hpp"
+#include "Logger.hpp"
+#include "Exceptions.hpp"
 
 
 // because I don't want to start the Qt app in main;
@@ -27,9 +29,7 @@ GUI::GUI(int32_t clientSocket, int32_t height, int32_t width) :
 		this->readFromServerNotifier.get(),
 		&QSocketNotifier::activated,
 	    this,
-		[this]() {
-			this->readDataFromServer();		// NB catch and log
-		}
+		&GUI::handleServerData
 	);
 
     this->gameWin->show();
@@ -45,9 +45,30 @@ GUI::~GUI(void) noexcept
 	this->app.reset();
 }
 
+void GUI::handleServerData(void)
+{
+	try
+	{
+		this->readDataFromServer();
+	}
+	catch(const IOException& e)
+	{
+		LOG_ERROR(LogContext::INTERFACE, std::format("I/O error failed to write to client: '{}'", e.what()));
+		// show error tab and close win
+	}
+}
+
 void GUI::handleCommand(std::string const& command)
 {
-	this->writeDataToServer(command);		// NB catch and log
+	try
+	{
+		this->writeDataToServer(command);
+	}
+	catch(const IOException& e)
+	{
+		LOG_ERROR(LogContext::INTERFACE, std::format("I/O error failed to write to client: '{}'", e.what()));
+		// show error tab and close win
+	}
 }
 
 void GUI::handleResponse(std::string const& response) noexcept
@@ -60,6 +81,10 @@ void GUI::handleEvent(std::string const& event) noexcept
 	this->gameWin->appendEvent(QString::fromStdString(event));
 }
 
+void GUI::handleServerDisconnect(void) noexcept
+{
+
+}
 
 std::unique_ptr<UI> uiFactory(int32_t clientSocket)
 {
