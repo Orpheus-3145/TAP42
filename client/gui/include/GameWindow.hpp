@@ -9,6 +9,7 @@
 #include <QLabel>
 #include <QSplitter>
 #include <QFont>
+#include <QSocketNotifier>
 
 
 // Stile "terminale" condiviso da tutti i pannelli: sfondo scuro, testo bianco,
@@ -24,14 +25,24 @@ static const QString kPanelStyle = R"(
 class GameWindow : public QMainWindow
 {
     Q_OBJECT
+
 	public:
 		GameWindow(QWidget *parent, int32_t height, int32_t width);
 
-		void appendInput(const QString &text)     { this->inputLog->appendPlainText(text); }
+		~GameWindow(void) noexcept {}
+
 		void appendResponse(const QString &text)  { this->responsesLog->appendPlainText(text); }
 		void appendEvent(const QString &text)     { this->eventsLog->appendPlainText(text); }
 
+	signals:
+		void commandEntered(const QString &command);
+
+	private slots:
+		void onPromptSubmitted();
+
 	private:
+		void draw(int32_t height, int32_t width);
+
 		QPlainTextEdit *inputLog;
 		QLineEdit      *promptField;
 		QPlainTextEdit *responsesLog;
