@@ -6,6 +6,7 @@
 #include <fcntl.h>		// fcntl, macros for I/O, execve, dup, dup2, pipe, fork, access, close
 #include <unistd.h>		// read, write, open
 #include <poll.h>
+#include <sys/socket.h>			// send, recv
 
 
 namespace ioUtils {
@@ -13,6 +14,7 @@ namespace ioUtils {
 using ::read;
 using ::write;
 using ::close;
+using ::getsockopt;
 
 struct Address
 {
