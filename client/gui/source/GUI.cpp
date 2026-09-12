@@ -34,7 +34,7 @@ void GUI::refresh(void) noexcept
 }
 
 
-std::unique_ptr<UI> factoryUI(int32_t clientSocket)
+std::unique_ptr<UI> uiFactory(int32_t clientSocket)
 {
 	return std::make_unique<GUI>(clientSocket, Config::HEIGHT_GUI, Config::WIDTH_GUI);
 }

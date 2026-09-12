@@ -52,7 +52,7 @@ CLI::~CLI(void) noexcept
 	ioUtils::close(this->pollFds[CLI::I_RESIZE]. fd);
 }
 
-void CLI::loop(void)
+void CLI::startUI(void)
 {
 	while (this->keepAlive == true)
 	{
@@ -71,16 +71,16 @@ void CLI::loop(void)
 			this->handleResizeEvent();
 
 		if (pollFds[I_CLIENT].revents & POLLIN)
-			this->readDataFromServer(this->pollFds[CLI::I_CLIENT].fd);
+			this->readDataFromServer();
 
 		if (pollFds[I_CLIENT].revents & POLLOUT)
-			this->handleCommand();
+			this->handleCommand(this->commandTab->getLastInput());
 
 		// client closed connection (because server did so) (POLLHUP) or got an error (POLLERR | POLLNVAL)
 		if (pollFds[I_CLIENT].revents & (POLLHUP | POLLERR | POLLNVAL))
 		{
 			LOG_WARN(LogContext::INTERFACE, "Client HTTP unexpectedly terminated connection, closing session");
-			this->exitLoop();
+			this->stopUI();
 		}
 		this->refresh();
 	}
@@ -115,15 +115,14 @@ void CLI::createWindow(void)
 	LOG_DEBUG(LogContext::INTERFACE, std::format("CLI window size h: {}, w: {}", height, width));
 }
 
-void CLI::handleCommand(void)
+void CLI::handleCommand(std::string const& command)
 {
-	std::string command = this->commandTab->getLastInput();
 	if (command == "")
 		return;
 
 	// if necessary parse/format command
-	if (this->forwardDataToServer(this->pollFds[CLI::I_CLIENT].fd, command) == true)
-		this->pollFds[CLI::I_CLIENT].events = 0;			// is everything has been sent stop poll for writing
+	if (this->writeDataToServer(command) == true)
+		this->pollFds[CLI::I_CLIENT].events = 0;			// if everything has been sent end  poll writing
 }
 
 void CLI::handleResponse(std::string const& response) noexcept
@@ -198,7 +197,7 @@ void CLI::handleUserInput(void)
 		this->pollFds[CLI::I_CLIENT].events |= POLLOUT;
 }
 
-std::unique_ptr<UI> factoryUI(int32_t clientSocket)
+std::unique_ptr<UI> uiFactory(int32_t clientSocket)
 {
 	return std::make_unique<CLI>(clientSocket);
 }

@@ -7,15 +7,15 @@
 #include <format>
 
 
-void UI::readDataFromServer(int32_t fd)
+void UI::readDataFromServer(void)
 {
 	try
 	{
-		ssize_t n = ioUtils::readNonBlock(fd, this->serverBuffer + this->bufferSize, Config::BUFF_SIZE - this->bufferSize);
+		ssize_t n = ioUtils::readNonBlock(this->clientSocket, this->serverBuffer + this->bufferSize, Config::BUFF_SIZE - this->bufferSize);
 		if (n == -1)
 		{
 			LOG_WARN(LogContext::INTERFACE, "Client unexpectedly terminated connection, closing session");
-			this->exitLoop();
+			this->stopUI();		// or throw?
 			return;
 		}
 		this->bufferSize += n;
@@ -24,7 +24,7 @@ void UI::readDataFromServer(int32_t fd)
 	catch(const IOException& e)
 	{
 		LOG_ERROR(LogContext::INTERFACE, std::format("I/O error failed to read from client: '{}'", e.what()));
-		this->exitLoop();
+		this->stopUI();		// or throw?
 	}
 }
 
@@ -56,7 +56,7 @@ void UI::handleServerInput(void)
 		::memmove(this->serverBuffer, startMsg, this->bufferSize);
 }
 
-bool UI::forwardDataToServer(int32_t fd, std::string const& command)
+bool UI::writeDataToServer(std::string const& command)
 {
 	LOG_INFO(LogContext::INTERFACE, "Got new command: " + command);
 
@@ -64,19 +64,19 @@ bool UI::forwardDataToServer(int32_t fd, std::string const& command)
 	std::string request = command + "\n";
 	try
 	{
-		if (ioUtils::writeNonBlock(fd, request.data(), request.size()) == -1)
+		if (ioUtils::writeNonBlock(this->clientSocket, request.data(), request.size()) == -1)
 		{
 			LOG_WARN(LogContext::INTERFACE, "Client socket busy, trying again later");
 			return false;
 		}
 
 		if (command == G_QUIT)
-			this->exitLoop();		// should tell that specifically to graceful terminate after game session
+			this->stopUI();		// should tell that specifically to graceful terminate after game session
 	}
 	catch(const IOException& e)
 	{
 		LOG_ERROR(LogContext::INTERFACE, std::format("I/O error failed to write to client: '{}'", e.what()));
-		this->exitLoop();
+		this->stopUI();		// or throw?
 	}
 	return true;
 }
