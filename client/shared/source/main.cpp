@@ -1,8 +1,9 @@
 #include <iostream>
+#include <memory>
 
 #include "ArgParser.hpp"
 #include "ClientHTTP.hpp"
-#include "CLI.hpp"
+#include "UI.hpp"
 #include "Logger.hpp"
 #include "Utils.hpp"
 #include "Config.hpp"
@@ -22,15 +23,14 @@ void run(std::string const& host, uint32_t port)
 {
 	ioUtils::SocketPair gameClientSockets = ioUtils::createSocketPair();
 
-	ClientHTTP clientHTTP = ClientHTTP(host, port, gameClientSockets.first);
+	std::unique_ptr<ClientHTTP> clientHTTP = std::make_unique<ClientHTTP>(host, port, gameClientSockets.first);
+	clientHTTP->startWorker();
 
-	// decide if use CLI or GUI
-	CLI interface = CLI(gameClientSockets.second);
-	
-	clientHTTP.startWorker();
-	interface.loop();		// blocks here, NB if exceptions happen here they must be caught and terminate the running threads
+	std::unique_ptr<UI> interface = uiFactory(gameClientSockets.second);
 
-	clientHTTP.stopWorker();
+	interface->startUI();		// blocks here, NB if exceptions happen here they must be caught and terminate the running threads
+
+	clientHTTP->stopWorker();
 
 	ioUtils::closePair(gameClientSockets);
 }

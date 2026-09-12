@@ -245,25 +245,27 @@ class CLI : public UI
 		CLI(int32_t clientSocket);
 
 		virtual ~CLI(void) noexcept override;
-		
-		void loop(void) override;
+
+		void startUI(void) override;
+		void stopUI(void) noexcept override { this->keepAlive = false; }
+		void resize(int32_t height, int32_t width) override;
 
 	private:
 		void createWindow(void);
-		void refresh(void) noexcept override { ::doupdate(); }
-		void handleCommand(void) override;
+		void refresh(void) noexcept { ::doupdate(); }
+		void handleResizeEvent(void);
+		void handleUserInput(void);
+
+		void handleCommand(std::string const& command) override;
 		void handleResponse(std::string const& response) noexcept override;
 		void handleEvent(std::string const& event) noexcept override;
-
-		void handleResizeEvent(void);
-		void resize(int32_t height, int32_t width) override;
-		
-		void handleUserInput(void);
 
 		static constexpr size_t POLL_SIZE = 3UL;
 		static constexpr size_t I_STDIN = 0UL;
 		static constexpr size_t I_RESIZE = 1UL;
 		static constexpr size_t I_CLIENT = 2UL;
+
+		bool keepAlive{true};
 
 		std::unique_ptr<OutputTab>	frame;
 		std::unique_ptr<InputTab>	commandTab;
