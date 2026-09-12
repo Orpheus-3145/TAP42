@@ -1,14 +1,20 @@
 #pragma once
 
 #include <QApplication>
+#include <QObject>
+#include <QSocketNotifier>
+
 #include <cstdint>
+#include <string>
 
 #include "UI.hpp"
 #include "GameWindow.hpp"
 
 
-class GUI : public UI
+class GUI : public QObject, public UI
 {
+	Q_OBJECT
+
 	public:
 		GUI(int32_t clientSocket, int32_t height, int32_t width);
 
@@ -17,18 +23,19 @@ class GUI : public UI
 		GUI(GUI&& other) noexcept = delete;
 		GUI& operator=(GUI&& other) noexcept = delete;
 
-		~GUI(void) noexcept override {};
+		~GUI(void) noexcept override;
 
-		void loop(void) override { this->app.exec();}
+		void startUI(void) override { this->app->exec(); }
+		void stopUI(void) noexcept override { this->app->quit(); }
+		void resize(int32_t height, int32_t width) override { this->gameWin->resize(width, height); }
 		
 	private:
-		void handleCommand(void) override;
+		void handleCommand(std::string const& command) override;
 		void handleResponse(std::string const& response) noexcept override;
 		void handleEvent(std::string const& event) noexcept override;
 
-		void resize(int32_t height, int32_t width) override { this->mainWindow.resize(width, height); }
-		void refresh(void) noexcept override;
+		std::unique_ptr<QApplication>	app;
+		std::unique_ptr<GameWindow>		gameWin;
 
-		QApplication	app;
-		GameWindow		mainWindow;
+		std::unique_ptr<QSocketNotifier> readFromServerNotifier;
 };
