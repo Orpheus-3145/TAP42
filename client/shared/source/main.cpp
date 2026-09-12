@@ -16,7 +16,7 @@ void startLogging(void)
 	Logger::getInstance().setLogFile(logName);
 	Logger::getInstance().setMinLevel(Config::DEFAULT_LOG_LEVEL);
 	Logger::getInstance().setConsoleOutput(false);
-	Logger::getInstance().setFilter(Logger::ALL_ENTRIES & ~LogContext::INPUT_OUTPUT);
+	Logger::getInstance().removeFilter(LogContext::INPUT_OUTPUT);
 }
 
 void run(std::string const& host, uint32_t port)

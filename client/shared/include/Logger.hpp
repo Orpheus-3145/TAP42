@@ -72,7 +72,9 @@ class Logger		// Singleton
 		void setLogFile(const std::string& path);
 		void setMinLevel(LogLevel level) noexcept;
 		void setConsoleOutput(bool enabled) noexcept;
-		void setFilter(LogContext filters) noexcept { this->filter = this->filter & filters; }
+		void setFilter(LogContext filters) noexcept { this->filter = filters; }
+		void addFilter(LogContext filters) noexcept { this->filter = this->filter | filters; }
+		void removeFilter(LogContext filters) noexcept { this->filter = this->filter & ~filters; }
 
 		void log(LogContext context, LogLevel level, const std::string& message) noexcept;
 		void debug(LogContext context, const std::string& message) noexcept;
