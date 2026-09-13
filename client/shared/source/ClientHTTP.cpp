@@ -5,8 +5,9 @@
 #include <cstring>				// strerror, memchr, memeset, memmove
 
 #include "ClientHTTP.hpp"
-#include "Exceptions.hpp"
 #include "Logger.hpp"
+#include "Utils.hpp"
+#include "Exceptions.hpp"
 
 
 ClientHTTP::ClientHTTP(std::string const& host, uint32_t port, int32_t gameSocket)
@@ -109,28 +110,28 @@ void ClientHTTP::handleDataFromGame(void)
 {
 	int32_t gameSocket = this->pollFds[ClientHTTP::GAME].fd;
 
-	ssize_t n;
 	try
 	{
-		n = ioUtils::readNonBlock(gameSocket, this->gameBuffer + this->gameBufferSize, Config::BUFF_SIZE - this->gameBufferSize);
+		ssize_t n = ioUtils::readNonBlock(gameSocket, this->gameBuffer + this->gameBufferSize, Config::BUFF_SIZE - this->gameBufferSize);
+
+		if (n < 0L)
+		{
+			this->pollFds[ClientHTTP::GAME].revents = POLLHUP;
+			this->handleGameError();
+		}
+		else if (n > 0L)
+		{
+			std::string gameData = escapeNewLine(this->gameBuffer + this->gameBufferSize, n);
+			LOG_DEBUG(LogContext::HTTP_CLIENT, std::format("Read from game: '{}'", gameData));
+
+			this->gameBufferSize += n;
+			this->pollFds[ClientHTTP::SERVER].events |= POLLOUT;
+		}
 	}
 	catch(const IOException& e)
 	{
 		LOG_ERROR(LogContext::HTTP_CLIENT, std::format("I/O error in worker thread: '{}'", e.what()));
 		this->exitPoll();
-	}
-
-	if (n < 0)
-	{
-		this->pollFds[ClientHTTP::GAME].revents |= POLLHUP;
-		this->handleGameError();
-	}
-	else if (n > 0)
-	{
-		this->gameBufferSize += n;
-		this->pollFds[ClientHTTP::SERVER].events |= POLLOUT;
-
-		LOG_DEBUG(LogContext::HTTP_CLIENT, std::format("Read from game: '{}'", std::string(this->gameBuffer, this->gameBufferSize)));
 	}
 }
 
@@ -138,26 +139,34 @@ void ClientHTTP::handleDataToGame(void)
 {
 	int32_t gameSocket = this->pollFds[ClientHTTP::GAME].fd;
 
-	ssize_t n;
 	try
 	{
-		n = ioUtils::writeNonBlock(gameSocket, this->serverBuffer, this->serverBufferSize);
+		ssize_t n = ioUtils::writeNonBlock(gameSocket, this->serverBuffer, this->serverBufferSize);
+
+		if (n < 0L)
+		{
+			LOG_WARN(LogContext::HTTP_CLIENT, "Game socket disconnected");
+			this->pollFds[ClientHTTP::GAME].revents = POLLHUP;
+			this->handleGameError();
+		}
+		else if (n > 0L)
+		{
+			std::string serverData = escapeNewLine(this->serverBuffer, n);
+			LOG_DEBUG(LogContext::HTTP_CLIENT, std::format("Sent to game: '{}'", serverData));
+			
+			this->serverBufferSize -= n;
+			if (this->serverBufferSize == 0UL)
+				this->pollFds[ClientHTTP::GAME].events = POLLIN;		// is done writing, no POLLOUT anymore
+			else
+				::memmove(this->serverBuffer, this->serverBuffer + n, this->serverBufferSize);
+		}
+		else
+			LOG_WARN(LogContext::HTTP_CLIENT, "Game socket buffer is busy, try writing later");
 	}
 	catch(const IOException& e)
 	{
 		LOG_ERROR(LogContext::HTTP_CLIENT, std::format("I/O error in worker thread: '{}'", e.what()));
 		this->exitPoll();
-	}
-
-	if (n > 0)
-	{
-		LOG_DEBUG(LogContext::HTTP_CLIENT, std::format("Sent to game: '{}'", std::string(this->serverBuffer, this->serverBufferSize)));
-
-		this->serverBufferSize -= n;
-		if (this->serverBufferSize == 0UL)
-			this->pollFds[ClientHTTP::GAME].events = 0;
-		else
-			::memmove(this->serverBuffer, this->serverBuffer + n, this->serverBufferSize);
 	}
 }
 
@@ -165,56 +174,63 @@ void ClientHTTP::handleDataFromServer(void)
 {
 	int32_t serverSocket = this->pollFds[ClientHTTP::SERVER].fd;
 
-	ssize_t n;
 	try
 	{
-		n = ioUtils::readNonBlock(serverSocket, this->serverBuffer + this->serverBufferSize, Config::BUFF_SIZE - this->serverBufferSize);
+		ssize_t n = ioUtils::readNonBlock(serverSocket, this->serverBuffer + this->serverBufferSize, Config::BUFF_SIZE - this->serverBufferSize);
+
+		if (n < 0L)
+		{
+			this->pollFds[ClientHTTP::SERVER].revents = POLLHUP;
+			this->handleServerError();
+		}
+		else if (n > 0L)
+		{
+			std::string serverData = escapeNewLine(this->serverBuffer + this->serverBufferSize, n);
+			LOG_DEBUG(LogContext::HTTP_CLIENT, std::format("Read from server: '{}'", serverData));
+
+			this->serverBufferSize += n;
+			this->pollFds[ClientHTTP::GAME].events |= POLLOUT;
+		}
 	}
 	catch(const IOException& e)
 	{
 		LOG_ERROR(LogContext::HTTP_CLIENT, std::format("I/O error in worker thread: '{}'", e.what()));
 		this->exitPoll();
 	}
-
-	if (n < 0)
-	{
-		this->pollFds[ClientHTTP::SERVER].revents |= POLLHUP;
-		this->handleServerError();
-	}
-	else if (n > 0)
-	{
-		this->serverBufferSize += n;
-		this->pollFds[ClientHTTP::GAME].events |= POLLOUT;
-
-		LOG_DEBUG(LogContext::HTTP_CLIENT, std::format("Read from server: '{}'", std::string(this->serverBuffer, this->serverBufferSize)));
-	}
-
 }
 
 void ClientHTTP::handleDataToServer(void)
 {
 	int32_t serverSocket = this->pollFds[ClientHTTP::SERVER].fd;
 
-	ssize_t n;
 	try
 	{
-		n = ioUtils::writeNonBlock(serverSocket, this->gameBuffer, this->gameBufferSize);
+		ssize_t n = ioUtils::writeNonBlock(serverSocket, this->gameBuffer, this->gameBufferSize);
+
+		if (n < 0L)
+		{
+			LOG_WARN(LogContext::HTTP_CLIENT, "Server socket disconnected");
+			this->pollFds[ClientHTTP::SERVER].revents = POLLHUP;
+			this->handleServerError();
+		}
+		else if (n > 0L)
+		{
+			std::string gameData = escapeNewLine(this->gameBuffer, n);
+			LOG_DEBUG(LogContext::HTTP_CLIENT, std::format("Sent to server: '{}'", gameData));
+
+			this->gameBufferSize -= n;
+			if (this->gameBufferSize == 0UL)
+				this->pollFds[ClientHTTP::SERVER].events = POLLIN;		// is done writing, no POLLOUT anymore
+			else
+				::memmove(this->gameBuffer, this->gameBuffer + n, this->gameBufferSize);
+		}
+		else
+			LOG_WARN(LogContext::HTTP_CLIENT, "Server socket buffer is busy, try writing later");
 	}
 	catch(const IOException& e)
 	{
 		LOG_ERROR(LogContext::HTTP_CLIENT, std::format("I/O error in worker thread: '{}'", e.what()));
 		this->exitPoll();
-	}
-
-	if (n > 0)
-	{
-		LOG_DEBUG(LogContext::HTTP_CLIENT, std::format("Sent to server: '{}'", std::string(this->gameBuffer, this->gameBufferSize)));
-
-		this->gameBufferSize -= n;
-		if (this->gameBufferSize == 0UL)
-			this->pollFds[ClientHTTP::GAME].events = 0;
-		else
-			::memmove(this->gameBuffer, this->gameBuffer + n, this->gameBufferSize);
 	}
 }
 

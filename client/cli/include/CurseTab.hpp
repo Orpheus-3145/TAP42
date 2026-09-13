@@ -2,9 +2,9 @@
 
 #include <ncurses.h>
 #include <vector>
-#include <array>
+#include <unordered_map>
 #include <string>
-#include <mutex>
+#include <functional>
 #include <deque>
 #include <cstring>
 
@@ -12,7 +12,6 @@
 
 
 static constexpr char const*	PROMPT = "-> ";
-static constexpr char const*	QUIT = "quit";
 static constexpr const char		COMMAND_TERM = '\n';
 
 static std::vector<const char*> HINTS
@@ -65,15 +64,19 @@ class BasicTab
 
 class InputTab : public BasicTab
 {
+	using InputDispatcher = std::unordered_map<int32_t,std::function<void()>>;
+
 	public:
 		using BasicTab::BasicTab;
 
-		InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar = -1);
+		InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t forwardInputFd, int32_t borderChar = -1);
 
 		InputTab(InputTab&&) noexcept;
 		InputTab& operator=(InputTab&&) noexcept;
 
 		~InputTab(void) { ::keypad(this->main, false); }
+	
+		void handleUserInput(void);
 
 		void deleteCharForward(void) noexcept;
 		void deleteCharBack(void) noexcept;
@@ -82,8 +85,6 @@ class InputTab : public BasicTab
 		void moveCursorRight(void) const noexcept;
 
 		void setChar(int32_t input);
-		std::string getLastInput(void) const noexcept;
-		int32_t getChar(void) const noexcept;
 
 		void suggestPrevious(void) noexcept;
 		void showPrevious(void) noexcept;
@@ -102,6 +103,11 @@ class InputTab : public BasicTab
 
 		void overwriteLine(void) const noexcept;
 
+		int32_t forwardInputFd;
+		int32_t borderChar;
+
+		InputDispatcher	dispatcher;
+
 		std::deque<std::string>		history;
 		std::vector<const char*>	hints;
 
@@ -115,7 +121,7 @@ class InputTab : public BasicTab
 		size_t	tmpBufferSize{0UL};
 		char	tmpCommandBuffer[Config::CMD_BUFFER_SIZE];
 
-		bool autocompleteMode{false};
+		bool	autocompleteMode{false};
 };
 
 class OutputTab : public BasicTab

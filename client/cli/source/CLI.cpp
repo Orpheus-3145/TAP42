@@ -1,6 +1,7 @@
 #include "CLI.hpp"
 #include "Logger.hpp"
 #include "Exceptions.hpp"
+#include "Utils.hpp"
 
 #include <format>
 #include <cassert>
@@ -12,191 +13,113 @@
 CLI::CLI(int32_t clientSocket) :
 	UI(clientSocket)
 {
-	::memset(this->pollFds, 0, CLI::POLL_SIZE * sizeof(struct pollfd));
-	this->pollFds[CLI::I_STDIN].fd = STDIN_FILENO;
-	this->pollFds[CLI::I_RESIZE].fd = ioUtils::createSignalRedirectFd(SIGWINCH);
-	this->pollFds[CLI::I_CLIENT].fd = clientSocket;
+	this->commandPipe = ioUtils::createPipe();
+	this->chatPipe = ioUtils::createPipe();
 
-	this->dispatcher[KEY_LEFT]      = [this] { this->commandTab->moveCursorLeft(); };
-	this->dispatcher[KEY_RIGHT]     = [this] { this->commandTab->moveCursorRight(); };
-	// this->dispatcher['\t']          = [this] { this->switchForwardTab(); };
-	// this->dispatcher[KEY_BTAB]      = [this] { this->switchBackwardTab(); };
-	// KEY_HOME / KEY_END: not mapped
-	this->dispatcher[KEY_DC]        = [this] { this->commandTab->deleteCharForward(); };
-	this->dispatcher[127]           = [this] { this->commandTab->deleteCharBack(); };
-	this->dispatcher[KEY_BACKSPACE] = [this] { this->commandTab->deleteCharBack(); };
-	this->dispatcher[KEY_UP]        = [this] { this->commandTab->suggestPrevious(); };
-	this->dispatcher[KEY_DOWN]      = [this] { this->commandTab->suggestNext(); };
+	::memset(this->pollFds, 0, CLI::POLL_SIZE * sizeof(struct pollfd));
+	this->pollFds[CLI::STDIN].fd = STDIN_FILENO;
+	this->pollFds[CLI::RESIZE].fd = ioUtils::createSignalRedirectFd(SIGWINCH);
+	this->pollFds[CLI::CLIENT].fd = clientSocket;
+	this->pollFds[CLI::CMD].fd = this->commandPipe.out;
+	this->pollFds[CLI::CHAT].fd = this->chatPipe.out;
 
 	::initscr();
 	::cbreak();
 	::noecho();
 
-	this->createWindow();
-	this->refresh();
+	this->game = std::make_unique<GameWindow>(LINES, COLS, this->commandPipe.in, this->chatPipe.in);
+	// this->settings = std::make_unique<GameWindow>(LINES, COLS);
+	// this->login = std::make_unique<GameWindow>(LINES, COLS);
 
 	LOG_INFO(LogContext::INTERFACE, "Done setup CLI");
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Listening to client socket: {}", this->pollFds[CLI::I_CLIENT].fd));
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Listening to client socket: {}", this->pollFds[CLI::CLIENT].fd));
 }
 
 CLI::~CLI(void) noexcept
 {
 	// empty memory manually because endwin has to be last
 	// ncurses function to be called
-	this->frame.reset();
-	this->commandTab.reset();
-	this->responseTab.reset();
-	this->eventTab.reset();
+	this->game->clear();
+	// this->settings->clear();
+	// this->login->clear();
 
 	::endwin();
-	ioUtils::close(this->pollFds[CLI::I_RESIZE]. fd);
+
+	ioUtils::closePipe(this->commandPipe);
+	ioUtils::closePipe(this->chatPipe);
+	ioUtils::close(this->pollFds[CLI::RESIZE].fd);
+	LOG_DEBUG(LogContext::INTERFACE, "Destructor ended");
 }
 
-void CLI::startUI(void)
+void CLI::start(void)
 {
 	while (this->keepAlive == true)
 	{
-		this->pollFds[CLI::I_STDIN].events |= POLLIN;
-		this->pollFds[CLI::I_STDIN].revents = 0;
-		this->pollFds[CLI::I_RESIZE].events |= POLLIN;
-		this->pollFds[CLI::I_RESIZE].revents = 0;
-		this->pollFds[CLI::I_CLIENT].events |= POLLIN;
-		this->pollFds[CLI::I_CLIENT].revents = 0;
+		this->pollFds[CLI::STDIN].events |= POLLIN;
+		this->pollFds[CLI::STDIN].revents = 0;
+		this->pollFds[CLI::RESIZE].events |= POLLIN;
+		this->pollFds[CLI::RESIZE].revents = 0;
+		this->pollFds[CLI::CLIENT].events |= POLLIN;
+		this->pollFds[CLI::CLIENT].revents = 0;
+		this->pollFds[CLI::CMD].events |= POLLIN;
+		this->pollFds[CLI::CMD].revents = 0;
+		this->pollFds[CLI::CHAT].events |= POLLIN;
+		this->pollFds[CLI::CHAT].revents = 0;
 		ioUtils::poll(this->pollFds, POLL_SIZE, -1);
 
-		if (this->pollFds[I_STDIN].revents & POLLIN)
-			this->handleUserInput();
+		if (this->pollFds[STDIN].revents & POLLIN)
+			this->game->readInput();
 
-		if (this->pollFds[I_RESIZE].revents & POLLIN)
-			this->handleResizeEvent();
+		if (this->pollFds[RESIZE].revents & POLLIN)
+			this->handleResize();
 
-		if (this->pollFds[I_CLIENT].revents & POLLIN)
-			this->handleServerData();
+		if (this->pollFds[CLIENT].revents & POLLIN)
+			this->handleInputFromServer();
 
-		if (this->pollFds[I_CLIENT].revents & POLLOUT)
-			this->handleCommand(this->commandTab->getLastInput());
+		if (this->pollFds[CLIENT].revents & POLLOUT)
+		{
+			this->handleInputToServer();
+			if (this->toServerSize == 0UL)
+				this->pollFds[CLI::CLIENT].events = POLLIN;
+		}
 
-		if (this->pollFds[I_CLIENT].revents & (POLLHUP | POLLERR | POLLNVAL))
-			this->handleError();
+		if (this->pollFds[CLIENT].revents & (POLLHUP | POLLERR | POLLNVAL))
+			this->handlePollError();
 
-		this->refresh();
+		if (this->pollFds[CMD].revents & POLLIN)
+			this->handleGameCommand();
+
+		if (this->pollFds[CHAT].revents & POLLIN)
+			this->handleChatCommand();
+
+		this->game->refresh();
 	}
 	LOG_INFO(LogContext::INTERFACE, "CLI stopped");
 }
 
-void CLI::resize(int32_t height, int32_t width)
-{
-	height = (height % 2) == 0 ? height : height - 1;
-	width = (width % 2) != 0 ? width : width - 1;
-	int32_t starty = 0;
-	int32_t startx = 0;
-	::resizeterm(height, width);
-	this->frame->resize(height, width, starty, startx);
-
-	height -= 2;
-	width = (width - 5) / 2;
-	startx += 2;
-	starty += 1;
-	this->commandTab->resize(height, width, starty, startx);
-
-	height /= 2;
-	startx += width + 1;
-	this->responseTab->resize(height, width, starty, startx);
-
-	starty += height;
-	this->eventTab->resize(height, width, starty, startx);
-	this->commandTab->refresh();
-
-	// because resize is not handled by ncurses there might be some garbage to read, flush it
-	::flushinp();
-
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Window resized to h: {}, w: {}", height, width));
-}
-
-void CLI::createWindow(void)
-{
-	int32_t height = (LINES % 2) == 0 ? LINES : LINES - 1;
-	int32_t width = (COLS % 2) != 0 ? COLS : COLS - 1;
-	int32_t starty = 0;
-	int32_t startx = 0;
-	this->frame = std::make_unique<OutputTab>(height, width, starty, startx, 0);
-
-	height -= 2;
-	width = (width - 5) / 2;
-	startx += 2;
-	starty += 1;
-	this->commandTab = std::make_unique<InputTab>(height, width, starty, startx, 0);
-	this->commandTab->appendContent("This is where the input is shown");
-
-	height /= 2;
-	startx += width + 1;
-	this->responseTab = std::make_unique<OutputTab>(height, width, starty, startx, 0);
-	this->responseTab->appendContent("This is where responses are shown");
-
-	starty += height;
-	this->eventTab = std::make_unique<OutputTab>(height, width, starty, startx, 0);
-	this->eventTab->appendContent("This is where events are shown");
-	this->commandTab->refresh();
-
-	LOG_DEBUG(LogContext::INTERFACE, std::format("CLI window size h: {}, w: {}", height, width));
-}
-
-void CLI::handleResizeEvent(void)
+void CLI::handleResize(void)
 {
 	struct signalfd_siginfo si;
-	ioUtils::read(this->pollFds[CLI::I_RESIZE].fd, &si, sizeof(si));		// I don't care about the data, flush it
+	ioUtils::read(this->pollFds[CLI::RESIZE].fd, &si, sizeof(si));		// I don't care about the data, flush it
 
 	struct winsize windowSize;
 	::ioctl(STDOUT_FILENO, TIOCGWINSZ, &windowSize);	// get the size of the resized terminal
 
-	this->resize(windowSize.ws_row, windowSize.ws_col);
+	// should do the current window
+	this->game->resize(windowSize.ws_row, windowSize.ws_col);
 }
 
-void CLI::handleUserInput(void)
+void CLI::handlePollError(void) noexcept
 {
-	int32_t inputChar = this->commandTab->getChar();	// this is blocking
-
-	// special characters handling
-	auto it = this->dispatcher.find(inputChar);
-	if (it != this->dispatcher.end())
-	{
-		it->second();
-		return;
-	}
-
-	// Default handling
-	this->commandTab->setChar(inputChar);
-	if (inputChar != COMMAND_TERM)
-		return;
-
-	if (this->commandTab->getLastInput().empty() == false)
-		this->pollFds[CLI::I_CLIENT].events |= POLLOUT;
-}
-
-void CLI::handleServerData(void)
-{
-	try
-	{
-		this->readDataFromServer();
-	}
-	catch(const IOException& e)
-	{
-		LOG_ERROR(LogContext::INTERFACE, std::format("I/O error failed to read from client: '{}'", e.what()));
-		// show error tab and close win
-	}
-}
-
-void CLI::handleError(void) noexcept
-{
-	if (this->pollFds[I_CLIENT].revents & POLLHUP)
+	if (this->pollFds[CLIENT].revents & POLLHUP)
 	{
 		// HTTP client stopped, log, show error tab and close win
 	}
-	else if (this->pollFds[I_CLIENT].revents & POLLERR)
+	else if (this->pollFds[CLIENT].revents & POLLERR)
 	{
 		// socket is invalid (poll didn't fail), log, show error tab and close win
 	}
-	else if (this->pollFds[I_CLIENT].revents & POLLNVAL)
+	else if (this->pollFds[CLIENT].revents & POLLNVAL)
 	{
 		// something actually went wrong with poll
 		int32_t sockErr = 0;
@@ -213,39 +136,54 @@ void CLI::handleError(void) noexcept
 	}
 }
 
-void CLI::handleCommand(std::string const& command)
+void CLI::handleGameCommand(void)
 {
-	if (command == "")
-		return;
+	int32_t commandPipe = this->pollFds[CMD].fd;
+	// format command, convert it to HTTP command if necessary
 
-	// if necessary parse/format command
 	try
 	{
-		if (this->writeDataToServer(command) == true)
-			this->pollFds[CLI::I_CLIENT].events = 0;			// if everything has been sent end poll writing
+		ssize_t n = ioUtils::read(commandPipe, this->toServerBuffer + this->toServerSize, Config::BUFF_SIZE - this->toServerSize);
+		this->pollFds[CLI::CLIENT].events |= POLLOUT;
+
+		this->toServerSize += n;
 	}
 	catch(const IOException& e)
 	{
-		LOG_ERROR(LogContext::INTERFACE, std::format("I/O error failed to write to client: '{}'", e.what()));
-		// show error tab and close win
+		std::string errMsg = std::format("I/O error failed to write to client: '{}'", e.what());
+		LOG_ERROR(LogContext::INTERFACE, errMsg);
+		this->handleError(errMsg);
+	}
+}
+
+void CLI::handleChatCommand(void)
+{
+	int32_t chatPipe = this->pollFds[CHAT].fd;
+	// format command, convert it to HTTP command if necessary
+
+	try
+	{
+		ssize_t n = ioUtils::read(chatPipe, this->toServerBuffer + this->toServerSize, Config::BUFF_SIZE - this->toServerSize);
+		this->pollFds[CLI::CLIENT].events |= POLLOUT;
+
+		this->toServerSize += n;
+	}
+	catch(const IOException& e)
+	{
+		std::string errMsg = std::format("I/O error failed to write to client: '{}'", e.what());
+		LOG_ERROR(LogContext::INTERFACE, errMsg);
+		this->handleError(errMsg);
 	}
 }
 
 void CLI::handleResponse(std::string const& response) noexcept
 {
-	this->responseTab->appendContent(response);
-	this->commandTab->refresh();
+	this->game->handleResponse(response);
 }
 
 void CLI::handleEvent(std::string const& event) noexcept
 {
-	this->eventTab->appendContent(event);
-	this->commandTab->refresh();
-}
-
-void CLI::handleServerDisconnect(void) noexcept
-{
-
+	this->game->handleEvent(event);
 }
 
 std::unique_ptr<UI> uiFactory(int32_t clientSocket)
