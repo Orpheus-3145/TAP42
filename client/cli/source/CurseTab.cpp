@@ -1,6 +1,7 @@
 #include "CurseTab.hpp"
 #include "Config.hpp"
 #include "Logger.hpp"
+#include "Utils.hpp"
 #include "Exceptions.hpp"
 
 #include <ncurses.h>
@@ -71,9 +72,21 @@ void BasicTab::clear(void) noexcept
 }
 
 
-InputTab::InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar)
+InputTab::InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t forwardInputFd, int32_t borderChar) :
+	forwardInputFd{forwardInputFd},
+	borderChar{borderChar}
 {
-	this->borderChar = borderChar;
+	this->dispatcher[KEY_LEFT]      = [this] { this->moveCursorLeft(); };
+	this->dispatcher[KEY_RIGHT]     = [this] { this->moveCursorRight(); };
+	this->dispatcher[KEY_DC]        = [this] { this->deleteCharForward(); };
+	this->dispatcher[127]           = [this] { this->deleteCharBack(); };
+	this->dispatcher[KEY_BACKSPACE] = [this] { this->deleteCharBack(); };
+	this->dispatcher[KEY_UP]        = [this] { this->suggestPrevious(); };
+	this->dispatcher[KEY_DOWN]      = [this] { this->suggestNext(); };
+
+	// this->dispatcher['\t']          = [this] { this->switchForwardTab(); };
+	// this->dispatcher[KEY_BTAB]      = [this] { this->switchBackwardTab(); };
+	// KEY_HOME / KEY_END: not mapped
 
 	this->draw(h, w, y, x);
 }
@@ -113,6 +126,22 @@ InputTab& InputTab::operator=(InputTab&& other) noexcept
 		this->autocompleteMode = other.autocompleteMode;
 	}
 	return *this;
+}
+
+void InputTab::handleUserInput(void)
+{
+	int32_t inputChar = ::wgetch(this->main);	// this is blocking
+
+	// special characters handling
+	auto it = this->dispatcher.find(inputChar);
+	if (it != this->dispatcher.end())
+	{
+		it->second();
+		return;
+	}
+
+	// Default handling
+	this->setChar(inputChar);
 }
 
 void InputTab::deleteCharForward(void) noexcept
@@ -190,30 +219,25 @@ void InputTab::moveCursorRight(void) const noexcept
 	}
 }
 
-int32_t InputTab::getChar(void) const noexcept
-{
-	return ::wgetch(this->main);
-}
-
 void InputTab::setChar(int32_t input)
 {
+	int32_t y, x;
+	(void)y;
+
 	if (input != COMMAND_TERM)		// append normal char to buffer
 	{
-		int32_t y, x;
-		(void)y;
-		getyx(this->main, y, x);
-	
-		x -= this->startX;
-	
-		if (x < static_cast<int32_t>(this->bufferSize))			// in case the cursor is not at the end of the buffer
-			::memmove(this->commandBuffer + x + 1, this->commandBuffer + x, static_cast<int32_t>(this->bufferSize) - x);
-	
-		this->commandBuffer[x] = static_cast<char>(input);		// could overflow if not ASCII value
-		this->bufferSize++;
-	
 		if (this->bufferSize == Config::CMD_BUFFER_SIZE)
 			throw CliException("Command buffer overflow");
-	
+
+		getyx(this->main, y, x);
+		x -= this->startX;
+
+		if (x < static_cast<int32_t>(this->bufferSize))			// in case the cursor is not at the end of the buffer
+			::memmove(this->commandBuffer + x + 1, this->commandBuffer + x, static_cast<int32_t>(this->bufferSize) - x);
+
+		this->commandBuffer[x] = static_cast<char>(input);		// could overflow if not ASCII value
+		this->bufferSize++;
+
 		this->updateHints();		// got at least one input use hints now instead of history for suggestions
 	}
 	else		// if got end msg and buffer is not empty store current command
@@ -222,7 +246,9 @@ void InputTab::setChar(int32_t input)
 			return;
 
 		std::string command = std::string(this->commandBuffer, this->bufferSize);
-		this->_state.push_back(PROMPT + std::string(this->commandBuffer, this->bufferSize));
+		ioUtils::write(this->forwardInputFd, command.data(), command.size());
+
+		this->_state.push_back(PROMPT + command);
 		this->history.emplace_front(std::move(command));
 
 		this->bufferSize = 0UL;
@@ -230,7 +256,6 @@ void InputTab::setChar(int32_t input)
 		this->currentCommandIndex = -1L;
 		this->clearHints();
 
-		int32_t y, x;
 		getyx(this->main, y, x);
 		wmove(this->main, y + 1, 0);
 	}
@@ -396,14 +421,6 @@ void InputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 		::waddnstr(this->main, this->commandBuffer, this->bufferSize);
 
 	::wnoutrefresh(this->main);
-}
-
-std::string InputTab::getLastInput(void) const noexcept
-{
-	if (this->history.empty() == true)
-		return "";
-
-	return this->history.front();
 }
 
 void InputTab::updateHints(void) noexcept

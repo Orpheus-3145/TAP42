@@ -33,7 +33,9 @@ CLI_DEPS         = $(patsubst $(CLI_SRC_DIR)/%.cpp,$(DEPS_DIR)/client/cli/%.d,$(
 GUI_DEPS         = $(patsubst $(GUI_SRC_DIR)/%.cpp,$(DEPS_DIR)/client/gui/%.d,$(GUI_SOURCES))
 SHARED_DEPS      = $(patsubst $(SHARED_SRC_DIR)/%.cpp,$(DEPS_DIR)/shared/%.d,$(SHARED_SOURCES))
 
-INCLUDE         := -I$(CLI_DIR)/include -I$(GUI_DIR)/include -I$(SHARED_DIR)/include
+INCLUDE         := -I$(SHARED_DIR)/include
+INCLUDE_CLI     := $(INCLUDE) -I$(CLI_DIR)/include
+INCLUDE_GUI     := $(INCLUDE) -I$(GUI_DIR)/include
 
 CLI_BASE_LIBS   := -lncurses
 
@@ -52,7 +54,7 @@ MOC_OBJECTS     := $(OBJ_DIR)/client/gui/moc_GameWindow.o $(OBJ_DIR)/client/gui/
 all: cli
 
 cli: $(LOG_DIR) $(SHARED_OBJECTS) $(CLI_LIB_TARGET)
-	$(CC) $(CPP_FLAGS) $(INCLUDE) $(SHARED_OBJECTS) $(CLI_LIB_TARGET) $(CLI_BASE_LIBS) -o $(TARGET)
+	$(CC) $(CPP_FLAGS) $(INCLUDE_CLI) $(SHARED_OBJECTS) $(CLI_LIB_TARGET) $(CLI_BASE_LIBS) -o $(TARGET)
 
 gui: $(LOG_DIR) $(SHARED_OBJECTS) $(GUI_LIB_TARGET)
 	$(CC) $(CPP_FLAGS) $(INCLUDE) $(SHARED_OBJECTS) $(GUI_LIB_TARGET) $(GUI_QT_LIBS) -o $(TARGET)
@@ -70,18 +72,18 @@ $(GUI_LIB_TARGET): $(GUI_OBJECTS) $(MOC_OBJECTS)
 	ar -rcs $@ $(GUI_OBJECTS) $(MOC_OBJECTS)
 
 $(GUI_SRC_DIR)/moc_%.cpp: $(GUI_DIR)/include/%.hpp
-	$(MOC) $(INCLUDE) $< -o $@
+	$(MOC) $(INCLUDE_GUI) $< -o $@
 
 $(OBJ_DIR)/client/gui/moc_%.o: $(GUI_SRC_DIR)/moc_%.cpp
-	$(CC) $(CPP_FLAGS) $(INCLUDE) $(GUI_QT_CFLAGS) -c $< -o $@
+	$(CC) $(CPP_FLAGS) $(INCLUDE_GUI) $(GUI_QT_CFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/client/cli/%.o: $(CLI_SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@) $(dir $(DEPS_DIR)/client/cli/$*.d)
-	$(CC) $(CPP_FLAGS) $(INCLUDE) $(DEPS_FLAGS) $(DEPS_DIR)/client/cli/$*.d -c $< -o $@
+	$(CC) $(CPP_FLAGS) $(INCLUDE_CLI) $(DEPS_FLAGS) $(DEPS_DIR)/client/cli/$*.d -c $< -o $@
 
 $(OBJ_DIR)/client/gui/%.o: $(GUI_SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@) $(dir $(DEPS_DIR)/client/gui/$*.d)
-	$(CC) $(CPP_FLAGS) $(INCLUDE) $(GUI_QT_CFLAGS) $(DEPS_FLAGS) $(DEPS_DIR)/client/gui/$*.d -c $< -o $@
+	$(CC) $(CPP_FLAGS) $(INCLUDE_GUI) $(GUI_QT_CFLAGS) $(DEPS_FLAGS) $(DEPS_DIR)/client/gui/$*.d -c $< -o $@
 
 $(OBJ_DIR)/shared/%.o: $(SHARED_SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@) $(dir $(DEPS_DIR)/shared/$*.d)

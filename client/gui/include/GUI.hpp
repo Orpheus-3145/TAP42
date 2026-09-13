@@ -25,17 +25,16 @@ class GUI : public QObject, public UI
 
 		~GUI(void) noexcept override;
 
-		void startUI(void) override { this->app->exec(); }
-		void stopUI(void) noexcept override { this->app->quit(); }
-		void resize(int32_t height, int32_t width) override { this->gameWin->resize(width, height); }
+		void start(void) override { this->app->exec(); }
+		void stop(void) noexcept override { this->app->quit(); }
+		// void resize(int32_t height, int32_t width) { this->gameWin->resize(width, height); }
 		
 	private:
-		void handleServerData(void);
+		void handleError(std::string const& errMsg) noexcept override { (void) errMsg; }
+		void handleServerDisconnect(void) noexcept override {}
 
-		void handleCommand(std::string const& command) override;
 		void handleResponse(std::string const& response) noexcept override;
 		void handleEvent(std::string const& event) noexcept override;
-		void handleServerDisconnect(void) noexcept override;
 
 		std::unique_ptr<QApplication>	app;
 		std::unique_ptr<GameWindow>		gameWin;

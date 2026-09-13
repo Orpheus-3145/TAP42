@@ -180,7 +180,9 @@ ssize_t writeNonBlock(int32_t fd, const char* buffer, size_t size)
 	ssize_t offset = 0L;
 	while (true)
 	{
-		ssize_t n = ::send(fd, buffer + offset, size - offset, 0);
+		// MSG_NOSIGNAL so if socket closes connection send returns -1 (EPIPE)
+		// instead of generating signal SIGPIPE
+		ssize_t n = ::send(fd, buffer + offset, size - offset, MSG_NOSIGNAL);
 		
 		if (n > 0)
 		{
@@ -190,9 +192,11 @@ ssize_t writeNonBlock(int32_t fd, const char* buffer, size_t size)
 			continue;
 		}
 
-		if (errno == EAGAIN || errno == EWOULDBLOCK)	// buffer full, wait for next pollout
+		if (errno == EPIPE)
 			return -1L;
-		if (errno == EINTR)
+		else if (errno == EAGAIN || errno == EWOULDBLOCK)	// buffer full, wait for next pollout
+			break;
+		else if (errno == EINTR)
 			continue;
 
 		throw ReadException(std::format("Send failed: {}", strerror(errno)));

@@ -1,5 +1,6 @@
 #include "GameWindow.hpp"
 
+
 GameWindow::GameWindow(QWidget *parent, int32_t height, int32_t width) :
 	QMainWindow(parent)
 {
@@ -24,7 +25,6 @@ void GameWindow::onPromptSubmitted()
 
 	this->promptField->clear();
 }
-
 
 void GameWindow::draw(int32_t height, int32_t width)
 {
