@@ -1,15 +1,11 @@
 #pragma once
 
-#include <ncurses.h>
-#include <unordered_map>
-#include <functional>
 #include <memory>
-#include <array>
+#include <string>
 
-#include "Config.hpp"
-#include "Utils.hpp"
 #include "UI.hpp"
-#include "CurseTab.hpp"
+#include "GameWindow.hpp"
+#include "Utils.hpp"
 
 
 // NCURSES:
@@ -238,42 +234,41 @@
 
 class CLI : public UI
 {
-	using InputDispatcher = std::unordered_map<int32_t,std::function<void()>>;
-
 	public:
 		using UI::UI;
 		CLI(int32_t clientSocket);
 
 		virtual ~CLI(void) noexcept override;
 
-		void startUI(void) override;
-		void stopUI(void) noexcept override { this->keepAlive = false; }
-		void resize(int32_t height, int32_t width) override;
-
+		void start(void) override;
+		void stop(void) noexcept override { this->keepAlive = false; }
+		
 	private:
-		void createWindow(void);
-		void refresh(void) noexcept { ::doupdate(); }
-		void handleResizeEvent(void);
-		void handleUserInput(void);
-		void handleServerData(void);
-		void handleError(void) noexcept;
+		void handleResize(void);
+		void handlePollError(void) noexcept;
+		void handleGameCommand(void);
+		void handleChatCommand(void);
 
-		void handleCommand(std::string const& command) override;
+		void handleError(std::string const& errMsg) noexcept override { (void) errMsg; }
+		void handleServerDisconnect(void) noexcept override {}
+
 		void handleResponse(std::string const& response) noexcept override;
 		void handleEvent(std::string const& event) noexcept override;
-		void handleServerDisconnect(void) noexcept override;
 
-		static constexpr size_t POLL_SIZE = 3UL;
-		static constexpr size_t I_STDIN = 0UL;
-		static constexpr size_t I_RESIZE = 1UL;
-		static constexpr size_t I_CLIENT = 2UL;
+		static constexpr size_t POLL_SIZE = 5UL;
+		static constexpr size_t STDIN = 0UL;
+		static constexpr size_t RESIZE = 1UL;
+		static constexpr size_t CLIENT = 2UL;
+		static constexpr size_t CMD = 3UL;
+		static constexpr size_t CHAT = 4UL;
+
+		ioUtils::Pipe commandPipe, chatPipe;
+
+		struct pollfd	pollFds[POLL_SIZE];
 
 		bool keepAlive{true};
 
-		std::unique_ptr<OutputTab>	frame;
-		std::unique_ptr<InputTab>	commandTab;
-		std::unique_ptr<OutputTab>	responseTab, eventTab;
-
-		struct pollfd	pollFds[POLL_SIZE];
-		InputDispatcher	dispatcher;
+		std::unique_ptr<GameWindow> game;
+		std::unique_ptr<GameWindow> settings;
+		std::unique_ptr<GameWindow> login;
 };

@@ -23,14 +23,15 @@ void run(std::string const& host, uint32_t port)
 {
 	ioUtils::SocketPair gameClientSockets = ioUtils::createSocketPair();
 
-	std::unique_ptr<ClientHTTP> clientHTTP = std::make_unique<ClientHTTP>(host, port, gameClientSockets.first);
-	clientHTTP->startWorker();
-
+	// std::unique_ptr<ClientHTTP> clientHTTP = std::make_unique<ClientHTTP>(host, port, gameClientSockets.first);
+	// clientHTTP->startWorker();
+	(void) host;
+	(void) port;
 	std::unique_ptr<UI> interface = uiFactory(gameClientSockets.second);
 
-	interface->startUI();		// blocks here
+	interface->start();		// blocks here
 
-	clientHTTP->stopWorker();
+	// clientHTTP->stopWorker();
 
 	ioUtils::closePair(gameClientSockets);
 }
