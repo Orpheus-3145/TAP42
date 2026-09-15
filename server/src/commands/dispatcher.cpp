@@ -214,6 +214,8 @@ void handle_command(std::shared_ptr<Session> session, const std::string& line) {
         cmd_drop(session, args);
     } else if (cmd == "INVENTORY") {
         cmd_inventory(session);
+    } else if (cmd == "USE") {
+        cmd_use(session, args);
     } else if (cmd == "TALK") {
         cmd_talk(session, args);
     } else if (cmd == "ATTACK") {

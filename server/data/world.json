@@ -32,7 +32,7 @@
       "name": "Guest Room",
       "description": "Another rented room, this one smelling faintly of pipe smoke.",
       "exits": { "west": "loc.inn_corridor" },
-      "items": [],
+      "items": ["item.potion_1"],
       "npcs": []
     },
     "loc.inn_bathroom": {
@@ -60,21 +60,21 @@
       "name": "Sewer Passage",
       "description": "A low, dripping passage. Rat droppings crunch underfoot.",
       "exits": { "south": "loc.sewer_entrance", "east": "loc.sewer_chamber_1" },
-      "items": [],
+      "items": ["item.potion_2"],
       "npcs": []
     },
     "loc.sewer_chamber_1": {
       "name": "Flooded Chamber",
       "description": "A wider chamber where the sewer walls have crumbled, exposing bare earth.",
       "exits": { "west": "loc.sewer_corridor_1", "south": "loc.sewer_chamber_2" },
-      "items": [],
+      "items": ["item.potion_3"],
       "npcs": ["npc.rat_5", "npc.rat_6"]
     },
     "loc.sewer_chamber_2": {
       "name": "Stagnant Pool",
       "description": "Stagnant water pools in the middle of this chamber, rippling with unseen movement.",
       "exits": { "north": "loc.sewer_chamber_1", "east": "loc.sewer_nest", "south": "loc.sewer_corridor_2" },
-      "items": [],
+      "items": ["item.grenade_1"],
       "npcs": ["npc.rat_7", "npc.rat_8"]
     },
     "loc.sewer_nest": {
@@ -93,7 +93,12 @@
     }
   },
 
-  "items": {},
+  "items": {
+    "item.potion_1": { "name": "Potion", "description": "A small vial of shimmering red liquid. Smells faintly of berries.", "effect": "heal", "amount": 20 },
+    "item.potion_2": { "name": "Potion", "description": "A small vial of shimmering red liquid. Smells faintly of berries.", "effect": "heal", "amount": 20 },
+    "item.potion_3": { "name": "Potion", "description": "A small vial of shimmering red liquid. Smells faintly of berries.", "effect": "heal", "amount": 20 },
+    "item.grenade_1": { "name": "Grenade", "description": "A crude iron sphere with a sputtering fuse. Handle with care.", "effect": "damage", "amount": 20 }
+  },
 
   "npcs": {
     "npc.bartender": {
@@ -103,7 +108,9 @@
         "Welcome, traveler. Rooms are upstairs, drinks are on the house tonight.",
         "Something's been nesting in my basement. Rats, big ones - would you deal with them?"
       ],
-      "hp": 15
+      "hp": 200,
+      "counter_damage_min": 100,
+      "counter_damage_max": 100
     },
     "npc.rat_1": {
       "name": "Sewer Rat",
