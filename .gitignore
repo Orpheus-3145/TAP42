@@ -62,6 +62,9 @@ compile_commands.json
 *.log
 logs/
 
+# Saved characters — runtime data written by the running server, not part of the repo
+server/data/characters/
+
 # vcpkg
 vcpkg_installed/
 

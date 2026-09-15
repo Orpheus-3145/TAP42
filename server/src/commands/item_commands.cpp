@@ -8,6 +8,7 @@
 #include "commands/common.hpp"
 #include "commands/quest_commands.hpp"
 #include "logging/logger.hpp"
+#include "world/character_store.hpp"
 
 void cmd_take(const std::shared_ptr<Session>& session, const std::vector<std::string>& args) {
     if (session->player_id.empty()) {
@@ -22,6 +23,7 @@ void cmd_take(const std::shared_ptr<Session>& session, const std::vector<std::st
 
     auto& world = World::instance();
     std::string response, taken_id;
+    PlayerState taker;
     {
         std::lock_guard<std::mutex> lock(world.mutex);
         auto& player = world.players.at(session->player_id);
@@ -36,10 +38,12 @@ void cmd_take(const std::shared_ptr<Session>& session, const std::vector<std::st
             player.inventory.push_back(item_id);
             response = "OK taken=" + item_id;
             taken_id = item_id;
+            taker = player;
         }
     }
     send_line(*session, response);
     if (!taken_id.empty()) {
+        character_store::save(taker);
         log_info("item_taken", {{"player", session->player_id}, {"item", taken_id}});
         on_item_taken(session->player_id, taken_id);
     }
@@ -58,6 +62,7 @@ void cmd_drop(const std::shared_ptr<Session>& session, const std::vector<std::st
 
     auto& world = World::instance();
     std::string response, dropped_id;
+    PlayerState dropper;
     {
         std::lock_guard<std::mutex> lock(world.mutex);
         auto& player = world.players.at(session->player_id);
@@ -71,10 +76,12 @@ void cmd_drop(const std::shared_ptr<Session>& session, const std::vector<std::st
             room.item_instance_ids.push_back(item_id);
             response = "OK dropped=" + item_id;
             dropped_id = item_id;
+            dropper = player;
         }
     }
     send_line(*session, response);
     if (!dropped_id.empty()) {
+        character_store::save(dropper);
         log_info("item_dropped", {{"player", session->player_id}, {"item", dropped_id}});
     }
 }
@@ -100,6 +107,8 @@ void cmd_use(const std::shared_ptr<Session>& session, const std::vector<std::str
     std::string response, room_id, used_item_id, npc_id;
     int heal_amount = 0, damage_dealt = 0, target_hp = 0;
     bool is_heal = false, is_damage = false, npc_died = false;
+    PlayerState user;
+    bool user_mutated = false;
 
     {
         std::lock_guard<std::mutex> lock(world.mutex);
@@ -154,11 +163,16 @@ void cmd_use(const std::shared_ptr<Session>& session, const std::vector<std::str
                 } else {
                     response = "ERR ERR_BAD_ARGS " + item_ref + " cannot be used";
                 }
+                if (is_heal || is_damage) {
+                    user = player;
+                    user_mutated = true;
+                }
             }
         }
     }
 
     send_line(*session, response);
+    if (user_mutated) character_store::save(user);
     if (is_heal) {
         log_info("item_used", {{"player", session->player_id},
                                 {"item", used_item_id},

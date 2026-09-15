@@ -8,6 +8,7 @@
 #include "commands/common.hpp"
 #include "logging/logger.hpp"
 #include "network/registry.hpp"
+#include "world/character_store.hpp"
 
 namespace {
 
@@ -49,6 +50,8 @@ void init_player_quests_locked(PlayerState& player) {
 void on_item_taken(const std::string& player_id, const std::string& item_id) {
     auto& world = World::instance();
     std::vector<std::string> completed;
+    PlayerState taker;
+    bool taker_mutated = false;
     {
         std::lock_guard<std::mutex> lock(world.mutex);
         auto p_it = world.players.find(player_id);
@@ -61,7 +64,12 @@ void on_item_taken(const std::string& player_id, const std::string& item_id) {
             if (!quest.reward_item_id.empty()) p_it->second.inventory.push_back(quest.reward_item_id);
             completed.push_back(qid);
         }
+        if (!completed.empty()) {
+            taker = p_it->second;
+            taker_mutated = true;
+        }
     }
+    if (taker_mutated) character_store::save(taker);
     for (const auto& qid : completed) complete_quest_and_notify(player_id, qid, "take", item_id);
 }
 
@@ -75,6 +83,7 @@ void on_item_taken(const std::string& player_id, const std::string& item_id) {
 void on_npc_defeated(const std::string& player_id, const std::string& npc_id) {
     auto& world = World::instance();
     std::vector<std::pair<std::string, std::string>> completions; // (player_id, quest_id)
+    std::vector<PlayerState> mutated_players;
     {
         std::lock_guard<std::mutex> lock(world.mutex);
         for (auto& [qid, quest] : world.quests) {
@@ -89,6 +98,7 @@ void on_npc_defeated(const std::string& player_id, const std::string& npc_id) {
                 status_it->second = "completed";
                 if (!quest.reward_item_id.empty()) pstate.inventory.push_back(quest.reward_item_id);
                 completions.emplace_back(pid, qid);
+                mutated_players.push_back(pstate);
             }
         }
     }
@@ -98,6 +108,11 @@ void on_npc_defeated(const std::string& player_id, const std::string& npc_id) {
         // rather than being one of the notified players itself.
         log_info("quest_world_cleared", {{"triggered_by", player_id}, {"npc", npc_id}});
     }
+    // A player can appear here once per completed quest, so this may save
+    // the same character's file twice in a row (e.g. clearing the rats and
+    // the rat king at once) - harmless, character_store::save is just an
+    // overwrite of the same file with slightly newer content each time.
+    for (const auto& p : mutated_players) character_store::save(p);
     for (auto& [pid, qid] : completions) complete_quest_and_notify(pid, qid, "defeat", npc_id);
 }
 

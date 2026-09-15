@@ -62,6 +62,13 @@ struct Quest {
 
 struct PlayerState {
     std::string player_id;
+
+    // Chosen at character creation, free text within a fixed pair of slots.
+    // Purely cosmetic: nothing in game logic ever reads these to change a
+    // stat or a roll, they only exist for the client to show back to the player.
+    std::string race;
+    std::string special_attributes;
+
     std::string current_room;
     std::vector<std::string> inventory; // item instance ids
     int hp = 100;

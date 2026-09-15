@@ -4,8 +4,9 @@ Riferimento condiviso tra server e client (CLI/GUI). Da tenere aggiornato man
 mano che si chiudono i punti aperti in fondo al documento.
 
 Stato implementazione lato server: tutti i comandi sono implementati e
-verificati con test funzionali (item, combattimento, quest, gruppi). Il
-world data è caricato davvero da `server/data/world.json` con validazione
+verificati con test funzionali (item, combattimento, quest, gruppi,
+creazione/login personaggi). Il world data è caricato davvero da
+`server/data/world.json` con validazione
 referenziale completa (exits, item/npc piazzati, target delle quest — vedi
 `server/src/world/loader.cpp`). Il mondo attuale è una locanda con un
 seminterrato che scende nei sotterranei, 13 stanze in totale con un loop
@@ -13,9 +14,24 @@ chiuso nei sotterranei e un ramo morto verso il boss.
 
 ## 0. Persistenza
 
-Nessuna persistenza: tutto lo stato del mondo vive in RAM per la durata del
-processo server e viene perso al restart. Nessun salvataggio su file/DB
-durante la partita.
+Il mondo statico (stanze, item, npc, quest — tutto ciò che viene da
+`world.json`) resta solo in RAM: nessun salvataggio, si perde e si ricarica
+identico a ogni restart.
+
+I personaggi invece sono persistiti su disco, un file JSON per personaggio
+sotto `server/data/characters/<nome>.json` (vedi
+`server/src/world/character_store.cpp`). Scelta deliberata: un file per
+personaggio invece di un unico database, così il salvataggio di un
+giocatore non prende mai un lock che blocchi il salvataggio di un altro —
+solo due salvataggi dello stesso personaggio (es. una quest che si completa
+grazie alla kill di un altro giocatore mentre lui si sta muovendo) si
+serializzano tra loro. Il file viene riscritto dopo ogni comando che cambia
+lo stato del personaggio (MOVE, TAKE/DROP/USE, ATTACK, TALK, completamento
+quest) e di nuovo, per sicurezza, alla disconnessione.
+
+Non esistono credenziali: l'unico identificatore di un personaggio è il suo
+nome, che deve essere alfanumerico (più `_` e `-`, max 32 caratteri) perché
+finisce direttamente nel path del file.
 
 ## 1. Regole di framing
 
@@ -48,7 +64,8 @@ ERR <CODE> <messaggio leggibile>
 | `ERR_BAD_ARGS` | argomenti mancanti/malformati |
 | `ERR_NOT_CONNECTED` | comando richiede CONNECT prima |
 | `ERR_ALREADY_CONNECTED` | CONNECT già effettuato |
-| `ERR_NAME_TAKEN` | nome già in uso da un altro giocatore connesso |
+| `ERR_NAME_TAKEN` | CREATE_CHARACTER con un nome già usato (online o solo salvato su disco) |
+| `ERR_CHARACTER_NOT_FOUND` | CONNECT con un nome che non ha mai fatto CREATE_CHARACTER |
 | `ERR_NO_EXIT` | direzione non valida da questa stanza |
 | `ERR_ITEM_NOT_FOUND` | item non presente/riferito male |
 | `ERR_NPC_NOT_FOUND` | NPC non presente nella stanza |
@@ -60,16 +77,51 @@ ERR <CODE> <messaggio leggibile>
 
 ## 4. Comandi (Client → Server)
 
+### CREATE_CHARACTER — estensione non RFC
+```
+C: CREATE_CHARACTER <name> <race> [special_attributes...]
+S: OK {"name":"...","race":"...","special_attributes":"...","room":"loc.start","hp":100,"max_hp":100,"inventory":[]}
+S: ERR ERR_BAD_ARGS ...
+S: ERR ERR_NAME_TAKEN ...
+S: ERR_ALREADY_CONNECTED ...
+```
+Crea un personaggio nuovo e ci connette la sessione corrente, in un solo
+passo. `name` e `race` sono un solo token ciascuno; `special_attributes` è
+libero, può contenere spazi, prende tutto il resto della riga ed è
+opzionale.
+
+`race` e `special_attributes` sono campi fissi (lo slot esiste sempre) ma a
+valore libero: il giocatore scrive quello che vuole, il server li salva e li
+restituisce tali e quali, senza che influenzino mai una statistica o un tiro
+di dado — sono lì solo perché il client li mostri. Tutti i personaggi
+partono identici: stesse HP (100/100), stesso punto di spawn (`loc.start`),
+indipendentemente da cosa è stato scritto in questi campi. Lo stesso punto
+di spawn viene usato anche per il respawn dopo la morte (§ ATTACK).
+
+`ERR_NAME_TAKEN` scatta sia se il nome è già online sia se esiste già un
+file di quel personaggio su disco da una sessione precedente — un nome, una
+volta creato, è riservato per sempre.
+
 ### CONNECT
 ```
 C: CONNECT <name>
-S: OK connected
+S: OK {"name":"...","race":"...","special_attributes":"...","room":"...","hp":...,"max_hp":...,"inventory":[...]}
 S: ERR ERR_ALREADY_CONNECTED ...
-S: ERR ERR_NAME_TAKEN ...
+S: ERR ERR_CHARACTER_NOT_FOUND ...
 ```
-All'atto della CONNECT, tutte le quest del mondo vengono inizializzate a
-`in_progress` per il player (vedi §7, nessun comando ACCEPT esplicito per le
-quest — RFC non lo prevede).
+CONNECT è il login di un personaggio che esiste già: il server verifica che
+il nome non sia già online, carica lo stato salvato da
+`data/characters/<name>.json` (stanza, HP, inventario, progresso quest,
+progresso dialoghi — tutto com'era all'ultima disconnessione) e lo rimette
+in gioco esattamente da lì. Un nome mai creato con CREATE_CHARACTER dà
+`ERR_CHARACTER_NOT_FOUND`, non crea nulla al posto del client.
+
+Le quest vengono comunque passate attraverso l'inizializzazione a
+`in_progress` a ogni CONNECT (vedi §7, nessun comando ACCEPT esplicito per
+le quest — RFC non lo prevede): questo serve solo a coprire il caso in cui
+`world.json` abbia guadagnato una quest nuova da quando il personaggio è
+stato salvato l'ultima volta, così non resta bloccato per sempre su
+`not_started`. Le quest già presenti nel salvataggio non vengono toccate.
 
 ### LOOK
 ```
@@ -305,3 +357,5 @@ Vedi il codice sorgente per i dettagli esatti:
 - `server/src/commands/quest_commands.cpp` — trigger di completamento
 - `server/src/world/loader.cpp` — item, npc, quest attualmente definiti nel
   world data
+- `server/src/world/character_store.cpp` — creazione/login/salvataggio dei
+  personaggi su disco

@@ -4,6 +4,7 @@
 
 #include "commands/common.hpp"
 #include "logging/logger.hpp"
+#include "world/character_store.hpp"
 
 // Design choice: an NPC's dialogue is cyclic (each TALK shows the next
 // line, wrapping back to the first after the last), not random or a
@@ -24,6 +25,8 @@ void cmd_talk(const std::shared_ptr<Session>& session, const std::vector<std::st
 
     auto& world = World::instance();
     std::string response;
+    PlayerState talker;
+    bool talker_mutated = false;
     {
         std::lock_guard<std::mutex> lock(world.mutex);
         auto& player = world.players.at(session->player_id);
@@ -57,7 +60,10 @@ void cmd_talk(const std::shared_ptr<Session>& session, const std::vector<std::st
             std::ostringstream oss;
             oss << "OK {\"npc\":\"" << npc_id << "\",\"dialogue\":\"" << json_escape(line) << "\"}";
             response = oss.str();
+            talker = player;
+            talker_mutated = true;
         }
     }
     send_line(*session, response);
+    if (talker_mutated) character_store::save(talker);
 }

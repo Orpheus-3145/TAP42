@@ -9,6 +9,7 @@
 #include "commands/common.hpp"
 #include "commands/quest_commands.hpp"
 #include "logging/logger.hpp"
+#include "world/character_store.hpp"
 
 namespace {
 
@@ -62,6 +63,8 @@ void cmd_attack(const std::shared_ptr<Session>& session, const std::vector<std::
     int damage_dealt = 0, target_hp = 0, counter_damage = 0, player_hp = 0;
     bool player_hit = false, npc_countered = false, npc_died = false, player_died = false;
     std::string old_room, new_room;
+    PlayerState attacker;
+    bool attacker_mutated = false;
 
     {
         std::lock_guard<std::mutex> lock(world.mutex);
@@ -113,11 +116,14 @@ void cmd_attack(const std::shared_ptr<Session>& session, const std::vector<std::
                     << ",\"counter_damage\":" << counter_damage << ",\"player_hp\":" << player_hp
                     << ",\"respawned\":" << (player_died ? "true" : "false") << "}";
                 response = oss.str();
+                attacker = player;
+                attacker_mutated = true;
             }
         }
     }
 
     send_line(*session, response);
+    if (attacker_mutated) character_store::save(attacker);
     if (!room_id.empty()) {
         broadcast_to_room(room_id, session->player_id,
                            "EVT ROOM COMBAT " + session->player_id + " " + npc_id + " " +
