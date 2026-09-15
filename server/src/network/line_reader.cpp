@@ -10,6 +10,11 @@ namespace {
 // recv_buffer grow without bound (a memory DoS). Past this threshold we
 // treat the connection as abusive and close it instead of keep accumulating.
 constexpr size_t MAX_LINE_LENGTH = 8192;
+
+// Only applies once a message has started arriving but hasn't been
+// terminated yet: a player who's simply idle between commands (empty
+// recv_buffer) still gets a normal indefinite block, no timeout involved.
+constexpr int PARTIAL_MESSAGE_TIMEOUT_MS = 5000;
 } // namespace
 
 bool read_line(Session& session, std::string& out_line) {
@@ -19,9 +24,17 @@ bool read_line(Session& session, std::string& out_line) {
             log_warn("line_too_long", {{"ip", session.peer_ip}, {"size", std::to_string(session.recv_buffer.size())}});
             return false;
         }
+        net::set_recv_timeout(session.socket_fd,
+                               session.recv_buffer.empty() ? 0 : PARTIAL_MESSAGE_TIMEOUT_MS);
         char buf[4096];
         int n = net::recv_some(session.socket_fd, buf, sizeof(buf));
-        if (n <= 0) return false; // connection closed or errored
+        if (n <= 0) {
+            if (!session.recv_buffer.empty()) {
+                log_warn("partial_message_stalled",
+                         {{"ip", session.peer_ip}, {"buffered", std::to_string(session.recv_buffer.size())}});
+            }
+            return false; // connection closed, errored, or timed out mid-message
+        }
         session.recv_buffer.append(buf, static_cast<size_t>(n));
     }
     out_line = session.recv_buffer.substr(0, newline_pos);

@@ -17,6 +17,7 @@ using socket_t_impl = SOCKET;
   #include <arpa/inet.h>
   #include <netinet/in.h>
   #include <sys/socket.h>
+  #include <sys/time.h>
   #include <unistd.h>
 using socket_t_impl = int;
   #define INVALID_SOCK_VALUE (-1)
@@ -34,6 +35,10 @@ bool platform_init();
 void platform_cleanup();
 
 void close_socket(socket_t s);
+
+// 0 = block indefinitely (the platform default); >0 = recv() gives up and
+// returns an error after that many milliseconds of silence.
+void set_recv_timeout(socket_t s, int timeout_ms);
 
 int send_all(socket_t s, const char* data, size_t len);
 int recv_some(socket_t s, char* buf, size_t len);
