@@ -7,9 +7,9 @@ Stato implementazione lato server: tutti i comandi sono implementati e
 verificati con test funzionali (item, combattimento, quest, gruppi). Il
 world data è caricato davvero da `server/data/world.json` con validazione
 referenziale completa (exits, item/npc piazzati, target delle quest — vedi
-`server/src/world/loader.cpp`); manca ancora l'espansione del mondo alle
-dimensioni minime richieste dal subject (8+ stanze, ecc.) — quello è lavoro
-di game design (Fase 2), non di protocollo o di caricamento dati.
+`server/src/world/loader.cpp`). Il mondo attuale è una locanda con un
+seminterrato che scende nei sotterranei, 13 stanze in totale con un loop
+chiuso nei sotterranei e un ramo morto verso il boss.
 
 ## 0. Persistenza
 
@@ -53,7 +53,7 @@ ERR <CODE> <messaggio leggibile>
 | `ERR_ITEM_NOT_FOUND` | item non presente/riferito male |
 | `ERR_NPC_NOT_FOUND` | NPC non presente nella stanza |
 | `ERR_TARGET_NOT_FOUND` | target ATTACK/GROUP INVITE non valido o non connesso |
-| `ERR_DEAD` | azione non permessa perché il player è a 0 HP |
+| `ERR_DEAD` | azione (ATTACK o USE) non permessa perché il player è a 0 HP |
 | `ERR_QUEST_NOT_FOUND` | id quest non valido |
 | `ERR_NOT_IN_GROUP` | CHAT GROUP inviato senza far parte di un gruppo |
 | `ERR_INTERNAL` | errore server generico |
@@ -125,12 +125,14 @@ S: ERR ERR_NPC_NOT_FOUND ...
 ```
 Design choice: dialogo **ciclico** — ogni TALK mostra la riga successiva
 dell'array `dialogue`, tornando alla prima dopo l'ultima. Deterministico e
-facile da testare.
+facile da testare. Il progresso è **per player**, non condiviso: due
+giocatori che parlano con lo stesso NPC sentono ciascuno la propria sequenza
+dall'inizio, uno non "consuma" le righe per l'altro.
 
 ### ATTACK
 ```
 C: ATTACK <target>
-S: OK {"target":"npc.guard","damage_dealt":12,"target_hp":8,"counter_damage":5,"player_hp":95,"respawned":false}
+S: OK {"target":"npc.guard","hit":true,"damage_dealt":12,"target_hp":8,"countered":true,"counter_damage":5,"player_hp":95,"respawned":false}
 S: ERR ERR_TARGET_NOT_FOUND ...
 S: ERR ERR_DEAD ...   # il player attaccante è già a 0 HP
 ```
@@ -145,13 +147,54 @@ EVT ROOM PRESENCE ENTER <player>            # respawn: ingresso nella stanza sic
 
 **Design choice — combattimento**: risolto in modo atomico per ogni comando
 ATTACK (un colpo del player, poi eventuale contrattacco NPC nella stessa
-esecuzione), non come stato "a turni" che aspetta un secondo comando. Danno
-player: 10-15 (uniforme). Contrattacco NPC: 3-8, solo se l'NPC sopravvive al
-colpo. Un NPC sconfitto viene rimosso definitivamente dalla stanza (nessun
-respawn NPC — solo i player respawnano, come richiesto dal subject). Un
-player a 0 HP respawna a `loc.start` con 50 HP.
+esecuzione), non come stato "a turni" che aspetta un secondo comando. Non
+esiste nessuna azione autonoma dell'NPC: se il player non manda ATTACK,
+l'NPC resta completamente inerte, anche restando nella sua stanza per sempre.
+Il contrattacco reagisce sempre e solo a chi ha appena colpito, non c'è
+nessun concetto di aggro o target fissato: se due player attaccano lo stesso
+NPC, ciascuno rischia il proprio contrattacco sul proprio colpo.
+
+Sia il colpo del player che il contrattacco dell'NPC hanno una probabilità
+di mancare: player 85%, NPC 70%. I due tiri sono indipendenti — se il player
+manca, l'NPC prova comunque a contrattaccare, non viene "risparmiato" dal
+fallimento del player. `hit` e `countered` nella risposta dicono esplicitamente
+cosa è successo, invece di doverlo dedurre da un danno a zero.
+
+Danno player: 10-15 (uniforme). Contrattacco NPC: 3-8 di default, ma è
+**per NPC** — un NPC può definire nel world data un range diverso (min==max
+per un danno fisso, es. il barista fa sempre esattamente 100). Un NPC
+sconfitto viene rimosso definitivamente dalla stanza (nessun respawn NPC —
+solo i player respawnano, come richiesto dal subject). Un player a 0 HP
+respawna a `loc.start` con 50 HP.
 `DEFEND`/`FLEE` **non sono implementati**: restano un punto aperto (§6), non
 fanno parte del set di comandi base dell'RFC.
+
+### USE — estensione non RFC
+```
+C: USE <item>
+S: OK healed=<amount> hp=<new_hp>                                          # item curativo
+S: ERR ERR_ITEM_NOT_FOUND ...
+S: ERR ERR_DEAD ...
+
+C: USE <item> <target>
+S: OK {"target":"npc.rat_king","damage_dealt":20,"target_hp":0}            # item offensivo
+S: ERR ERR_BAD_ARGS ...            # item offensivo usato senza target
+S: ERR ERR_TARGET_NOT_FOUND ...    # target non nella stanza
+```
+Broadcast:
+```
+EVT ROOM ITEM_USE <player> <item_id>                                # item curativo, agli altri non si dice quanto ha curato
+EVT ROOM COMBAT <player> <target> <damage> <target_hp_remaining>     # item offensivo, stesso evento di ATTACK
+EVT ROOM COMBAT_DEATH <npc_id>                                       # se il target muore
+```
+Non fa parte del set di comandi base dell'RFC, quindi lo documentiamo qui
+come nostra estensione. Ogni item usabile ha un `effect` (`heal` o `damage`)
+e un `amount` fisso definiti nel world data — nessuna variazione casuale
+sull'effetto dell'item, solo sul colpo dell'ATTACK. L'item viene sempre
+consumato all'uso, che l'effetto vada a buon fine o non serva un target
+valido non cambia: se il target non c'è, l'item non viene consumato (l'errore
+arriva prima della rimozione dall'inventario). Un item offensivo non tira per
+colpire come ATTACK: se il target è nella stanza, il danno arriva sempre.
 
 ### STATUS
 ```
@@ -238,7 +281,9 @@ EVT GROUP LEAVE <player>   # se il player era in un gruppo
 ## 7. Riferimento rapido stato quest/combattimento
 
 Vedi il codice sorgente per i dettagli esatti:
-- `server/src/commands/combat_commands.cpp` — formule danno, respawn
+- `server/src/commands/combat_commands.cpp` — formule danno, probabilità di
+  colpire, respawn
+- `server/src/commands/item_commands.cpp` — TAKE/DROP/INVENTORY e USE
 - `server/src/commands/quest_commands.cpp` — trigger di completamento
-- `server/src/world/loader.cpp` — quest e reward attualmente definite (dati
-  placeholder, da espandere in Fase 2 di game design)
+- `server/src/world/loader.cpp` — item, npc, quest attualmente definiti nel
+  world data

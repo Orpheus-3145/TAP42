@@ -36,6 +36,22 @@ bool parse_quest_type(const std::string& type_str, QuestType& out) {
     return false;
 }
 
+bool parse_item_effect(const std::string& effect_str, ItemEffect& out) {
+    if (effect_str.empty()) {
+        out = ItemEffect::None;
+        return true;
+    }
+    if (effect_str == "heal") {
+        out = ItemEffect::Heal;
+        return true;
+    }
+    if (effect_str == "damage") {
+        out = ItemEffect::Damage;
+        return true;
+    }
+    return false;
+}
+
 } // namespace
 
 bool load_world(const std::string& path) {
@@ -68,6 +84,12 @@ bool load_world(const std::string& path) {
         item.id = item_id;
         item.name = item_obj["name"].as_string();
         item.description = item_obj["description"].as_string();
+        if (!parse_item_effect(item_obj["effect"].as_string(), item.effect)) {
+            log_error("world_validation_failed",
+                      {{"item", item_id}, {"error", "unknown item effect '" + item_obj["effect"].as_string() + "'"}});
+            return false;
+        }
+        item.effect_amount = item_obj["amount"].as_int();
         world.items[item_id] = item;
     }
 
@@ -80,6 +102,13 @@ bool load_world(const std::string& path) {
         for (auto& line : npc_obj["dialogue"].array_value) npc.dialogue.push_back(line.as_string());
         npc.hp = npc_obj["hp"].as_int();
         npc.max_hp = npc.hp;
+        // Optional per-NPC overrides; absent means keep Npc's struct defaults (3/8).
+        if (npc_obj["counter_damage_min"].type != JsonValue::Type::Null) {
+            npc.counter_damage_min = npc_obj["counter_damage_min"].as_int();
+        }
+        if (npc_obj["counter_damage_max"].type != JsonValue::Type::Null) {
+            npc.counter_damage_max = npc_obj["counter_damage_max"].as_int();
+        }
         world.npcs[npc_id] = npc;
     }
 
