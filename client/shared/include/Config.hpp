@@ -16,6 +16,6 @@ struct Config
 	static constexpr char const* LOG_DIR = "logs";
 	static constexpr LogLevel DEFAULT_LOG_LEVEL = LogLevel::DEBUG;
 
-	static constexpr int32_t WIDTH_WIN = 100;
-	static constexpr int32_t HEIGHT_WIN = 40;
+	static constexpr int32_t WIDTH_GUI = 1100;
+	static constexpr int32_t HEIGHT_GUI = 600;
 };

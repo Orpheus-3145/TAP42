@@ -16,7 +16,6 @@
 #include <netinet/in.h>			// socket, accept, listen, bind, connect
 #include <arpa/inet.h>			// htons, htonl, ntohs, ntohl
 #include <sys/types.h>			// send, recv
-#include <sys/socket.h>			// send, recv
 #include <signal.h>
 #include <sys/signalfd.h>
 
@@ -156,7 +155,7 @@ ssize_t readNonBlock(int32_t fd, char* buffer, size_t size)
 		if (n > 0)
 		{
 			offset += n;
-			if (static_cast<size_t>(offset) == size)		// overflow
+			if (static_cast<size_t>(offset) == size)
 				break;
 			continue;
 		}

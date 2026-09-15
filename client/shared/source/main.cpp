@@ -1,8 +1,9 @@
 #include <iostream>
+#include <memory>
 
 #include "ArgParser.hpp"
 #include "ClientHTTP.hpp"
-#include "CLI.hpp"
+#include "UI.hpp"
 #include "Logger.hpp"
 #include "Utils.hpp"
 #include "Config.hpp"
@@ -15,22 +16,21 @@ void startLogging(void)
 	Logger::getInstance().setLogFile(logName);
 	Logger::getInstance().setMinLevel(Config::DEFAULT_LOG_LEVEL);
 	Logger::getInstance().setConsoleOutput(false);
-	Logger::getInstance().setFilter(Logger::ALL_ENTRIES & ~LogContext::INPUT_OUTPUT);
+	Logger::getInstance().removeFilter(LogContext::INPUT_OUTPUT);
 }
 
 void run(std::string const& host, uint32_t port)
 {
 	ioUtils::SocketPair gameClientSockets = ioUtils::createSocketPair();
 
-	ClientHTTP clientHTTP = ClientHTTP(host, port, gameClientSockets.first);
+	std::unique_ptr<ClientHTTP> clientHTTP = std::make_unique<ClientHTTP>(host, port, gameClientSockets.first);
+	clientHTTP->startWorker();
 
-	// decide if use CLI or GUI
-	CLI interface = CLI(gameClientSockets.second);
-	
-	clientHTTP.startWorker();
-	interface.loop();		// blocks here, NB if exceptions happen here they must be caught and terminate the running threads
+	std::unique_ptr<UI> interface = uiFactory(gameClientSockets.second);
 
-	clientHTTP.stopWorker();
+	interface->startUI();		// blocks here
+
+	clientHTTP->stopWorker();
 
 	ioUtils::closePair(gameClientSockets);
 }

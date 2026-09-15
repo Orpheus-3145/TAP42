@@ -45,7 +45,7 @@ class BasicTab
 
 		virtual ~BasicTab(void) { this->clear(); }
 
-		virtual void appendContent(std::string const& newContent) noexcept;		// NB same of printLine ?
+		virtual void appendContent(std::string const& newContent) noexcept;
 		virtual void refresh(void) const noexcept { ::wnoutrefresh(this->main); }
 		virtual void resize(int32_t newHeight, int32_t newWidth, int32_t newY = 0, int32_t newX = 0) = 0;
 

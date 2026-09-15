@@ -52,7 +52,7 @@ CLI::~CLI(void) noexcept
 	ioUtils::close(this->pollFds[CLI::I_RESIZE]. fd);
 }
 
-void CLI::loop(void)
+void CLI::startUI(void)
 {
 	while (this->keepAlive == true)
 	{
@@ -64,89 +64,24 @@ void CLI::loop(void)
 		this->pollFds[CLI::I_CLIENT].revents = 0;
 		ioUtils::poll(this->pollFds, POLL_SIZE, -1);
 
-		if (pollFds[I_STDIN].revents & POLLIN)
+		if (this->pollFds[I_STDIN].revents & POLLIN)
 			this->handleUserInput();
 
-		if (pollFds[I_RESIZE].revents & POLLIN)
+		if (this->pollFds[I_RESIZE].revents & POLLIN)
 			this->handleResizeEvent();
 
-		if (pollFds[I_CLIENT].revents & POLLIN)
-			this->readDataFromServer(this->pollFds[CLI::I_CLIENT].fd);
+		if (this->pollFds[I_CLIENT].revents & POLLIN)
+			this->handleServerData();
 
-		if (pollFds[I_CLIENT].revents & POLLOUT)
-			this->handleCommand();
+		if (this->pollFds[I_CLIENT].revents & POLLOUT)
+			this->handleCommand(this->commandTab->getLastInput());
 
-		// client closed connection (because server did so) (POLLHUP) or got an error (POLLERR | POLLNVAL)
-		if (pollFds[I_CLIENT].revents & (POLLHUP | POLLERR | POLLNVAL))
-		{
-			LOG_WARN(LogContext::INTERFACE, "Client HTTP unexpectedly terminated connection, closing session");
-			this->exitLoop();
-		}
+		if (this->pollFds[I_CLIENT].revents & (POLLHUP | POLLERR | POLLNVAL))
+			this->handleError();
+
 		this->refresh();
 	}
 	LOG_INFO(LogContext::INTERFACE, "CLI stopped");
-}
-
-void CLI::createWindow(void)
-{
-	int32_t height = (LINES % 2) == 0 ? LINES : LINES - 1;
-	int32_t width = (COLS % 2) != 0 ? COLS : COLS - 1;
-	int32_t starty = 0;
-	int32_t startx = 0;
-	this->frame = std::make_unique<OutputTab>(height, width, starty, startx, 0);
-
-	height -= 2;
-	width = (width - 5) / 2;
-	startx += 2;
-	starty += 1;
-	this->commandTab = std::make_unique<InputTab>(height, width, starty, startx, 0);
-	this->commandTab->appendContent("This is where the input is shown");
-
-	height /= 2;
-	startx += width + 1;
-	this->responseTab = std::make_unique<OutputTab>(height, width, starty, startx, 0);
-	this->responseTab->appendContent("This is where responses are shown");
-
-	starty += height;
-	this->eventTab = std::make_unique<OutputTab>(height, width, starty, startx, 0);
-	this->eventTab->appendContent("This is where events are shown");
-	this->commandTab->refresh();
-
-	LOG_DEBUG(LogContext::INTERFACE, std::format("CLI window size h: {}, w: {}", height, width));
-}
-
-void CLI::handleCommand(void)
-{
-	std::string command = this->commandTab->getLastInput();
-	if (command == "")
-		return;
-
-	// if necessary parse/format command
-	if (this->forwardDataToServer(this->pollFds[CLI::I_CLIENT].fd, command) == true)
-		this->pollFds[CLI::I_CLIENT].events = 0;			// is everything has been sent stop poll for writing
-}
-
-void CLI::handleResponse(std::string const& response) noexcept
-{
-	this->responseTab->appendContent(response);
-	this->commandTab->refresh();
-}
-
-void CLI::handleEvent(std::string const& event) noexcept
-{
-	this->eventTab->appendContent(event);
-	this->commandTab->refresh();
-}
-
-void CLI::handleResizeEvent(void)
-{
-	struct signalfd_siginfo si;
-	ioUtils::read(this->pollFds[CLI::I_RESIZE].fd, &si, sizeof(si));		// I don't care about the data, flush it
-
-	struct winsize windowSize;
-	::ioctl(STDOUT_FILENO, TIOCGWINSZ, &windowSize);	// get the size of the resized terminal
-
-	this->resize(windowSize.ws_row, windowSize.ws_col);
 }
 
 void CLI::resize(int32_t height, int32_t width)
@@ -178,13 +113,53 @@ void CLI::resize(int32_t height, int32_t width)
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Window resized to h: {}, w: {}", height, width));
 }
 
+void CLI::createWindow(void)
+{
+	int32_t height = (LINES % 2) == 0 ? LINES : LINES - 1;
+	int32_t width = (COLS % 2) != 0 ? COLS : COLS - 1;
+	int32_t starty = 0;
+	int32_t startx = 0;
+	this->frame = std::make_unique<OutputTab>(height, width, starty, startx, 0);
+
+	height -= 2;
+	width = (width - 5) / 2;
+	startx += 2;
+	starty += 1;
+	this->commandTab = std::make_unique<InputTab>(height, width, starty, startx, 0);
+	this->commandTab->appendContent("This is where the input is shown");
+
+	height /= 2;
+	startx += width + 1;
+	this->responseTab = std::make_unique<OutputTab>(height, width, starty, startx, 0);
+	this->responseTab->appendContent("This is where responses are shown");
+
+	starty += height;
+	this->eventTab = std::make_unique<OutputTab>(height, width, starty, startx, 0);
+	this->eventTab->appendContent("This is where events are shown");
+	this->commandTab->refresh();
+
+	LOG_DEBUG(LogContext::INTERFACE, std::format("CLI window size h: {}, w: {}", height, width));
+}
+
+void CLI::handleResizeEvent(void)
+{
+	struct signalfd_siginfo si;
+	ioUtils::read(this->pollFds[CLI::I_RESIZE].fd, &si, sizeof(si));		// I don't care about the data, flush it
+
+	struct winsize windowSize;
+	::ioctl(STDOUT_FILENO, TIOCGWINSZ, &windowSize);	// get the size of the resized terminal
+
+	this->resize(windowSize.ws_row, windowSize.ws_col);
+}
+
 void CLI::handleUserInput(void)
 {
 	int32_t inputChar = this->commandTab->getChar();	// this is blocking
 
 	// special characters handling
 	auto it = this->dispatcher.find(inputChar);
-	if (it != this->dispatcher.end()) {
+	if (it != this->dispatcher.end())
+	{
 		it->second();
 		return;
 	}
@@ -196,4 +171,84 @@ void CLI::handleUserInput(void)
 
 	if (this->commandTab->getLastInput().empty() == false)
 		this->pollFds[CLI::I_CLIENT].events |= POLLOUT;
+}
+
+void CLI::handleServerData(void)
+{
+	try
+	{
+		this->readDataFromServer();
+	}
+	catch(const IOException& e)
+	{
+		LOG_ERROR(LogContext::INTERFACE, std::format("I/O error failed to read from client: '{}'", e.what()));
+		// show error tab and close win
+	}
+}
+
+void CLI::handleError(void) noexcept
+{
+	if (this->pollFds[I_CLIENT].revents & POLLHUP)
+	{
+		// HTTP client stopped, log, show error tab and close win
+	}
+	else if (this->pollFds[I_CLIENT].revents & POLLERR)
+	{
+		// socket is invalid (poll didn't fail), log, show error tab and close win
+	}
+	else if (this->pollFds[I_CLIENT].revents & POLLNVAL)
+	{
+		// something actually went wrong with poll
+		int32_t sockErr = 0;
+		socklen_t len = sizeof(sockErr);
+	
+		if (ioUtils::getsockopt(this->clientSocket, SOL_SOCKET, SO_ERROR, &sockErr, &len) < 0)
+		{
+			// getsockopt could also fail, log, show error tab and close win (check strerror(errno))
+		}
+		else if (sockErr != 0)
+		{
+			// log, show error tab and close win (check strerror(sockErr))
+		}
+	}
+}
+
+void CLI::handleCommand(std::string const& command)
+{
+	if (command == "")
+		return;
+
+	// if necessary parse/format command
+	try
+	{
+		if (this->writeDataToServer(command) == true)
+			this->pollFds[CLI::I_CLIENT].events = 0;			// if everything has been sent end poll writing
+	}
+	catch(const IOException& e)
+	{
+		LOG_ERROR(LogContext::INTERFACE, std::format("I/O error failed to write to client: '{}'", e.what()));
+		// show error tab and close win
+	}
+}
+
+void CLI::handleResponse(std::string const& response) noexcept
+{
+	this->responseTab->appendContent(response);
+	this->commandTab->refresh();
+}
+
+void CLI::handleEvent(std::string const& event) noexcept
+{
+	this->eventTab->appendContent(event);
+	this->commandTab->refresh();
+}
+
+void CLI::handleServerDisconnect(void) noexcept
+{
+
+}
+
+std::unique_ptr<UI> uiFactory(int32_t clientSocket)
+{
+	return std::make_unique<CLI>(clientSocket);
 }
