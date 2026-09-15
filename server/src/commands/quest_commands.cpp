@@ -2,6 +2,7 @@
 // you connect. Simpler, and the RFC never asked for an accept step anyway.
 #include "commands/quest_commands.hpp"
 
+#include <algorithm>
 #include <sstream>
 
 #include "commands/common.hpp"
@@ -11,6 +12,17 @@
 namespace {
 
 std::string quest_type_str(QuestType t) { return t == QuestType::Fetch ? "fetch" : "defeat"; }
+
+// True once every npc listed in a Defeat quest's target_ids is dead.
+// Precondition: world.mutex already held.
+bool all_defeat_targets_dead_locked(const Quest& quest) {
+    auto& world = World::instance();
+    for (const auto& npc_id : quest.target_ids) {
+        auto it = world.npcs.find(npc_id);
+        if (it == world.npcs.end() || it->second.hp > 0) return false;
+    }
+    return true;
+}
 
 void complete_quest_and_notify(const std::string& player_id, const std::string& quest_id,
                                 const std::string& trigger, const std::string& trigger_ref) {
@@ -25,7 +37,12 @@ void complete_quest_and_notify(const std::string& player_id, const std::string& 
 void init_player_quests_locked(PlayerState& player) {
     auto& world = World::instance();
     for (auto& [qid, quest] : world.quests) {
-        if (!player.quest_status.count(qid)) player.quest_status[qid] = "in_progress";
+        if (player.quest_status.count(qid)) continue;
+        // A defeat quest whose targets are already all dead (someone cleared
+        // it before this player even connected) starts completed instead of
+        // lying about being in_progress forever.
+        bool already_done = quest.type == QuestType::Defeat && all_defeat_targets_dead_locked(quest);
+        player.quest_status[qid] = already_done ? "completed" : "in_progress";
     }
 }
 
@@ -48,23 +65,40 @@ void on_item_taken(const std::string& player_id, const std::string& item_id) {
     for (const auto& qid : completed) complete_quest_and_notify(player_id, qid, "take", item_id);
 }
 
+// Design choice: a defeat quest is world state, not personal credit — "kill
+// all the rats" is about the sewers being clear, not about who swung the
+// killing blow on each one. So when the last listed npc dies, every player
+// who still has the quest in_progress gets it marked completed at once, not
+// just whoever landed this particular kill. No reward_item_id on a quest
+// that can complete for several players simultaneously: handing the same
+// item id to two inventories at once would break instance uniqueness.
 void on_npc_defeated(const std::string& player_id, const std::string& npc_id) {
     auto& world = World::instance();
-    std::vector<std::string> completed;
+    std::vector<std::pair<std::string, std::string>> completions; // (player_id, quest_id)
     {
         std::lock_guard<std::mutex> lock(world.mutex);
-        auto p_it = world.players.find(player_id);
-        if (p_it == world.players.end()) return;
         for (auto& [qid, quest] : world.quests) {
-            if (quest.type != QuestType::Defeat || quest.target_id != npc_id) continue;
-            auto status_it = p_it->second.quest_status.find(qid);
-            if (status_it == p_it->second.quest_status.end() || status_it->second != "in_progress") continue;
-            status_it->second = "completed";
-            if (!quest.reward_item_id.empty()) p_it->second.inventory.push_back(quest.reward_item_id);
-            completed.push_back(qid);
+            if (quest.type != QuestType::Defeat) continue;
+            bool targets_this_npc =
+                std::find(quest.target_ids.begin(), quest.target_ids.end(), npc_id) != quest.target_ids.end();
+            if (!targets_this_npc || !all_defeat_targets_dead_locked(quest)) continue;
+
+            for (auto& [pid, pstate] : world.players) {
+                auto status_it = pstate.quest_status.find(qid);
+                if (status_it == pstate.quest_status.end() || status_it->second != "in_progress") continue;
+                status_it->second = "completed";
+                if (!quest.reward_item_id.empty()) pstate.inventory.push_back(quest.reward_item_id);
+                completions.emplace_back(pid, qid);
+            }
         }
     }
-    for (const auto& qid : completed) complete_quest_and_notify(player_id, qid, "defeat", npc_id);
+    if (!completions.empty()) {
+        // player_id is whoever actually landed this kill; everyone in
+        // completions benefits from it, so it's logged separately here
+        // rather than being one of the notified players itself.
+        log_info("quest_world_cleared", {{"triggered_by", player_id}, {"npc", npc_id}});
+    }
+    for (auto& [pid, qid] : completions) complete_quest_and_notify(pid, qid, "defeat", npc_id);
 }
 
 void cmd_quests(const std::shared_ptr<Session>& session) {
