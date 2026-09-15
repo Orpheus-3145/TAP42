@@ -1,0 +1,513 @@
+<title>Rat Cellar Map</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Kalam:wght@400;700&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --page:      #10140f;
+    --board:     #1e2624;
+    --panel:     #26312d;
+    --panel-hi:  #2f3d38;
+    --chalk:     #f2f0e6;
+    --chalk-dim: #93a39a;
+    --inn:       #f4c04d;
+    --sewer:     #57c2c9;
+    --danger:    #e2604f;
+    --line:      #4c5a55;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--chalk);
+    font-family: "Work Sans", sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 32px 20px 48px;
+  }
+
+  .page {
+    width: 100%;
+    max-width: 1320px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  header h1 {
+    font-family: "Permanent Marker", cursive;
+    font-size: clamp(28px, 4vw, 40px);
+    color: var(--chalk);
+    margin: 0 0 6px;
+    text-wrap: balance;
+    letter-spacing: 0.5px;
+  }
+
+  header p.sub {
+    margin: 0 0 14px;
+    color: var(--chalk-dim);
+    font-size: 15px;
+    max-width: 62ch;
+  }
+
+  blockquote {
+    margin: 0;
+    padding: 10px 16px;
+    border-left: 3px solid var(--inn);
+    background: rgba(244, 192, 77, 0.08);
+    font-family: "Kalam", cursive;
+    font-size: 16px;
+    color: var(--chalk);
+    max-width: 62ch;
+  }
+
+  blockquote cite {
+    display: block;
+    margin-top: 4px;
+    font-family: "IBM Plex Mono", monospace;
+    font-style: normal;
+    font-size: 12px;
+    color: var(--chalk-dim);
+  }
+
+  main {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .board-frame {
+    flex: 1 1 720px;
+    min-width: 0;
+    background: var(--board);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: inset 0 0 60px rgba(0,0,0,0.45), 0 8px 24px rgba(0,0,0,0.35);
+  }
+
+  .board-scroll {
+    overflow-x: auto;
+  }
+
+  .board-scroll svg {
+    display: block;
+    width: 100%;
+    min-width: 760px;
+    height: auto;
+  }
+
+  .room { cursor: pointer; }
+  .room rect.box {
+    fill: var(--panel);
+    stroke-width: 2;
+    transition: fill 0.15s ease, filter 0.15s ease;
+  }
+  .room:hover rect.box { fill: var(--panel-hi); }
+  .room.selected rect.box {
+    fill: var(--panel-hi);
+    filter: drop-shadow(0 0 6px currentColor);
+  }
+  .room:focus-visible rect.box {
+    outline: 2px solid var(--chalk);
+    outline-offset: 2px;
+  }
+  .room text.name {
+    font-family: "Kalam", cursive;
+    font-weight: 700;
+    font-size: 15px;
+    text-anchor: middle;
+    pointer-events: none;
+  }
+  .room text.badge {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    text-anchor: middle;
+    pointer-events: none;
+  }
+
+  .edge { stroke: var(--line); stroke-width: 2; fill: none; }
+  .edge.special { stroke-dasharray: 2 5; stroke-width: 2.5; }
+  .edge-label {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    fill: var(--chalk-dim);
+    text-anchor: middle;
+  }
+  .edge-label-bg { fill: var(--board); }
+
+  aside#detail {
+    flex: 0 0 300px;
+    min-width: 260px;
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  aside#detail .zone-tag {
+    display: inline-block;
+    width: fit-content;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 999px;
+  }
+
+  aside#detail h2 {
+    font-family: "Kalam", cursive;
+    font-size: 22px;
+    margin: 0;
+    color: var(--chalk);
+  }
+
+  aside#detail .room-id {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    color: var(--chalk-dim);
+    margin-top: -8px;
+  }
+
+  aside#detail p.desc {
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--chalk);
+    margin: 0;
+  }
+
+  aside#detail h3 {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--chalk-dim);
+    margin: 4px 0 2px;
+  }
+
+  aside#detail ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  aside#detail ul.npcs li {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 5px 8px;
+    background: var(--panel-hi);
+    border-radius: 6px;
+  }
+  aside#detail ul.npcs li span.hp {
+    font-family: "IBM Plex Mono", monospace;
+    color: var(--chalk-dim);
+    font-variant-numeric: tabular-nums;
+  }
+  aside#detail ul.npcs li.boss span.who { color: var(--danger); font-weight: 600; }
+
+  aside#detail ul.exits li {
+    font-size: 13px;
+    display: flex;
+    gap: 8px;
+  }
+  aside#detail ul.exits li .dir {
+    font-family: "IBM Plex Mono", monospace;
+    color: var(--sewer);
+    width: 44px;
+    flex: none;
+  }
+
+  aside#detail .empty-note {
+    font-size: 13px;
+    color: var(--chalk-dim);
+    font-style: italic;
+  }
+
+  footer.legend {
+    display: flex;
+    gap: 22px;
+    flex-wrap: wrap;
+    align-items: center;
+    font-size: 13px;
+    color: var(--chalk-dim);
+    padding-top: 4px;
+    border-top: 1px solid var(--line);
+  }
+  footer.legend .item { display: flex; align-items: center; gap: 8px; }
+  footer.legend .swatch {
+    width: 14px; height: 14px; border-radius: 4px; flex: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .room rect.box { transition: none; }
+  }
+</style>
+
+<div class="page">
+  <header>
+    <h1>Rat Cellar Map</h1>
+    <p class="sub">The inn level and the sewer network beneath it. Click any room to see its description, its occupants, and where its exits lead.</p>
+    <blockquote>
+      &ldquo;Something&rsquo;s been nesting in my basement. Rats, big ones &mdash; would you deal with them?&rdquo;
+      <cite>&mdash; the bartender, Inn Hall</cite>
+    </blockquote>
+  </header>
+
+  <main>
+    <div class="board-frame">
+      <div class="board-scroll">
+        <svg viewBox="0 0 1280 720" role="img" aria-label="Map of the inn and sewer level: seven rooms in the inn on the left, six sewer rooms on the right forming a loop, connected by a tunnel from the basement.">
+          <!-- edges (drawn first so room boxes sit cleanly on top) -->
+          <g class="edges">
+            <line class="edge" x1="140" y1="358" x2="340" y2="358" />
+            <line class="edge" x1="340" y1="358" x2="340" y2="228" />
+            <line class="edge" x1="340" y1="228" x2="340" y2="98" />
+            <line class="edge" x1="340" y1="228" x2="540" y2="228" />
+            <line class="edge" x1="340" y1="228" x2="140" y2="228" />
+
+            <line class="edge special" x1="340" y1="358" x2="340" y2="488" />
+            <rect class="edge-label-bg" x="352" y="410" width="40" height="16" />
+            <text class="edge-label" x="372" y="422">down</text>
+
+            <line class="edge special" x1="340" y1="488" x2="740" y2="488" />
+            <rect class="edge-label-bg" x="470" y="470" width="140" height="16" />
+            <text class="edge-label" x="540" y="482">into the sewers &rarr;</text>
+
+            <line class="edge" x1="740" y1="488" x2="740" y2="358" />
+            <line class="edge" x1="740" y1="358" x2="940" y2="358" />
+            <line class="edge" x1="940" y1="358" x2="940" y2="488" />
+            <line class="edge" x1="940" y1="488" x2="1140" y2="488" />
+            <line class="edge" x1="940" y1="488" x2="940" y2="618" />
+
+            <path class="edge special" d="M 940 618 C 780 660, 660 600, 740 500" style="stroke: var(--sewer);" />
+            <rect class="edge-label-bg" x="700" y="588" width="120" height="16" />
+            <text class="edge-label" x="760" y="600" style="fill: var(--sewer);">loop closes here</text>
+          </g>
+
+          <!-- rooms -->
+          <g class="rooms">
+            <g class="room" data-id="loc.start" tabindex="0" role="button" aria-label="Traveler's Road" transform="rotate(-1 140 358)">
+              <rect class="box" x="60" y="320" width="160" height="76" rx="12" style="stroke: var(--inn);" />
+              <text class="name" x="140" y="352" style="fill: var(--inn);">Traveler&rsquo;s Road</text>
+              <text class="badge" x="140" y="372" style="fill: var(--chalk-dim);">start</text>
+            </g>
+
+            <g class="room" data-id="loc.inn_hall" tabindex="0" role="button" aria-label="Inn Hall" transform="rotate(1 340 358)">
+              <rect class="box" x="260" y="320" width="160" height="76" rx="12" style="stroke: var(--inn);" />
+              <text class="name" x="340" y="352" style="fill: var(--inn);">Inn Hall</text>
+              <text class="badge" x="340" y="372" style="fill: var(--chalk-dim);">Bartender</text>
+            </g>
+
+            <g class="room" data-id="loc.inn_corridor" tabindex="0" role="button" aria-label="Inn Corridor" transform="rotate(-1 340 228)">
+              <rect class="box" x="260" y="190" width="160" height="76" rx="12" style="stroke: var(--inn);" />
+              <text class="name" x="340" y="222" style="fill: var(--inn);">Inn Corridor</text>
+            </g>
+
+            <g class="room" data-id="loc.inn_room1" tabindex="0" role="button" aria-label="Guest Room, north" transform="rotate(1 340 98)">
+              <rect class="box" x="260" y="60" width="160" height="76" rx="12" style="stroke: var(--inn);" />
+              <text class="name" x="340" y="98" style="fill: var(--inn);">Guest Room</text>
+            </g>
+
+            <g class="room" data-id="loc.inn_room2" tabindex="0" role="button" aria-label="Guest Room, east" transform="rotate(-1 540 228)">
+              <rect class="box" x="460" y="190" width="160" height="76" rx="12" style="stroke: var(--inn);" />
+              <text class="name" x="540" y="228" style="fill: var(--inn);">Guest Room</text>
+            </g>
+
+            <g class="room" data-id="loc.inn_bathroom" tabindex="0" role="button" aria-label="Inn Bathroom" transform="rotate(1 140 228)">
+              <rect class="box" x="60" y="190" width="160" height="76" rx="12" style="stroke: var(--inn);" />
+              <text class="name" x="140" y="228" style="fill: var(--inn);">Bathroom</text>
+            </g>
+
+            <g class="room" data-id="loc.basement" tabindex="0" role="button" aria-label="Inn Basement" transform="rotate(-1 340 488)">
+              <rect class="box" x="260" y="450" width="160" height="76" rx="12" style="stroke: var(--chalk-dim);" />
+              <text class="name" x="340" y="482" style="fill: var(--chalk);">Basement</text>
+              <text class="badge" x="340" y="502" style="fill: var(--chalk-dim);">3&times; Sewer Rat</text>
+            </g>
+
+            <g class="room" data-id="loc.sewer_entrance" tabindex="0" role="button" aria-label="Sewer Entrance" transform="rotate(1 740 488)">
+              <rect class="box" x="660" y="450" width="160" height="76" rx="12" style="stroke: var(--sewer);" />
+              <text class="name" x="740" y="482" style="fill: var(--sewer);">Sewer Entrance</text>
+              <text class="badge" x="740" y="502" style="fill: var(--chalk-dim);">1&times; Sewer Rat</text>
+            </g>
+
+            <g class="room" data-id="loc.sewer_corridor_1" tabindex="0" role="button" aria-label="Sewer Passage" transform="rotate(-1 740 358)">
+              <rect class="box" x="660" y="320" width="160" height="76" rx="12" style="stroke: var(--sewer);" />
+              <text class="name" x="740" y="358" style="fill: var(--sewer);">Sewer Passage</text>
+            </g>
+
+            <g class="room" data-id="loc.sewer_chamber_1" tabindex="0" role="button" aria-label="Flooded Chamber" transform="rotate(1 940 358)">
+              <rect class="box" x="860" y="320" width="160" height="76" rx="12" style="stroke: var(--sewer);" />
+              <text class="name" x="940" y="352" style="fill: var(--sewer);">Flooded Chamber</text>
+              <text class="badge" x="940" y="372" style="fill: var(--chalk-dim);">2&times; Sewer Rat</text>
+            </g>
+
+            <g class="room" data-id="loc.sewer_chamber_2" tabindex="0" role="button" aria-label="Stagnant Pool" transform="rotate(-1 940 488)">
+              <rect class="box" x="860" y="450" width="160" height="76" rx="12" style="stroke: var(--sewer);" />
+              <text class="name" x="940" y="482" style="fill: var(--sewer);">Stagnant Pool</text>
+              <text class="badge" x="940" y="502" style="fill: var(--chalk-dim);">2&times; Sewer Rat</text>
+            </g>
+
+            <g class="room" data-id="loc.sewer_nest" tabindex="0" role="button" aria-label="Rat Nest, dead end" transform="rotate(1 1140 488)">
+              <rect class="box" x="1060" y="450" width="160" height="76" rx="12" style="stroke: var(--danger);" />
+              <text class="name" x="1140" y="482" style="fill: var(--danger);">Rat Nest</text>
+              <text class="badge" x="1140" y="502" style="fill: var(--danger);">Rat King</text>
+            </g>
+
+            <g class="room" data-id="loc.sewer_corridor_2" tabindex="0" role="button" aria-label="Curving Passage" transform="rotate(-1 940 618)">
+              <rect class="box" x="860" y="580" width="160" height="76" rx="12" style="stroke: var(--sewer);" />
+              <text class="name" x="940" y="612" style="fill: var(--sewer);">Curving Passage</text>
+              <text class="badge" x="940" y="632" style="fill: var(--chalk-dim);">loop &rarr; entrance</text>
+            </g>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <aside id="detail">
+      <!-- filled by script -->
+    </aside>
+  </main>
+
+  <footer class="legend">
+    <div class="item"><span class="swatch" style="background: var(--inn);"></span> Inn &amp; street</div>
+    <div class="item"><span class="swatch" style="background: var(--sewer);"></span> Sewers</div>
+    <div class="item"><span class="swatch" style="background: var(--danger);"></span> Rat King&rsquo;s nest</div>
+    <div class="item">Dashed line = tunnel or loop connection</div>
+  </footer>
+</div>
+
+<script>
+  const ROOMS = {
+    "loc.start": {
+      name: "Traveler's Road", zone: "inn",
+      desc: "A dusty road leading into town. To the east stands the light of a wayside inn.",
+      npcs: [],
+      exits: [["east", "Inn Hall"]]
+    },
+    "loc.inn_hall": {
+      name: "Inn Hall", zone: "inn",
+      desc: "A warm common room, tables scattered around a crackling hearth. The bartender wipes down the counter.",
+      npcs: [{ who: "Bartender", hp: 15 }],
+      exits: [["west", "Traveler's Road"], ["north", "Inn Corridor"], ["down", "Inn Basement"]]
+    },
+    "loc.inn_corridor": {
+      name: "Inn Corridor", zone: "inn",
+      desc: "A narrow, creaking hallway lit by a single lantern.",
+      npcs: [],
+      exits: [["south", "Inn Hall"], ["north", "Guest Room"], ["east", "Guest Room"], ["west", "Bathroom"]]
+    },
+    "loc.inn_room1": {
+      name: "Guest Room", zone: "inn",
+      desc: "A small rented room with a lumpy bed and a shuttered window.",
+      npcs: [],
+      exits: [["south", "Inn Corridor"]]
+    },
+    "loc.inn_room2": {
+      name: "Guest Room", zone: "inn",
+      desc: "Another rented room, this one smelling faintly of pipe smoke.",
+      npcs: [],
+      exits: [["west", "Inn Corridor"]]
+    },
+    "loc.inn_bathroom": {
+      name: "Inn Bathroom", zone: "inn",
+      desc: "A cramped bathroom shared by the inn's guests. The pipes groan constantly.",
+      npcs: [],
+      exits: [["east", "Inn Corridor"]]
+    },
+    "loc.basement": {
+      name: "Inn Basement", zone: "neutral",
+      desc: "A damp cellar stacked with old barrels. Something skitters in the dark corners.",
+      npcs: [{ who: "Sewer Rat", hp: 8 }, { who: "Sewer Rat", hp: 8 }, { who: "Sewer Rat", hp: 8 }],
+      exits: [["up", "Inn Hall"], ["east", "Sewer Entrance"]]
+    },
+    "loc.sewer_entrance": {
+      name: "Sewer Entrance", zone: "sewer",
+      desc: "A narrow tunnel mouth where the inn's cellar gives way to the sewers below. The air reeks of mildew.",
+      npcs: [{ who: "Sewer Rat", hp: 8 }],
+      exits: [["west", "Inn Basement"], ["north", "Sewer Passage"], ["east", "Curving Passage"]]
+    },
+    "loc.sewer_corridor_1": {
+      name: "Sewer Passage", zone: "sewer",
+      desc: "A low, dripping passage. Rat droppings crunch underfoot.",
+      npcs: [],
+      exits: [["south", "Sewer Entrance"], ["east", "Flooded Chamber"]]
+    },
+    "loc.sewer_chamber_1": {
+      name: "Flooded Chamber", zone: "sewer",
+      desc: "A wider chamber where the sewer walls have crumbled, exposing bare earth.",
+      npcs: [{ who: "Sewer Rat", hp: 8 }, { who: "Sewer Rat", hp: 8 }],
+      exits: [["west", "Sewer Passage"], ["south", "Stagnant Pool"]]
+    },
+    "loc.sewer_chamber_2": {
+      name: "Stagnant Pool", zone: "sewer",
+      desc: "Stagnant water pools in the middle of this chamber, rippling with unseen movement.",
+      npcs: [{ who: "Sewer Rat", hp: 8 }, { who: "Sewer Rat", hp: 8 }],
+      exits: [["north", "Flooded Chamber"], ["east", "Rat Nest"], ["south", "Curving Passage"]]
+    },
+    "loc.sewer_nest": {
+      name: "Rat Nest", zone: "danger",
+      desc: "A nest of gnawed bones and shredded cloth fills this dead-end alcove. Something bigger lives here.",
+      npcs: [{ who: "Rat King", hp: 20, boss: true }],
+      exits: [["west", "Stagnant Pool"]]
+    },
+    "loc.sewer_corridor_2": {
+      name: "Curving Passage", zone: "sewer",
+      desc: "A long, curving passage that loops back toward the entrance tunnel.",
+      npcs: [],
+      exits: [["north", "Stagnant Pool"], ["west", "Sewer Entrance"]]
+    }
+  };
+
+  const ZONE_LABEL = { inn: "Inn & street", sewer: "Sewers", neutral: "Transition point", danger: "Danger" };
+  const ZONE_VAR = { inn: "var(--inn)", sewer: "var(--sewer)", neutral: "var(--chalk-dim)", danger: "var(--danger)" };
+
+  const detail = document.getElementById("detail");
+
+  function render(id) {
+    const room = ROOMS[id];
+    const npcsHtml = room.npcs.length
+      ? '<ul class="npcs">' + room.npcs.map(n =>
+          '<li class="' + (n.boss ? "boss" : "") + '"><span class="who">' + n.who + '</span><span class="hp">' + n.hp + ' hp</span></li>'
+        ).join("") + '</ul>'
+      : '<p class="empty-note">No NPCs here.</p>';
+
+    const exitsHtml = '<ul class="exits">' + room.exits.map(([dir, target]) =>
+      '<li><span class="dir">' + dir + '</span>' + target + '</li>'
+    ).join("") + '</ul>';
+
+    detail.innerHTML =
+      '<span class="zone-tag" style="color:' + ZONE_VAR[room.zone] + '; border:1px solid ' + ZONE_VAR[room.zone] + ';">' + ZONE_LABEL[room.zone] + '</span>' +
+      '<h2>' + room.name + '</h2>' +
+      '<div class="room-id">' + id + '</div>' +
+      '<p class="desc">' + room.desc + '</p>' +
+      '<h3>Occupants</h3>' + npcsHtml +
+      '<h3>Exits</h3>' + exitsHtml;
+  }
+
+  function select(id, group) {
+    document.querySelectorAll(".room.selected").forEach(el => el.classList.remove("selected"));
+    group.classList.add("selected");
+    render(id);
+  }
+
+  document.querySelectorAll(".room").forEach(group => {
+    const id = group.getAttribute("data-id");
+    group.addEventListener("click", () => select(id, group));
+    group.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        select(id, group);
+      }
+    });
+  });
+
+  const startGroup = document.querySelector('.room[data-id="loc.start"]');
+  select("loc.start", startGroup);
+</script>
