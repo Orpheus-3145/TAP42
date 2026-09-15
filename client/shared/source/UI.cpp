@@ -7,7 +7,6 @@
 #include <format>
 
 
-
 void UI::handleInputToServer(void)
 {
 	try
