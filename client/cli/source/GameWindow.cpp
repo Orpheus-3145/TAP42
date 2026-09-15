@@ -6,43 +6,103 @@
 #include <cassert>
 
 
-GameWindow::GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t chatFd) :
+GameWindow::GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t messageFd) :
 	height{height},
 	width{width},
 	commandFd{commandFd},
-	chatFd{chatFd}
+	messageFd{messageFd}
 {
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding commands");
-	assert(this->chatFd != -1 and "Invalid fd provided for forwarding chat messages");
+	assert(this->messageFd != -1 and "Invalid fd provided for forwarding chat messages");
+
+	this->height = ((this->height - 2) % 5) == 0 ? this->height : ((this->height - 2) / 5 * 5 + 2);		// has to be multiple of 5
+	this->width = (this->width % 2) == 0 ? (this->width - 1) : this->width;				// has to be an odd number
+
+	this->frame = std::make_unique<OutputTab>(0);
+	this->commandTab = std::make_unique<SingleInputTab>(this->commandFd, 0);
+	this->messageTab = std::make_unique<SingleInputTab>(this->messageFd, 0);
+	this->infoTab = std::make_unique<OutputTab>(0);
+	this->responseTab = std::make_unique<OutputTab>(0);
+	this->eventTab = std::make_unique<OutputTab>(0);
+	this->chatTab = std::make_unique<OutputTab>(0);
+	this->heightTBATab = std::make_unique<OutputTab>(0);
 
 	this->show();
+	this->commandTab->refresh();
 	this->refresh();
 }
 		
 void GameWindow::show(void)
 {
-	int32_t height = (this->height % 2) == 0 ? this->height : this->height - 1;
-	int32_t width = (this->width % 2) != 0 ? this->width : this->width - 1;
-	int32_t starty = 0;
-	int32_t startx = 0;
-	this->frame = std::make_unique<OutputTab>(height, width, starty, startx, 0);
+	this->frame->draw(
+		this->height,
+		this->width,
+		0,
+		0
+	);
 
-	height -= 2;
-	width = (width - 5) / 2;
-	startx += 2;
-	starty += 1;
-	this->commandTab = std::make_unique<InputTab>(height, width, starty, startx, this->commandFd, 0);
-	this->commandTab->appendContent("This is where the input is shown");
+	int32_t widthTabs = (this->width - 2) / 2 - 1;
+	// left panel
+	this->infoTab->draw(
+		6,
+		widthTabs,
+		1,
+		2
+	);
+	this->infoTab->appendContent("Player: <NAME>");
+	this->infoTab->appendContent("Data: <CLASS | RACE | ...>");
+	this->infoTab->appendContent("Currently in: <LOCATION>");
+	this->infoTab->appendContent("in group?");
 
-	height /= 2;
-	startx += width + 1;
-	this->responseTab = std::make_unique<OutputTab>(height, width, starty, startx, 0);
-	this->responseTab->appendContent("This is where responses are shown");
+	this->responseTab->draw(
+		this->height - 6 - 5,
+		widthTabs,
+		7,
+		2
+	);
 
-	starty += height;
-	this->eventTab = std::make_unique<OutputTab>(height, width, starty, startx, 0);
-	this->eventTab->appendContent("This is where events are shown");
-	this->commandTab->refresh();
+	this->commandTab->draw(
+		3,
+		widthTabs,
+		this->height - 4,
+		2
+	);
+	// right panel
+	int32_t tmpHeight = this->height - 2;
+	int32_t heightEventsTab = tmpHeight * 2 / 5;
+	int32_t heightChatTab = tmpHeight * 2 / 5 - 3;
+	int32_t heightTBATab = tmpHeight / 5;
+	this->eventTab->draw(
+		heightEventsTab,
+		widthTabs,
+		1,
+		widthTabs + 3
+	);
+
+	this->chatTab->draw(
+		heightChatTab,
+		widthTabs,
+		heightEventsTab + 1,
+		widthTabs + 3
+	);
+
+	this->messageTab->draw(
+		3,
+		widthTabs,
+		heightEventsTab + heightChatTab + 1,
+		widthTabs + 3
+	);
+
+	this->heightTBATab->draw(
+		heightTBATab,
+		widthTabs,
+		heightEventsTab + heightChatTab + 3 + 1,
+		widthTabs + 3
+	);
+
+	this->currentTab = this->commandTab.get();
+	this->currentTab->refresh();
+	this->refresh();
 
 	LOG_DEBUG(LogContext::INTERFACE, std::format("CLI window size h: {}, w: {}", height, width));
 }
@@ -51,8 +111,11 @@ void GameWindow::clear(void) noexcept
 {
 	this->frame.reset();
 	this->commandTab.reset();
+	this->messageTab.reset();
+	this->infoTab.reset();
 	this->responseTab.reset();
 	this->eventTab.reset();
+	this->chatTab.reset();
 }
 
 void GameWindow::readInput(void)
@@ -62,28 +125,76 @@ void GameWindow::readInput(void)
 
 void GameWindow::resize(int32_t height, int32_t width)
 {
-	this->height = height;
-	this->width = width;
+	this->height = ((height - 2) % 5) == 0 ? height : ((height - 2) / 5 * 5 + 2);			// has to be multiple of 5
+	this->width = (width % 2) == 0 ? (width - 1) : width;			// has to be an odd number
+	::resizeterm(this->height, this->width);
 
-	height = (height % 2) == 0 ? height : height - 1;
-	width = (width % 2) != 0 ? width : width - 1;
-	int32_t starty = 0;
-	int32_t startx = 0;
-	::resizeterm(height, width);
-	this->frame->resize(height, width, starty, startx);
+	this->frame->resize(
+		this->height,
+		this->width,
+		0,
+		0
+	);
 
-	height -= 2;
-	width = (width - 5) / 2;
-	startx += 2;
-	starty += 1;
-	this->commandTab->resize(height, width, starty, startx);
+	int32_t widthTabs = (this->width - 2) / 2 - 1;
+	// left panel
+	this->infoTab->resize(
+		6,
+		widthTabs,
+		1,
+		2
+	);
+	this->infoTab->appendContent("Player: <NAME>");
+	this->infoTab->appendContent("Data: <CLASS | RACE | ...>");
+	this->infoTab->appendContent("Currently in: <LOCATION>");
+	this->infoTab->appendContent("in group?");
 
-	height /= 2;
-	startx += width + 1;
-	this->responseTab->resize(height, width, starty, startx);
+	this->responseTab->resize(
+		this->height - 6 - 5,
+		widthTabs,
+		7,
+		2
+	);
 
-	starty += height;
-	this->eventTab->resize(height, width, starty, startx);
+	this->commandTab->resize(
+		3,
+		widthTabs,
+		this->height - 4,
+		2
+	);
+	// right panel
+	int32_t tmpHeight = this->height - 2;
+	int32_t heightEventsTab = tmpHeight * 2 / 5;
+	int32_t heightChatTab = tmpHeight * 2 / 5;
+	int32_t heightTBATab = tmpHeight - heightEventsTab - heightChatTab;
+	this->eventTab->resize(
+		heightEventsTab,
+		widthTabs,
+		1,
+		widthTabs + 3
+	);
+
+	this->chatTab->resize(
+		heightChatTab - 3,
+		widthTabs,
+		heightEventsTab + 1,
+		widthTabs + 3
+	);
+
+	this->messageTab->resize(
+		3,
+		widthTabs,
+		heightEventsTab + heightChatTab - 3 + 1,
+		widthTabs + 3
+	);
+
+	this->heightTBATab->resize(
+		heightTBATab,
+		widthTabs,
+		heightEventsTab + heightChatTab + 1,
+		widthTabs + 3
+	);
+
 	this->commandTab->refresh();
 
 	// because resize is not handled by ncurses there might be some garbage to read, flush it

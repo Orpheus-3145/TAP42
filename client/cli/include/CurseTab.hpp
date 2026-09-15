@@ -36,7 +36,8 @@ static std::vector<const char*> HINTS
 class BasicTab
 {
 	public:
-		BasicTab(void) noexcept = default;
+		BasicTab(int32_t borderChar = -1) : 
+			borderChar{borderChar} {}
 		BasicTab(BasicTab const& other) noexcept = delete;
 		BasicTab& operator=(BasicTab const& other) noexcept = delete;
 		BasicTab(BasicTab&&) noexcept;
@@ -44,20 +45,20 @@ class BasicTab
 
 		virtual ~BasicTab(void) { this->clear(); }
 
-		virtual void appendContent(std::string const& newContent) noexcept;
-		virtual void refresh(void) const noexcept { ::wnoutrefresh(this->main); }
-		virtual void resize(int32_t newHeight, int32_t newWidth, int32_t newY = 0, int32_t newX = 0) = 0;
-
 		void printLine(std::string const& newContent) const noexcept;
-	
+		void refresh(void) const noexcept { ::wnoutrefresh(this->main); }
+
+		virtual void draw(int32_t h, int32_t w, int32_t y, int32_t x);
+		virtual void appendContent(std::string const& newContent) noexcept;
+		virtual void resize(int32_t h, int32_t w, int32_t y, int32_t x);
+
 	protected:
-		virtual void draw(int32_t h, int32_t w, int32_t y, int32_t x) = 0;
 		virtual void clear(void) noexcept;
-		
+
 		WINDOW* border{nullptr};
 		WINDOW* main{nullptr};
 
-		int32_t borderChar{-1};
+		int32_t borderChar;
 
 		std::vector<std::string> _state;
 };
@@ -69,13 +70,13 @@ class InputTab : public BasicTab
 	public:
 		using BasicTab::BasicTab;
 
-		InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t forwardInputFd, int32_t borderChar = -1);
+		InputTab(int32_t forwardInputFd, int32_t borderChar = -1);
 
 		InputTab(InputTab&&) noexcept;
 		InputTab& operator=(InputTab&&) noexcept;
 
-		~InputTab(void) { ::keypad(this->main, false); }
-	
+		virtual ~InputTab(void) { ::keypad(this->main, false); }
+
 		void handleUserInput(void);
 
 		void deleteCharForward(void) noexcept;
@@ -91,15 +92,16 @@ class InputTab : public BasicTab
 
 		void suggestPrevious(void) noexcept;
 		void showPrevious(void) noexcept;
-		
+
 		void suggestNext(void) noexcept;
 		void showNext(void) noexcept;
 
-		void appendContent(std::string const& newContent) noexcept override;
-		void resize(int32_t newHeight, int32_t newWidth, int32_t newY = 0, int32_t newX = 0) override;
-
-	private:
 		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
+		void appendContent(std::string const& newContent) noexcept override;
+
+	protected:
+		virtual void appendCharToInput(int32_t input);
+		virtual void terminateInput(void);
 
 		void updateHints(void) noexcept;
 		void clearHints(void) noexcept;
@@ -127,22 +129,29 @@ class InputTab : public BasicTab
 		bool	autocompleteMode{false};
 };
 
+class SingleInputTab : public InputTab
+{
+	public:
+		using InputTab::InputTab;
+
+		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
+		void appendContent(std::string const& newContent) noexcept override { (void) newContent; }
+
+	private:
+		void terminateInput(void) override;
+};
+
 class OutputTab : public BasicTab
 {
 	public:
 		using BasicTab::BasicTab;
-		
-		OutputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t borderChar = -1);
 
 		OutputTab(OutputTab&&) noexcept;
 		OutputTab& operator=(OutputTab&&) noexcept;
 
 		void appendContent(std::string const& newContent) noexcept override;
-		void resize(int32_t newHeight, int32_t newWidth, int32_t newY = 0, int32_t newX = 0) override;
 
 	private:
-		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
-
 		std::deque<std::string> content;
 		size_t					firstLineToPrintIndex{0UL};
 };

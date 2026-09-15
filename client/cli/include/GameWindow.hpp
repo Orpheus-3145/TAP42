@@ -10,7 +10,7 @@
 class GameWindow
 {
 	public:
-		GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t chatFd);
+		GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t messageFd);
 
 		GameWindow(GameWindow const& other) = delete;
 		GameWindow& operator=(GameWindow const& other) = delete;
@@ -33,11 +33,14 @@ class GameWindow
 		int32_t width;
 
 		int32_t commandFd;
-		int32_t chatFd;
+		int32_t messageFd;
 
-		// NB add deque and indexes instead of single tabs
+		std::unique_ptr<OutputTab>	frame,
+									infoTab,
+									responseTab,
+									eventTab,
+									chatTab,
+									heightTBATab;
 
-		std::unique_ptr<OutputTab>	frame;
-		std::unique_ptr<InputTab>	commandTab;
-		std::unique_ptr<OutputTab>	responseTab, eventTab;
+		std::unique_ptr<SingleInputTab>	commandTab, messageTab;
 };
