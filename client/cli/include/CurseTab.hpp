@@ -84,6 +84,9 @@ class InputTab : public BasicTab
 		void moveCursorLeft(void) const noexcept;
 		void moveCursorRight(void) const noexcept;
 
+		void moveStartLine(void) const noexcept;
+		void moveEndLine(void) const noexcept;
+
 		void setChar(int32_t input);
 
 		void suggestPrevious(void) noexcept;
