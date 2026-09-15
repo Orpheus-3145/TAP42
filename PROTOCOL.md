@@ -129,6 +129,13 @@ facile da testare. Il progresso è **per player**, non condiviso: due
 giocatori che parlano con lo stesso NPC sentono ciascuno la propria sequenza
 dall'inizio, uno non "consuma" le righe per l'altro.
 
+Un NPC può avere anche `bonus_dialogue`: righe aggiunte in coda al ciclo
+solo quando il player ha status `completed` su **tutte** le quest elencate
+in `unlock_quest_ids` dell'NPC. Finché non sono tutte completate, il ciclo
+usa solo `dialogue`; una volta sbloccato, il ciclo si allunga per includere
+anche le righe bonus. Meccanismo generico, non specifico a un NPC in
+particolare.
+
 ### ATTACK
 ```
 C: ATTACK <target>
@@ -217,12 +224,23 @@ Evento broadcast al solo player interessato quando una quest si completa:
 EVT QUEST COMPLETE <player> <quest_id>
 ```
 **Design choice — progressione**: due tipi di quest, `fetch` (si completa al
-`TAKE` dell'item target) e `defeat` (si completa quando il player uccide
-l'NPC target via `ATTACK`). Nessun comando ACCEPT: ogni quest è
-`in_progress` per tutti dal momento della CONNECT. Reward: se la quest ha un
-`reward_item_id`, quell'item viene aggiunto all'inventario del player al
-completamento — l'id di reward non è mai piazzato in nessuna stanza, così
-resta un'istanza unica anche dopo l'assegnazione.
+`TAKE` dell'item target, un solo `target_id`) e `defeat` (si completa quando
+**tutti** gli NPC in `target_ids` sono morti — una lista, non un singolo id,
+così "uccidi il boss" e "uccidi tutti i topi" usano lo stesso meccanismo,
+cambia solo quanti elementi ha la lista). Nessun comando ACCEPT: ogni quest è
+`in_progress` per tutti dal momento della CONNECT (o già `completed` se un
+altro player aveva già finito una `defeat` prima che questo si connettesse).
+
+**Design choice — completamento delle defeat quest a livello di mondo**: una
+`defeat` quest non è credito personale di chi ha dato il colpo finale — è lo
+stato del mondo che conta. Quando muore l'ultimo NPC della lista, **ogni**
+player che ha ancora quella quest `in_progress` la vede completarsi nello
+stesso istante, non solo chi ha ucciso quell'ultimo NPC. Se due player si
+dividono gli obiettivi (uno ne uccide metà, l'altro il resto), la quest si
+completa comunque per entrambi. Di conseguenza una `defeat` quest **non ha
+mai `reward_item_id`** nel world data attuale: dare lo stesso item a più
+player nello stesso istante violerebbe l'unicità delle istanze. Le `fetch`
+quest restano invece a credito individuale (chi prende l'item).
 
 ### WHO
 ```

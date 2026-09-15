@@ -39,6 +39,12 @@ struct Npc {
     // (e.g. the bartender's flat 100) instead of a rolled range.
     int counter_damage_min = 3;
     int counter_damage_max = 8;
+
+    // Extra lines appended to the TALK cycle once a player has "completed"
+    // status on every quest listed in unlock_quest_ids. Either left empty
+    // for an NPC with nothing to unlock.
+    std::vector<std::string> bonus_dialogue;
+    std::vector<std::string> unlock_quest_ids;
 };
 
 enum class QuestType { Fetch, Defeat };
@@ -48,7 +54,9 @@ struct Quest {
     std::string name;
     std::string description;
     QuestType type = QuestType::Fetch;
-    std::string target_id;      // item id (Fetch) or npc id (Defeat)
+    std::string target_id;           // Fetch: the item to bring back
+    std::vector<std::string> target_ids; // Defeat: every npc that must die; a
+                                          // single-boss quest just lists one
     std::string reward_item_id; // empty = no reward
 };
 

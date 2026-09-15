@@ -100,6 +100,8 @@ bool load_world(const std::string& path) {
         npc.name = npc_obj["name"].as_string();
         npc.description = npc_obj["description"].as_string();
         for (auto& line : npc_obj["dialogue"].array_value) npc.dialogue.push_back(line.as_string());
+        for (auto& line : npc_obj["bonus_dialogue"].array_value) npc.bonus_dialogue.push_back(line.as_string());
+        for (auto& qid : npc_obj["unlock_quest_ids"].array_value) npc.unlock_quest_ids.push_back(qid.as_string());
         npc.hp = npc_obj["hp"].as_int();
         npc.max_hp = npc.hp;
         // Optional per-NPC overrides; absent means keep Npc's struct defaults (3/8).
@@ -137,7 +139,11 @@ bool load_world(const std::string& path) {
                       {{"quest", quest_id}, {"error", "unknown quest type '" + type_str + "'"}});
             return false;
         }
-        quest.target_id = quest_obj["target_id"].as_string();
+        if (quest.type == QuestType::Fetch) {
+            quest.target_id = quest_obj["target_id"].as_string();
+        } else {
+            for (auto& t : quest_obj["target_ids"].array_value) quest.target_ids.push_back(t.as_string());
+        }
         quest.reward_item_id = quest_obj["reward_item_id"].as_string();
         world.quests[quest_id] = quest;
     }
@@ -173,17 +179,39 @@ bool load_world(const std::string& path) {
         }
     }
     for (auto& [quest_id, quest] : world.quests) {
-        bool target_ok = quest.type == QuestType::Fetch ? world.items.count(quest.target_id) > 0
-                                                          : world.npcs.count(quest.target_id) > 0;
-        if (!target_ok) {
-            log_error("world_validation_failed",
-                      {{"quest", quest_id}, {"error", "target '" + quest.target_id + "' does not exist"}});
-            return false;
+        if (quest.type == QuestType::Fetch) {
+            if (!world.items.count(quest.target_id)) {
+                log_error("world_validation_failed",
+                          {{"quest", quest_id}, {"error", "target item '" + quest.target_id + "' does not exist"}});
+                return false;
+            }
+        } else {
+            if (quest.target_ids.empty()) {
+                log_error("world_validation_failed",
+                          {{"quest", quest_id}, {"error", "defeat quest has no target_ids"}});
+                return false;
+            }
+            for (auto& npc_id : quest.target_ids) {
+                if (!world.npcs.count(npc_id)) {
+                    log_error("world_validation_failed",
+                              {{"quest", quest_id}, {"error", "target npc '" + npc_id + "' does not exist"}});
+                    return false;
+                }
+            }
         }
         if (!quest.reward_item_id.empty() && !world.items.count(quest.reward_item_id)) {
             log_error("world_validation_failed",
                       {{"quest", quest_id}, {"error", "reward item '" + quest.reward_item_id + "' does not exist"}});
             return false;
+        }
+    }
+    for (auto& [npc_id, npc] : world.npcs) {
+        for (auto& qid : npc.unlock_quest_ids) {
+            if (!world.quests.count(qid)) {
+                log_error("world_validation_failed",
+                          {{"npc", npc_id}, {"error", "unlock quest '" + qid + "' does not exist"}});
+                return false;
+            }
         }
     }
     if (!world.rooms.count("loc.start")) {

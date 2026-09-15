@@ -108,6 +108,10 @@
         "Welcome, traveler. Rooms are upstairs, drinks are on the house tonight.",
         "Something's been nesting in my basement. Rats, big ones - would you deal with them?"
       ],
+      "bonus_dialogue": [
+        "Thank you for helping me. You can sleep here for free, as many times as you'd like."
+      ],
+      "unlock_quest_ids": ["quest.kill_all_rats", "quest.defeat_rat_king"],
       "hp": 200,
       "counter_damage_min": 100,
       "counter_damage_max": 100
@@ -168,5 +172,20 @@
     }
   },
 
-  "quests": {}
+  "quests": {
+    "quest.kill_all_rats": {
+      "name": "Clear the Rats",
+      "description": "The bartender wants every rat in the basement and sewers dealt with, not just a few of them.",
+      "type": "defeat",
+      "target_ids": ["npc.rat_1", "npc.rat_2", "npc.rat_3", "npc.rat_4", "npc.rat_5", "npc.rat_6", "npc.rat_7", "npc.rat_8"],
+      "reward_item_id": ""
+    },
+    "quest.defeat_rat_king": {
+      "name": "Defeat the Rat King",
+      "description": "Something bigger than a regular rat is running the nest. Put it down.",
+      "type": "defeat",
+      "target_ids": ["npc.rat_king"],
+      "reward_item_id": ""
+    }
+  }
 }
