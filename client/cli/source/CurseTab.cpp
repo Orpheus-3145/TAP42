@@ -78,6 +78,8 @@ InputTab::InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t forwardIn
 {
 	this->dispatcher[KEY_LEFT]      = [this] { this->moveCursorLeft(); };
 	this->dispatcher[KEY_RIGHT]     = [this] { this->moveCursorRight(); };
+	this->dispatcher[KEY_HOME]      = [this] { this->moveStartLine(); };
+	this->dispatcher[KEY_END]       = [this] { this->moveEndLine(); };
 	this->dispatcher[KEY_DC]        = [this] { this->deleteCharForward(); };
 	this->dispatcher[127]           = [this] { this->deleteCharBack(); };
 	this->dispatcher[KEY_BACKSPACE] = [this] { this->deleteCharBack(); };
@@ -86,7 +88,6 @@ InputTab::InputTab(int32_t h, int32_t w, int32_t y, int32_t x, int32_t forwardIn
 
 	// this->dispatcher['\t']          = [this] { this->switchForwardTab(); };
 	// this->dispatcher[KEY_BTAB]      = [this] { this->switchBackwardTab(); };
-	// KEY_HOME / KEY_END: not mapped
 
 	this->draw(h, w, y, x);
 }
@@ -219,10 +220,30 @@ void InputTab::moveCursorRight(void) const noexcept
 	}
 }
 
+void InputTab::moveStartLine(void) const noexcept
+{
+	int32_t y, x;
+	(void)x;
+
+	getyx(this->main, y, x);
+	::wmove(this->main, y, this->startX);
+	this->refresh();
+}
+
+void InputTab::moveEndLine(void) const noexcept
+{
+	int32_t y, x;
+	(void)x;
+
+	getyx(this->main, y, x);
+	::wmove(this->main, y, this->startX + this->bufferSize);
+	this->refresh();
+}
+
 void InputTab::setChar(int32_t input)
 {
 	int32_t y, x;
-	(void)y;
+	bool resetCursorPos = false;
 
 	if (input != COMMAND_TERM)		// append normal char to buffer
 	{
@@ -233,7 +254,10 @@ void InputTab::setChar(int32_t input)
 		x -= this->startX;
 
 		if (x < static_cast<int32_t>(this->bufferSize))			// in case the cursor is not at the end of the buffer
+		{
+			resetCursorPos = true;
 			::memmove(this->commandBuffer + x + 1, this->commandBuffer + x, static_cast<int32_t>(this->bufferSize) - x);
+		}
 
 		this->commandBuffer[x] = static_cast<char>(input);		// could overflow if not ASCII value
 		this->bufferSize++;
@@ -260,6 +284,13 @@ void InputTab::setChar(int32_t input)
 		wmove(this->main, y + 1, 0);
 	}
 	this->overwriteLine();
+
+	// move cursor back where it was originally
+	if (resetCursorPos)
+	{
+		::wmove(this->main, y, x + this->startX + 1);
+		this->refresh();
+	}
 }
 
 void InputTab::suggestPrevious(void) noexcept
