@@ -1,138 +1,165 @@
 {
   "rooms": {
     "loc.start": {
-      "name": "Village Square",
-      "description": "A bustling square with cobblestone paths.",
-      "exits": { "north": "loc.tavern", "east": "loc.shop" },
-      "items": [],
-      "npcs": ["npc.guard"]
-    },
-    "loc.tavern": {
-      "name": "The Prancing Pony",
-      "description": "A cozy tavern filled with warmth and laughter.",
-      "exits": { "south": "loc.start", "north": "loc.crossroads" },
-      "items": ["item.ale"],
-      "npcs": []
-    },
-    "loc.shop": {
-      "name": "General Store",
-      "description": "Shelves lined with various goods and supplies.",
-      "exits": { "west": "loc.start", "north": "loc.chapel" },
-      "items": [],
-      "npcs": ["npc.merchant"]
-    },
-    "loc.crossroads": {
-      "name": "Crossroads",
-      "description": "A weathered signpost marks the meeting of several dirt roads.",
-      "exits": { "south": "loc.tavern", "east": "loc.forest", "north": "loc.well" },
+      "name": "Traveler's Road",
+      "description": "A dusty road leading into town. To the east stands the light of a wayside inn.",
+      "exits": { "east": "loc.inn_hall" },
       "items": [],
       "npcs": []
     },
-    "loc.forest": {
-      "name": "Forest Path",
-      "description": "A narrow trail winds through tall, whispering trees.",
-      "exits": { "west": "loc.crossroads", "south": "loc.bridge" },
+    "loc.inn_hall": {
+      "name": "Inn Hall",
+      "description": "A warm common room, tables scattered around a crackling hearth. The bartender wipes down the counter.",
+      "exits": { "west": "loc.start", "north": "loc.inn_corridor", "down": "loc.basement" },
       "items": [],
-      "npcs": ["npc.bandit"]
+      "npcs": ["npc.bartender"]
     },
-    "loc.bridge": {
-      "name": "Old Stone Bridge",
-      "description": "A crumbling stone bridge arches over a rushing river.",
-      "exits": { "north": "loc.forest", "south": "loc.mill" },
+    "loc.inn_corridor": {
+      "name": "Inn Corridor",
+      "description": "A narrow, creaking hallway lit by a single lantern.",
+      "exits": { "south": "loc.inn_hall", "north": "loc.inn_room1", "east": "loc.inn_room2", "west": "loc.inn_bathroom" },
       "items": [],
       "npcs": []
     },
-    "loc.mill": {
-      "name": "Abandoned Mill",
-      "description": "Dust and cobwebs cling to the idle machinery of a long-abandoned mill.",
-      "exits": { "north": "loc.bridge", "west": "loc.chapel" },
-      "items": ["item.rusty_key"],
+    "loc.inn_room1": {
+      "name": "Guest Room",
+      "description": "A small rented room with a lumpy bed and a shuttered window.",
+      "exits": { "south": "loc.inn_corridor" },
+      "items": [],
       "npcs": []
     },
-    "loc.chapel": {
-      "name": "Village Chapel",
-      "description": "Sunlight filters through stained glass onto rows of empty pews.",
-      "exits": { "east": "loc.mill", "south": "loc.shop" },
+    "loc.inn_room2": {
+      "name": "Guest Room",
+      "description": "Another rented room, this one smelling faintly of pipe smoke.",
+      "exits": { "west": "loc.inn_corridor" },
       "items": [],
-      "npcs": ["npc.priest"]
+      "npcs": []
     },
-    "loc.well": {
-      "name": "Old Well",
-      "description": "A moss-covered well sits forgotten at the edge of the village.",
-      "exits": { "south": "loc.crossroads" },
-      "items": ["item.old_lantern"],
+    "loc.inn_bathroom": {
+      "name": "Inn Bathroom",
+      "description": "A cramped bathroom shared by the inn's guests. The pipes groan constantly.",
+      "exits": { "east": "loc.inn_corridor" },
+      "items": [],
+      "npcs": []
+    },
+    "loc.basement": {
+      "name": "Inn Basement",
+      "description": "A damp cellar stacked with old barrels. Something skitters in the dark corners.",
+      "exits": { "up": "loc.inn_hall", "east": "loc.sewer_entrance" },
+      "items": [],
+      "npcs": ["npc.rat_1", "npc.rat_2", "npc.rat_3"]
+    },
+    "loc.sewer_entrance": {
+      "name": "Sewer Entrance",
+      "description": "A narrow tunnel mouth where the inn's cellar gives way to the sewers below. The air reeks of mildew.",
+      "exits": { "west": "loc.basement", "north": "loc.sewer_corridor_1", "east": "loc.sewer_corridor_2" },
+      "items": [],
+      "npcs": ["npc.rat_4"]
+    },
+    "loc.sewer_corridor_1": {
+      "name": "Sewer Passage",
+      "description": "A low, dripping passage. Rat droppings crunch underfoot.",
+      "exits": { "south": "loc.sewer_entrance", "east": "loc.sewer_chamber_1" },
+      "items": [],
+      "npcs": []
+    },
+    "loc.sewer_chamber_1": {
+      "name": "Flooded Chamber",
+      "description": "A wider chamber where the sewer walls have crumbled, exposing bare earth.",
+      "exits": { "west": "loc.sewer_corridor_1", "south": "loc.sewer_chamber_2" },
+      "items": [],
+      "npcs": ["npc.rat_5", "npc.rat_6"]
+    },
+    "loc.sewer_chamber_2": {
+      "name": "Stagnant Pool",
+      "description": "Stagnant water pools in the middle of this chamber, rippling with unseen movement.",
+      "exits": { "north": "loc.sewer_chamber_1", "east": "loc.sewer_nest", "south": "loc.sewer_corridor_2" },
+      "items": [],
+      "npcs": ["npc.rat_7", "npc.rat_8"]
+    },
+    "loc.sewer_nest": {
+      "name": "Rat Nest",
+      "description": "A nest of gnawed bones and shredded cloth fills this dead-end alcove. Something bigger lives here.",
+      "exits": { "west": "loc.sewer_chamber_2" },
+      "items": [],
+      "npcs": ["npc.rat_king"]
+    },
+    "loc.sewer_corridor_2": {
+      "name": "Curving Passage",
+      "description": "A long, curving passage that loops back toward the entrance tunnel.",
+      "exits": { "north": "loc.sewer_chamber_2", "west": "loc.sewer_entrance" },
+      "items": [],
       "npcs": []
     }
   },
 
-  "items": {
-    "item.ale": { "name": "Frothy Ale", "description": "A refreshing drink that restores energy." },
-    "item.rusty_key": { "name": "Rusty Key", "description": "An old iron key, caked with rust." },
-    "item.old_lantern": { "name": "Old Lantern", "description": "A dented lantern that still holds a little oil." },
-    "item.reward_coin": { "name": "Gold Coin", "description": "A shiny reward coin." },
-    "item.bandit_loot": { "name": "Bandit's Pouch", "description": "A small pouch of coins taken off a defeated bandit." }
-  },
+  "items": {},
 
   "npcs": {
-    "npc.guard": {
-      "name": "Village Guard",
-      "description": "A stern-looking guard watching over the square.",
-      "dialogue": ["Stay safe, traveler.", "The roads can be dangerous."],
-      "hp": 20
-    },
-    "npc.merchant": {
-      "name": "Shop Keeper",
-      "description": "A friendly merchant eager to trade.",
-      "dialogue": ["Welcome to my shop!", "What can I get for you today?"],
+    "npc.bartender": {
+      "name": "Bartender",
+      "description": "A burly bartender, sleeves rolled up, keeping a watchful eye on the room.",
+      "dialogue": [
+        "Welcome, traveler. Rooms are upstairs, drinks are on the house tonight.",
+        "Something's been nesting in my basement. Rats, big ones - would you deal with them?"
+      ],
       "hp": 15
     },
-    "npc.priest": {
-      "name": "Village Priest",
-      "description": "An elderly priest tending quietly to the chapel.",
-      "dialogue": [
-        "Blessings upon you, traveler.",
-        "The tavern keeper always appreciates a fresh ale delivery.",
-        "Bandits have been troubling travelers on the forest path - someone should deal with them.",
-        "I heard the old well hides something forgotten. Bring back what you find, if you're curious."
-      ],
-      "hp": 10
+    "npc.rat_1": {
+      "name": "Sewer Rat",
+      "description": "A mangy rat, bigger than it has any right to be.",
+      "dialogue": [],
+      "hp": 8
     },
-    "npc.bandit": {
-      "name": "Forest Bandit",
-      "description": "A rough-looking bandit blocking the forest path.",
-      "dialogue": ["Hand over your valuables!", "This path belongs to us now."],
-      "hp": 25
+    "npc.rat_2": {
+      "name": "Sewer Rat",
+      "description": "A mangy rat, bigger than it has any right to be.",
+      "dialogue": [],
+      "hp": 8
+    },
+    "npc.rat_3": {
+      "name": "Sewer Rat",
+      "description": "A mangy rat, bigger than it has any right to be.",
+      "dialogue": [],
+      "hp": 8
+    },
+    "npc.rat_4": {
+      "name": "Sewer Rat",
+      "description": "A mangy rat, bigger than it has any right to be.",
+      "dialogue": [],
+      "hp": 8
+    },
+    "npc.rat_5": {
+      "name": "Sewer Rat",
+      "description": "A mangy rat, bigger than it has any right to be.",
+      "dialogue": [],
+      "hp": 8
+    },
+    "npc.rat_6": {
+      "name": "Sewer Rat",
+      "description": "A mangy rat, bigger than it has any right to be.",
+      "dialogue": [],
+      "hp": 8
+    },
+    "npc.rat_7": {
+      "name": "Sewer Rat",
+      "description": "A mangy rat, bigger than it has any right to be.",
+      "dialogue": [],
+      "hp": 8
+    },
+    "npc.rat_8": {
+      "name": "Sewer Rat",
+      "description": "A mangy rat, bigger than it has any right to be.",
+      "dialogue": [],
+      "hp": 8
+    },
+    "npc.rat_king": {
+      "name": "Rat King",
+      "description": "A grotesquely oversized rat, scarred from countless fights. It's clearly the one in charge down here.",
+      "dialogue": [],
+      "hp": 20
     }
   },
 
-  "quests": {
-    "quest.fetch_ale": {
-      "name": "Fetch the Ale",
-      "description": "Bring back the frothy ale from the tavern.",
-      "type": "fetch",
-      "target_id": "item.ale",
-      "reward_item_id": "item.reward_coin"
-    },
-    "quest.defeat_guard": {
-      "name": "Defeat the Guard",
-      "description": "The guard is causing trouble - defeat him.",
-      "type": "defeat",
-      "target_id": "npc.guard",
-      "reward_item_id": ""
-    },
-    "quest.defeat_bandit": {
-      "name": "Defeat the Bandit",
-      "description": "A bandit is blocking the forest path - deal with him.",
-      "type": "defeat",
-      "target_id": "npc.bandit",
-      "reward_item_id": "item.bandit_loot"
-    },
-    "quest.find_key": {
-      "name": "Find the Rusty Key",
-      "description": "Search the abandoned mill for the old rusty key.",
-      "type": "fetch",
-      "target_id": "item.rusty_key",
-      "reward_item_id": ""
-    }
-  }
+  "quests": {}
 }
