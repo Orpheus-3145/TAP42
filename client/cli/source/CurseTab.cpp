@@ -9,47 +9,50 @@
 
 
 BasicTab::BasicTab(BasicTab&& other) noexcept :
-	border{other.border},
-	main{other.main},
+	borderWin{other.borderWin},
+	mainWin{other.mainWin},
 	borderChar{other.borderChar},
 	parent{other.parent},
 	_state{std::move(other._state)}
 {
-	other.border = nullptr;
-	other.main = nullptr;
+	other.borderWin = nullptr;
+	other.mainWin = nullptr;
 }
 
 BasicTab& BasicTab::operator=(BasicTab&& other) noexcept
 {
 	if (this != &other)
 	{
-		if (this->main) ::delwin(this->main);
-		if (this->border) ::delwin(this->border);
+		if (this->mainWin) ::delwin(this->mainWin);
+		if (this->borderWin) ::delwin(this->borderWin);
 
-		this->border = other.border;
-		this->main = other.main;
+		this->borderWin = other.borderWin;
+		this->mainWin = other.mainWin;
 		this->borderChar = other.borderChar;
 		this->parent = other.parent;
 		this->_state = std::move(other._state);
 
-		other.border = nullptr;
-		other.main = nullptr;
+		other.borderWin = nullptr;
+		other.mainWin = nullptr;
 	}
 	return *this;
 }
 
 void BasicTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 {
+	assert((h > 0) and (w > 0) and "Invalid size provided");
+	assert((y > -1) and (x > -1) and "Invalid position provided");
+
 	if (this->borderChar != -1)
 	{
-		this->border = ::newwin(h, w, y, x);
-		if (this->border == nullptr)
+		this->borderWin = ::newwin(h, w, y, x);
+		if (this->borderWin == nullptr)
 		{
 			LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
 			throw CliException("Failed to create window");
 		}
 		::wborder(
-			this->border,
+			this->borderWin,
 			this->borderChar,
 			this->borderChar,
 			this->borderChar,
@@ -59,14 +62,14 @@ void BasicTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 			this->borderChar,
 			this->borderChar
 		);
-		::wnoutrefresh(this->border);
+		::wnoutrefresh(this->borderWin);
 
 		h -= 2, w -= 2;
 		y += 1, x += 1;
 	}
 
-	this->main = ::newwin(h, w, y, x);
-	if (this->main == nullptr)
+	this->mainWin = ::newwin(h, w, y, x);
+	if (this->mainWin == nullptr)
 	{
 		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
 		throw CliException("Failed to create window");
@@ -75,7 +78,7 @@ void BasicTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 	for (std::string const& line: this->_state)
 		this->printLine(line);
 
-	::wnoutrefresh(this->main);
+	::wnoutrefresh(this->mainWin);
 }
 
 void BasicTab::appendContent(std::string const& newContent) noexcept
@@ -86,9 +89,6 @@ void BasicTab::appendContent(std::string const& newContent) noexcept
 
 void BasicTab::resize(int32_t h, int32_t w, int32_t y, int32_t x)
 {
-	assert((h > 0) and (w > 0) and "Invalid resizing size provided");
-	assert((y > -1) and (x > -1) and "Invalid resizing position provided");
-
 	this->clear();
 	this->draw(h, w, y, x);
 }
@@ -97,29 +97,29 @@ void BasicTab::printLine(std::string const& newContent) const noexcept
 {
 	int32_t y, x;
 	(void)x;
-	getyx(this->main, y, x);
+	getyx(this->mainWin, y, x);
 
-	waddstr(this->main, newContent.data());
-	::wmove(this->main, y + 1, 0);
+	waddstr(this->mainWin, newContent.data());
+	::wmove(this->mainWin, y + 1, 0);
 
 	this->refresh();
 }
 
 void BasicTab::clear(void) noexcept
 {
-	if (this->main)
+	if (this->mainWin)
 	{
-		::wrefresh(this->main); 
-		::wclear(this->main);
-		::delwin(this->main);
-		this->main = nullptr;
+		::wrefresh(this->mainWin); 
+		::wclear(this->mainWin);
+		::delwin(this->mainWin);
+		this->mainWin = nullptr;
 	}
-	if (this->border)
+	if (this->borderWin)
 	{
-		::wrefresh(this->border);
-		::wclear(this->border);
-		::delwin(this->border);
-		this->border = nullptr;
+		::wrefresh(this->borderWin);
+		::wclear(this->borderWin);
+		::delwin(this->borderWin);
+		this->borderWin = nullptr;
 	}
 }
 
@@ -180,7 +180,7 @@ InputTab& InputTab::operator=(InputTab&& other) noexcept
 
 void InputTab::handleUserInput(void)
 {
-	int32_t inputChar = ::wgetch(this->main);	// this is blocking
+	int32_t inputChar = ::wgetch(this->mainWin);	// this is blocking
 
 	// special characters handling
 	auto it = this->dispatcher.find(inputChar);
@@ -198,12 +198,12 @@ void InputTab::deleteCharForward(void) noexcept
 {
 	int32_t y, x;
 	(void)y;
-	getyx(this->main, y, x);
+	getyx(this->mainWin, y, x);
 
 	if (x == this->startX + static_cast<int32_t>(this->bufferSize))		// end of the line can't do delete
 		return;
 
-	mvwdelch(this->main, y, x);
+	mvwdelch(this->mainWin, y, x);
 
 	x -= this->startX;
 
@@ -221,12 +221,12 @@ void InputTab::deleteCharForward(void) noexcept
 void InputTab::deleteCharBack(void) noexcept
 {
 	int32_t y, x;
-	getyx(this->main, y, x);
+	getyx(this->mainWin, y, x);
 
 	if (x == this->startX)			// start of the line cant't do backspace
 		return;
 
-	mvwdelch(this->main, y, x - 1);
+	mvwdelch(this->mainWin, y, x - 1);
 
 	x -= this->startX;
 
@@ -246,11 +246,11 @@ void InputTab::moveCursorLeft(void) const noexcept
 	int32_t y, x;
 	(void)y;
 
-	getyx(this->main, y, x);
+	getyx(this->mainWin, y, x);
 
 	if (x > this->startX)
 	{
-		::wmove(this->main, y, x - 1);
+		::wmove(this->mainWin, y, x - 1);
 		this->refresh();
 	}
 }
@@ -260,11 +260,11 @@ void InputTab::moveCursorRight(void) const noexcept
 	int32_t y, x;
 	(void)y;
 	
-	getyx(this->main, y, x);
+	getyx(this->mainWin, y, x);
 
 	if (x < static_cast<int32_t>(this->startX + this->bufferSize))
 	{
-		::wmove(this->main, y, x + 1);
+		::wmove(this->mainWin, y, x + 1);
 		this->refresh();
 	}
 }
@@ -274,8 +274,8 @@ void InputTab::moveStartLine(void) const noexcept
 	int32_t y, x;
 	(void)x;
 
-	getyx(this->main, y, x);
-	::wmove(this->main, y, this->startX);
+	getyx(this->mainWin, y, x);
+	::wmove(this->mainWin, y, this->startX);
 	this->refresh();
 }
 
@@ -284,8 +284,8 @@ void InputTab::moveEndLine(void) const noexcept
 	int32_t y, x;
 	(void)x;
 
-	getyx(this->main, y, x);
-	::wmove(this->main, y, this->startX + this->bufferSize);
+	getyx(this->mainWin, y, x);
+	::wmove(this->mainWin, y, this->startX + this->bufferSize);
 	this->refresh();
 }
 
@@ -393,27 +393,29 @@ void InputTab::showNext(void) noexcept
 void InputTab::appendContent(std::string const& newContent) noexcept
 {
 	int32_t y, x;
-	getyx(this->main, y, x);
+	getyx(this->mainWin, y, x);
 
 	if (x > this->startX)
-		wmove(this->main, y + 1, 0);		// if there's some input go to newline
+		wmove(this->mainWin, y + 1, 0);		// if there's some input go to newline
 	else
-		wmove(this->main, y, 0);			// else override the prompt
+		wmove(this->mainWin, y, 0);			// else override the prompt
 
 	BasicTab::appendContent(newContent);
-	waddstr(this->main, PROMPT);
+	waddstr(this->mainWin, PROMPT);
 }
 
 void InputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 {
 	BasicTab::draw(h, w, y, x);
-	::keypad(this->main, true);
+	::keypad(this->mainWin, true);
 
-	::waddstr(this->main, PROMPT);
+	wattron(this->mainWin, A_BLINK);
+	::waddstr(this->mainWin, PROMPT);
+	wattroff(this->mainWin, A_BLINK);
 	if (this->bufferSize > 0UL)
-		::waddnstr(this->main, this->commandBuffer, this->bufferSize);
+		::waddnstr(this->mainWin, this->commandBuffer, this->bufferSize);
 
-	::wnoutrefresh(this->main);
+	this->refresh();
 }
 
 void InputTab::updateHints(void) noexcept
@@ -438,12 +440,14 @@ void InputTab::overwriteLine(void) const noexcept
 {
 	int32_t y, x;
 	(void)x;
-	getyx(this->main, y, x);
+	getyx(this->mainWin, y, x);
 
-	::wmove(this->main, y, 0);
-	::wclrtoeol(this->main);
-	mvwaddstr(this->main, y, 0, PROMPT);
-	waddnstr(this->main, this->commandBuffer, this->bufferSize);
+	::wmove(this->mainWin, y, 0);
+	::wclrtoeol(this->mainWin);
+	wattron(this->mainWin, A_BLINK);
+	mvwaddstr(this->mainWin, y, 0, PROMPT);
+	wattroff(this->mainWin, A_BLINK);
+	waddnstr(this->mainWin, this->commandBuffer, this->bufferSize);
 	this->refresh();
 }
 
@@ -455,7 +459,7 @@ void InputTab::appendCharToInput(int32_t input)
 	bool resetCursorPos = false;
 	int32_t y, x;
 	(void) y;
-	getyx(this->main, y, x);
+	getyx(this->mainWin, y, x);
 	x -= this->startX;
 
 	if (x < static_cast<int32_t>(this->bufferSize))			// in case the cursor is not at the end of the buffer
@@ -473,7 +477,7 @@ void InputTab::appendCharToInput(int32_t input)
 	// move cursor back where it was originally
 	if (resetCursorPos)
 	{
-		::wmove(this->main, y, x + this->startX + 1);
+		::wmove(this->mainWin, y, x + this->startX + 1);
 		this->refresh();
 	}
 }
@@ -495,24 +499,27 @@ void InputTab::terminateInput(void)
 	this->clearHints();
 
 	int32_t y, x;
-	getyx(this->main, y, x);
-	wmove(this->main, y + 1, 0);
+	getyx(this->mainWin, y, x);
+	wmove(this->mainWin, y + 1, 0);
 	this->overwriteLine();
 }
 
 
 void SingleInputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 {
+	assert((h > 0) and (w > 0) and "Invalid size provided");
+	assert((y > -1) and (x > -1) and "Invalid position provided");
+
 	if (this->borderChar != -1)
 	{
-		this->border = ::newwin(h, w, y, x);
-		if (this->border == nullptr)
+		this->borderWin = ::newwin(h, w, y, x);
+		if (this->borderWin == nullptr)
 		{
 			LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
 			throw CliException("Failed to create window");
 		}
 		::wborder(
-			this->border,
+			this->borderWin,
 			this->borderChar,
 			this->borderChar,
 			this->borderChar,
@@ -522,26 +529,26 @@ void SingleInputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 			this->borderChar,
 			this->borderChar
 		);
-		::wnoutrefresh(this->border);
+		::wnoutrefresh(this->borderWin);
 
 		h -= 2, w -= 2;
 		y += 1, x += 1;
 	}
 
-	this->main = ::newwin(h, w, y, x);
-	if (this->main == nullptr)
+	this->mainWin = ::newwin(h, w, y, x);
+	if (this->mainWin == nullptr)
 	{
 		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
 		throw CliException("Failed to create window");
 	}
 
-	::keypad(this->main, true);
+	::keypad(this->mainWin, true);
 
-	::waddstr(this->main, PROMPT);
+	::waddstr(this->mainWin, PROMPT);
 	if (this->bufferSize > 0UL)
-		::waddnstr(this->main, this->commandBuffer, this->bufferSize);
+		::waddnstr(this->mainWin, this->commandBuffer, this->bufferSize);
 
-	::wnoutrefresh(this->main);
+	::wnoutrefresh(this->mainWin);
 }
 
 void SingleInputTab::terminateInput(void)
@@ -559,8 +566,8 @@ void SingleInputTab::terminateInput(void)
 	this->currentCommandIndex = -1L;
 
 	int32_t y, x;
-	getyx(this->main, y, x);
-	wmove(this->main, y, 0);
+	getyx(this->mainWin, y, x);
+	wmove(this->mainWin, y, 0);
 
 	this->clearHints();
 	this->overwriteLine();
@@ -569,9 +576,12 @@ void SingleInputTab::terminateInput(void)
 
 OutputTab::OutputTab(OutputTab&& other) noexcept :
 	BasicTab(std::move(other)),
+	titleWin{other.titleWin},
+	title{std::move(other.title)},
 	content{std::move(other.content)},
 	firstLineToPrintIndex{other.firstLineToPrintIndex}
 {
+	other.titleWin = nullptr;
 }
 
 OutputTab& OutputTab::operator=(OutputTab&& other) noexcept
@@ -586,26 +596,99 @@ OutputTab& OutputTab::operator=(OutputTab&& other) noexcept
 	return *this;
 }
 
+void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
+{
+	assert((h > 0) and (w > 0) and "Invalid size provided");
+	assert((y > -1) and (x > -1) and "Invalid position provided");
+
+	if (this->borderChar != -1)
+	{
+		this->borderWin = ::newwin(h, w, y, x);
+		if (this->borderWin == nullptr)
+		{
+			LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
+			throw CliException("Failed to create window");
+		}
+		::wborder(
+			this->borderWin,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar,
+			this->borderChar
+		);
+		::wnoutrefresh(this->borderWin);
+
+		h -= 2, w -= 2;
+		y += 1, x += 1;
+	}
+
+	if (this->title.empty() == false)
+	{
+		assert((w + 2) > static_cast<int32_t>(this->title.size()) and "Tab title longer than tab itself");
+		this->titleWin = ::newwin(3, this->title.size() + 2, y, x);
+		if (this->borderWin == nullptr)
+		{
+			LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
+			throw CliException("Failed to create window");
+		}
+
+		::wborder(this->titleWin, 0, 0, 0, 0, 0, 0, 0, 0);
+		wattron(this->titleWin, A_BOLD);
+		mvwaddstr(this->titleWin, 1, 1, this->title.data());
+		wattroff(this->titleWin, A_BOLD);
+		::wnoutrefresh(this->titleWin);
+
+		h -= 3;
+		y += 3;
+	}
+
+	this->mainWin = ::newwin(h, w, y, x);
+	if (this->mainWin == nullptr)
+	{
+		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
+		throw CliException("Failed to create window");
+	}
+
+	::wnoutrefresh(this->mainWin);
+}
+
 void OutputTab::appendContent(std::string const& newContent) noexcept
 {
 	this->content.push_back(newContent);
 
 	int32_t h, w;
 	(void)w;
-	getmaxyx(this->main, h, w);
+	getmaxyx(this->mainWin, h, w);
 
 	if (static_cast<int32_t>(this->content.size()) > h)
 	{
 		// reached the end of the tab, remove the latest input and print the newer ones
 		this->firstLineToPrintIndex++;
 
-		::wmove(this->main, 0, 0);
+		::wmove(this->mainWin, 0, 0);
 		for (int32_t i = 0; i < h; i++)
 		{
-			::wclrtoeol(this->main);
+			::wclrtoeol(this->mainWin);
 			BasicTab::appendContent(this->content.at(this->firstLineToPrintIndex + i));
 		}
 	}
 	else
 		BasicTab::appendContent(newContent);
+}
+
+void OutputTab::clear(void) noexcept
+{
+	BasicTab::clear();
+
+	if (this->titleWin)
+	{
+		::wrefresh(this->titleWin);
+		::wclear(this->titleWin);
+		::delwin(this->titleWin);
+		this->titleWin = nullptr;
+	}
 }

@@ -75,3 +75,4 @@ Testing/
 # specific to the project
 **/build
 tap-client
+.vscode

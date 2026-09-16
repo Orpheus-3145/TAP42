@@ -21,14 +21,14 @@ GameWindow::GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t
 	this->commandTab = std::make_unique<SingleInputTab>(this->commandFd, 0, this);
 	this->messageTab = std::make_unique<SingleInputTab>(this->messageFd, 0, this);
 	this->infoTab = std::make_unique<OutputTab>(0, this);
-	this->responseTab = std::make_unique<OutputTab>(0, this);
-	this->eventTab = std::make_unique<OutputTab>(0, this);
-	this->chatTab = std::make_unique<OutputTab>(0, this);
-	this->heightTBATab = std::make_unique<OutputTab>(0, this);
+	this->responseTab = std::make_unique<OutputTab>("Responses", 0, this);
+	this->eventTab = std::make_unique<OutputTab>("Events", 0, this);
+	this->chatTab = std::make_unique<OutputTab>("Chat", 0, this);
+	this->heightTBDTab = std::make_unique<OutputTab>("TBD", 0, this);
 
 	this->show();
 }
-		
+
 void GameWindow::show(void)
 {
 	this->frame->draw(
@@ -68,7 +68,7 @@ void GameWindow::show(void)
 	int32_t tmpHeight = this->height - 2;
 	int32_t heightEventsTab = tmpHeight * 2 / 5;
 	int32_t heightChatTab = tmpHeight * 2 / 5 - 3;
-	int32_t heightTBATab = tmpHeight / 5;
+	int32_t heightTBDTab = tmpHeight / 5;
 	this->eventTab->draw(
 		heightEventsTab,
 		widthTabs,
@@ -90,8 +90,8 @@ void GameWindow::show(void)
 		widthTabs + 3
 	);
 
-	this->heightTBATab->draw(
-		heightTBATab,
+	this->heightTBDTab->draw(
+		heightTBDTab,
 		widthTabs,
 		heightEventsTab + heightChatTab + 3 + 1,
 		widthTabs + 3
@@ -166,7 +166,7 @@ void GameWindow::resize(int32_t height, int32_t width)
 	int32_t tmpHeight = this->height - 2;
 	int32_t heightEventsTab = tmpHeight * 2 / 5;
 	int32_t heightChatTab = tmpHeight * 2 / 5;
-	int32_t heightTBATab = tmpHeight - heightEventsTab - heightChatTab;
+	int32_t heightTBDTab = tmpHeight - heightEventsTab - heightChatTab;
 	this->eventTab->resize(
 		heightEventsTab,
 		widthTabs,
@@ -188,8 +188,8 @@ void GameWindow::resize(int32_t height, int32_t width)
 		widthTabs + 3
 	);
 
-	this->heightTBATab->resize(
-		heightTBATab,
+	this->heightTBDTab->resize(
+		heightTBDTab,
 		widthTabs,
 		heightEventsTab + heightChatTab + 1,
 		widthTabs + 3

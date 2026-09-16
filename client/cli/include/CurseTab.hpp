@@ -48,7 +48,7 @@ class BasicTab
 		virtual ~BasicTab(void) { this->clear(); }
 
 		void printLine(std::string const& newContent) const noexcept;
-		void refresh(void) const noexcept { ::wnoutrefresh(this->main); }
+		void refresh(void) const noexcept { ::wnoutrefresh(this->mainWin); }
 
 		virtual void draw(int32_t h, int32_t w, int32_t y, int32_t x);
 		virtual void appendContent(std::string const& newContent) noexcept;
@@ -57,8 +57,8 @@ class BasicTab
 	protected:
 		virtual void clear(void) noexcept;
 
-		WINDOW* border{nullptr};
-		WINDOW* main{nullptr};
+		WINDOW* borderWin{nullptr};
+		WINDOW* mainWin{nullptr};
 
 		int32_t			borderChar;
 		CurseWindow*	parent;
@@ -78,7 +78,7 @@ class InputTab : public BasicTab
 		InputTab(InputTab&&) noexcept;
 		InputTab& operator=(InputTab&&) noexcept;
 
-		virtual ~InputTab(void) { ::keypad(this->main, false); }
+		virtual ~InputTab(void) { ::keypad(this->mainWin, false); }
 
 		void handleUserInput(void);
 
@@ -140,7 +140,7 @@ class SingleInputTab : public InputTab
 		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
 		void appendContent(std::string const& newContent) noexcept override { (void) newContent; }
 
-	private:
+	protected:
 		void terminateInput(void) override;
 };
 
@@ -149,12 +149,22 @@ class OutputTab : public BasicTab
 	public:
 		using BasicTab::BasicTab;
 
+		OutputTab(std::string const& title = "", int32_t borderChar = -1, CurseWindow* parent = nullptr) :
+			BasicTab(borderChar, parent),
+			title{title} {}
+
 		OutputTab(OutputTab&&) noexcept;
 		OutputTab& operator=(OutputTab&&) noexcept;
 
+		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
 		void appendContent(std::string const& newContent) noexcept override;
 
-	private:
+	protected:
+		virtual void clear(void) noexcept override;
+
+		WINDOW* titleWin{nullptr};
+
+		std::string 			title;
 		std::deque<std::string> content;
 		size_t					firstLineToPrintIndex{0UL};
 };

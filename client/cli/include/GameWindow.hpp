@@ -36,7 +36,7 @@ class GameWindow : public CurseWindow
 									responseTab,
 									eventTab,
 									chatTab,
-									heightTBATab;
+									heightTBDTab;
 
 		std::unique_ptr<SingleInputTab>	commandTab, messageTab;
 };
