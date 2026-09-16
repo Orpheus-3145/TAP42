@@ -12,28 +12,6 @@
 #include <CurseWindow.hpp>
 
 
-static constexpr char const*	PROMPT = "-> ";
-static constexpr const char		COMMAND_TERM = '\n';
-
-static std::vector<const char*> HINTS
-{
-	"CONNECT",
-	"LOOK",
-	"MOVE",
-	"WHO",
-	"CHAT",
-	"TAKE",
-	"DROP",
-	"INVENTORY",
-	"TALK",
-	"ATTACK",
-	"STATUS",
-	"QUEST",
-	"QUESTS",
-	"GROUP",
-	"QUIT"
-};
-
 class BasicTab
 {
 	public:
@@ -47,15 +25,17 @@ class BasicTab
 
 		virtual ~BasicTab(void) { this->clear(); }
 
-		void printLine(std::string const& newContent) const noexcept;
-		void refresh(void) const noexcept { ::wnoutrefresh(this->mainWin); }
+		virtual void refresh(void) const noexcept { ::wnoutrefresh(this->mainWin); }
 
 		virtual void draw(int32_t h, int32_t w, int32_t y, int32_t x);
-		virtual void appendContent(std::string const& newContent) noexcept;
 		virtual void resize(int32_t h, int32_t w, int32_t y, int32_t x);
 
-	protected:
+		virtual void appendContent(std::string const& newContent);
+		virtual void printLine(std::string const& newContent) const noexcept;
+
 		virtual void clear(void) noexcept;
+		
+	protected:
 
 		WINDOW* borderWin{nullptr};
 		WINDOW* mainWin{nullptr};
@@ -63,7 +43,7 @@ class BasicTab
 		int32_t			borderChar;
 		CurseWindow*	parent;
 
-		std::vector<std::string> _state;
+		std::deque<std::string> _state;
 };
 
 class InputTab : public BasicTab
@@ -73,10 +53,16 @@ class InputTab : public BasicTab
 	public:
 		using BasicTab::BasicTab;
 
-		InputTab(int32_t forwardInputFd, int32_t borderChar = -1, CurseWindow* parent = nullptr);
+		InputTab(
+			int32_t forwardInputFd,
+			std::vector<std::string> const& hints = std::vector<std::string>(),
+			std::string const& prompt = "<?> ",
+			int32_t borderChar = -1,
+			CurseWindow* parent = nullptr
+		);
 
 		InputTab(InputTab&&) noexcept;
-		InputTab& operator=(InputTab&&) noexcept;
+		InputTab& operator=(InputTab&&) = delete;
 
 		virtual ~InputTab(void) { ::keypad(this->mainWin, false); }
 
@@ -100,7 +86,7 @@ class InputTab : public BasicTab
 		void showNext(void) noexcept;
 
 		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
-		void appendContent(std::string const& newContent) noexcept override;
+		void appendContent(std::string const& newContent) override;
 
 	protected:
 		virtual void appendCharToInput(int32_t input);
@@ -108,20 +94,21 @@ class InputTab : public BasicTab
 
 		void updateHints(void) noexcept;
 		void clearHints(void) noexcept;
+		void writePromptLine(void) const noexcept;
 
-		void overwriteLine(void) const noexcept;
+		int32_t const forwardInputFd;
 
-		int32_t forwardInputFd;
-		int32_t borderChar;
+		std::vector<std::string> const	hints;
+		std::string const				prompt;
 
 		InputDispatcher	dispatcher;
 
-		std::deque<std::string>		history;
-		std::vector<const char*>	hints;
+		std::deque<std::string>	history;
+		std::vector<uint32_t>	suggestedHintIndexes;
 
 		ssize_t			currentCommandIndex{-1L};
 		ssize_t			currentSuggestedIndex{-1L};
-		const int32_t	startX{static_cast<int32_t>(::strlen(PROMPT))};
+		int32_t const	startX{static_cast<int32_t>(this->prompt.size())};
 
 		size_t	bufferSize{0UL};
 		char	commandBuffer[Config::CMD_BUFFER_SIZE];
@@ -137,8 +124,7 @@ class SingleInputTab : public InputTab
 	public:
 		using InputTab::InputTab;
 
-		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
-		void appendContent(std::string const& newContent) noexcept override { (void) newContent; }
+		void appendContent(std::string const& newContent) override { (void) newContent; }
 
 	protected:
 		void terminateInput(void) override;
@@ -157,14 +143,10 @@ class OutputTab : public BasicTab
 		OutputTab& operator=(OutputTab&&) noexcept;
 
 		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
-		void appendContent(std::string const& newContent) noexcept override;
 
 	protected:
 		virtual void clear(void) noexcept override;
 
-		WINDOW* titleWin{nullptr};
-
-		std::string 			title;
-		std::deque<std::string> content;
-		size_t					firstLineToPrintIndex{0UL};
+		WINDOW*		titleWin{nullptr};
+		std::string	title;
 };

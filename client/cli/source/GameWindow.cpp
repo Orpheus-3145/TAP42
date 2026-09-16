@@ -18,8 +18,8 @@ GameWindow::GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t
 	this->width = (this->width % 2) == 0 ? (this->width - 1) : this->width;				// has to be an odd number
 
 	this->frame = std::make_unique<OutputTab>(0, this);
-	this->commandTab = std::make_unique<SingleInputTab>(this->commandFd, 0, this);
-	this->messageTab = std::make_unique<SingleInputTab>(this->messageFd, 0, this);
+	this->commandTab = std::make_unique<SingleInputTab>(this->commandFd, CMD_HINTS, Config::PROMPT, 0, this);
+	this->messageTab = std::make_unique<SingleInputTab>(this->messageFd, CHAT_CMD_HINTS, Config::PROMPT, 0, this);
 	this->infoTab = std::make_unique<OutputTab>(0, this);
 	this->responseTab = std::make_unique<OutputTab>("Responses", 0, this);
 	this->eventTab = std::make_unique<OutputTab>("Events", 0, this);
