@@ -12,6 +12,7 @@ BasicTab::BasicTab(BasicTab&& other) noexcept :
 	border{other.border},
 	main{other.main},
 	borderChar{other.borderChar},
+	parent{other.parent},
 	_state{std::move(other._state)}
 {
 	other.border = nullptr;
@@ -27,6 +28,8 @@ BasicTab& BasicTab::operator=(BasicTab&& other) noexcept
 
 		this->border = other.border;
 		this->main = other.main;
+		this->borderChar = other.borderChar;
+		this->parent = other.parent;
 		this->_state = std::move(other._state);
 
 		other.border = nullptr;
@@ -121,8 +124,8 @@ void BasicTab::clear(void) noexcept
 }
 
 
-InputTab::InputTab(int32_t forwardInputFd, int32_t borderChar) :
-	BasicTab(borderChar),
+InputTab::InputTab(int32_t forwardInputFd, int32_t borderChar, CurseWindow* parent) :
+	BasicTab(borderChar, parent),
 	forwardInputFd{forwardInputFd}
 {
 	this->dispatcher[KEY_LEFT]      = [this] { this->moveCursorLeft(); };
@@ -134,9 +137,8 @@ InputTab::InputTab(int32_t forwardInputFd, int32_t borderChar) :
 	this->dispatcher[KEY_BACKSPACE] = [this] { this->deleteCharBack(); };
 	this->dispatcher[KEY_UP]        = [this] { this->suggestPrevious(); };
 	this->dispatcher[KEY_DOWN]      = [this] { this->suggestNext(); };
-
-	// this->dispatcher['\t']          = [this] { this->switchForwardTab(); };
-	// this->dispatcher[KEY_BTAB]      = [this] { this->switchBackwardTab(); };
+	this->dispatcher['\t']          = [this] { if (this->parent) this->parent->switchNextTab(); };
+	this->dispatcher[KEY_BTAB]      = [this] { if (this->parent) this->parent->switchPreviousTab(); };
 }
 
 InputTab::InputTab(InputTab&& other) noexcept :
