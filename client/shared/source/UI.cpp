@@ -75,7 +75,7 @@ void UI::splitIntoMessages(void)
 	char *startMsg = this->fromServerBuffer, *endMsg = nullptr;
 	while (true)
 	{
-		endMsg = reinterpret_cast<char*>(::memchr(startMsg, Config::MSG_TERM, this->fromServerSize));
+		endMsg = reinterpret_cast<char*>(::memchr(startMsg, Config::COMMAND_TERM, this->fromServerSize));
 		if (endMsg == nullptr)
 			break;
 

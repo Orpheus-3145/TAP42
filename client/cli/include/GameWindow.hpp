@@ -8,6 +8,31 @@
 #include "Config.hpp"
 
 
+static std::vector<std::string> CMD_HINTS
+{
+	"LOOK",
+	"MOVE",
+	"WHO",
+	"TAKE",
+	"DROP",
+	"INVENTORY",
+	"TALK",
+	"ATTACK",
+	"STATUS",
+	"QUEST",
+	"QUESTS",
+	"QUIT"
+};
+
+static std::vector<std::string> CHAT_CMD_HINTS
+{
+	"GROUP CREATE",
+	"GROUP INVITE",
+	"GROUP JOIN",
+	"GROUP LEAVE",
+	"CHAT",
+};
+
 class GameWindow : public CurseWindow
 {
 	public:
