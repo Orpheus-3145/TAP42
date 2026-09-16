@@ -3,35 +3,31 @@
 #include <ncurses.h>
 #include <memory>
 
-#include "Config.hpp"
+#include "CurseWindow.hpp"
 #include "CurseTab.hpp"
+#include "Config.hpp"
 
 
-class GameWindow
+class GameWindow : public CurseWindow
 {
 	public:
+		using CurseWindow::CurseWindow;
+
 		GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t messageFd);
 
-		GameWindow(GameWindow const& other) = delete;
-		GameWindow& operator=(GameWindow const& other) = delete;
-		GameWindow(GameWindow&& other) = delete;
-		GameWindow& operator=(GameWindow&& other) = delete;
-
-		~GameWindow(void) noexcept { this->clear(); }
-
-		void show(void);
-		void clear(void) noexcept;
-		void readInput(void);
-		void resize(int32_t height, int32_t width);
-		void refresh(void) noexcept { ::doupdate(); }
+		virtual ~GameWindow(void) noexcept { this->clear(); }
 
 		void handleResponse(std::string const& response) noexcept;
 		void handleEvent(std::string const& event) noexcept;
 
-	private:
-		int32_t height;
-		int32_t width;
+		void show(void) override;
+		void clear(void) noexcept override;
+		void readInput(void) override;
+		void resize(int32_t height, int32_t width) override;
+		void switchNextTab(void) noexcept override;
+		void switchPreviousTab(void) noexcept override { this->switchNextTab(); }
 
+	protected:
 		int32_t commandFd;
 		int32_t messageFd;
 

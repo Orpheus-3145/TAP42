@@ -9,6 +9,7 @@
 #include <cstring>
 
 #include <Config.hpp>
+#include <CurseWindow.hpp>
 
 
 static constexpr char const*	PROMPT = "-> ";
@@ -36,8 +37,9 @@ static std::vector<const char*> HINTS
 class BasicTab
 {
 	public:
-		BasicTab(int32_t borderChar = -1) : 
-			borderChar{borderChar} {}
+		BasicTab(int32_t borderChar = -1, CurseWindow* parent = nullptr) : 
+			borderChar{borderChar},
+			parent{parent} {}
 		BasicTab(BasicTab const& other) noexcept = delete;
 		BasicTab& operator=(BasicTab const& other) noexcept = delete;
 		BasicTab(BasicTab&&) noexcept;
@@ -58,7 +60,8 @@ class BasicTab
 		WINDOW* border{nullptr};
 		WINDOW* main{nullptr};
 
-		int32_t borderChar;
+		int32_t			borderChar;
+		CurseWindow*	parent;
 
 		std::vector<std::string> _state;
 };
@@ -70,7 +73,7 @@ class InputTab : public BasicTab
 	public:
 		using BasicTab::BasicTab;
 
-		InputTab(int32_t forwardInputFd, int32_t borderChar = -1);
+		InputTab(int32_t forwardInputFd, int32_t borderChar = -1, CurseWindow* parent = nullptr);
 
 		InputTab(InputTab&&) noexcept;
 		InputTab& operator=(InputTab&&) noexcept;
