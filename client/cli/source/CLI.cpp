@@ -39,16 +39,16 @@ CLI::~CLI(void) noexcept
 {
 	// empty memory manually because endwin has to be last
 	// ncurses function to be called
-	this->game->clear();
-	// this->settings->clear();
-	// this->login->clear();
+	this->game.reset();
+	// this->settings.reset();
+	// this->login.reset();
 
 	::endwin();
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Cleaned Ncurses data"));
 
 	ioUtils::closePipe(this->commandPipe);
 	ioUtils::closePipe(this->chatPipe);
 	ioUtils::close(this->pollFds[CLI::RESIZE].fd);
-	LOG_DEBUG(LogContext::INTERFACE, "Destructor ended");
 }
 
 void CLI::start(void)

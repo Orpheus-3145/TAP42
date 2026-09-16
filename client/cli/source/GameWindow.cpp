@@ -7,8 +7,7 @@
 
 
 GameWindow::GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t messageFd) :
-	height{height},
-	width{width},
+	CurseWindow(height, width),
 	commandFd{commandFd},
 	messageFd{messageFd}
 {
@@ -18,18 +17,16 @@ GameWindow::GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t
 	this->height = ((this->height - 2) % 5) == 0 ? this->height : ((this->height - 2) / 5 * 5 + 2);		// has to be multiple of 5
 	this->width = (this->width % 2) == 0 ? (this->width - 1) : this->width;				// has to be an odd number
 
-	this->frame = std::make_unique<OutputTab>(0);
-	this->commandTab = std::make_unique<SingleInputTab>(this->commandFd, 0);
-	this->messageTab = std::make_unique<SingleInputTab>(this->messageFd, 0);
-	this->infoTab = std::make_unique<OutputTab>(0);
-	this->responseTab = std::make_unique<OutputTab>(0);
-	this->eventTab = std::make_unique<OutputTab>(0);
-	this->chatTab = std::make_unique<OutputTab>(0);
-	this->heightTBATab = std::make_unique<OutputTab>(0);
+	this->frame = std::make_unique<OutputTab>(0, this);
+	this->commandTab = std::make_unique<SingleInputTab>(this->commandFd, 0, this);
+	this->messageTab = std::make_unique<SingleInputTab>(this->messageFd, 0, this);
+	this->infoTab = std::make_unique<OutputTab>(0, this);
+	this->responseTab = std::make_unique<OutputTab>(0, this);
+	this->eventTab = std::make_unique<OutputTab>(0, this);
+	this->chatTab = std::make_unique<OutputTab>(0, this);
+	this->heightTBATab = std::make_unique<OutputTab>(0, this);
 
 	this->show();
-	this->commandTab->refresh();
-	this->refresh();
 }
 		
 void GameWindow::show(void)
@@ -120,7 +117,10 @@ void GameWindow::clear(void) noexcept
 
 void GameWindow::readInput(void)
 {
-	this->commandTab->handleUserInput();
+	InputTab* inputTab = dynamic_cast<InputTab*>(this->currentTab);
+	assert(inputTab != nullptr and "current input doesn't support handling input");
+
+	inputTab->handleUserInput();
 }
 
 void GameWindow::resize(int32_t height, int32_t width)
@@ -195,12 +195,27 @@ void GameWindow::resize(int32_t height, int32_t width)
 		widthTabs + 3
 	);
 
-	this->commandTab->refresh();
+	this->currentTab->refresh();
+	this->refresh();
 
 	// because resize is not handled by ncurses there might be some garbage to read, flush it
 	::flushinp();
 
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Window resized to h: {}, w: {}", height, width));
+}
+
+void GameWindow::switchNextTab(void) noexcept
+{
+	if (this->currentTab == this->commandTab.get())
+	{
+		this->currentTab = this->messageTab.get();
+		this->messageTab->refresh();
+	}
+	else if (this->currentTab == this->messageTab.get())
+	{
+		this->currentTab = this->commandTab.get();
+		this->commandTab->refresh();
+	}
 }
 
 void GameWindow::handleResponse(std::string const& response) noexcept
