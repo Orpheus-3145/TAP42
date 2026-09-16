@@ -27,7 +27,11 @@ solo due salvataggi dello stesso personaggio (es. una quest che si completa
 grazie alla kill di un altro giocatore mentre lui si sta muovendo) si
 serializzano tra loro. Il file viene riscritto dopo ogni comando che cambia
 lo stato del personaggio (MOVE, TAKE/DROP/USE, ATTACK, TALK, completamento
-quest) e di nuovo, per sicurezza, alla disconnessione.
+quest) e di nuovo, per sicurezza, alla disconnessione. Ogni scrittura passa
+prima per un file temporaneo (`<nome>.json.tmp`) e solo alla fine viene
+rinominato sopra il file vero: un crash a metà scrittura lascia il
+personaggio con il salvataggio precedente intatto, mai con un JSON
+troncato/corrotto.
 
 Non esistono credenziali: l'unico identificatore di un personaggio è il suo
 nome, che deve essere alfanumerico (più `_` e `-`, max 32 caratteri) perché

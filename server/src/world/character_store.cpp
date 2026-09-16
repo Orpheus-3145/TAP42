@@ -30,6 +30,8 @@ std::string json_escape(const std::string& s) {
 
 std::string path_for(const std::string& name) { return g_directory + "/" + name + ".json"; }
 
+std::string tmp_path_for(const std::string& name) { return path_for(name) + ".tmp"; }
+
 // One mutex per character name, so a save of "gandalf" never waits on a
 // save of "frodo" — only two saves of the SAME character (e.g. the
 // player's own MOVE and someone else's kill completing one of their
@@ -119,13 +121,26 @@ void save(const PlayerState& state) {
     }
     oss << "}}";
 
+    // Written to a temp file first and only then swapped into place with an
+    // atomic rename, so a crash mid-write never leaves the real file half
+    // written - readers either see the old content or the new one, never
+    // something truncated in between.
     std::lock_guard<std::mutex> guard(lock_for(state.player_id));
-    std::ofstream file(path_for(state.player_id), std::ios::binary | std::ios::trunc);
-    if (!file) {
-        log_error("character_save_failed", {{"name", state.player_id}, {"error", "cannot open file for write"}});
-        return;
+    const std::string tmp = tmp_path_for(state.player_id);
+    {
+        std::ofstream file(tmp, std::ios::binary | std::ios::trunc);
+        if (!file) {
+            log_error("character_save_failed", {{"name", state.player_id}, {"error", "cannot open temp file for write"}});
+            return;
+        }
+        file << oss.str();
     }
-    file << oss.str();
+    std::error_code ec;
+    std::filesystem::rename(tmp, path_for(state.player_id), ec);
+    if (ec) {
+        log_error("character_save_failed",
+                  {{"name", state.player_id}, {"error", "rename failed: " + ec.message()}});
+    }
 }
 
 } // namespace character_store
