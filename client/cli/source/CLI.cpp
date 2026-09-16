@@ -37,7 +37,7 @@ CLI::CLI(int32_t clientSocket) :
 
 CLI::~CLI(void) noexcept
 {
-	// empty memory manually because endwin has to be last
+	// empty memory manually because endwin() has to be last
 	// ncurses function to be called
 	this->game.reset();
 	// this->settings.reset();
