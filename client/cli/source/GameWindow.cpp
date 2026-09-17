@@ -23,8 +23,8 @@ GameWindow::GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t
 	this->inputCmdTab = std::make_unique<SingleInputTab>(this->commandFd, CMD_HINTS, Config::PROMPT, 0, this);
 	this->inputChatTab = std::make_unique<SingleInputTab>(this->messageFd, CHAT_CMD_HINTS, Config::PROMPT, 0, this);
 	this->infoTab = std::make_unique<OutputTab>(0, this);
-	this->outputCmdTab = std::make_unique<OutputTab>("Responses", 0, this);
-	this->eventsTab = std::make_unique<OutputTab>("Events", 0, this);
+	this->outputCmdTab = std::make_unique<OutputTab>("User events", 0, this);
+	this->eventsTab = std::make_unique<OutputTab>("World events", 0, this);
 	this->outputChatTab = std::make_unique<OutputTab>("Chat", 0, this);
 	this->tbdTab = std::make_unique<OutputTab>("TBD", 0, this);
 
@@ -144,8 +144,20 @@ void GameWindow::readInput(void)
 
 void GameWindow::resize(int32_t height, int32_t width)
 {
-	this->height = ((height - 2) % 5) == 0 ? height : ((height - 2) / 5 * 5 + 2);			// has to be multiple of 5
-	this->width = (width % 2) == 0 ? (width - 1) : width;			// has to be an odd number
+	this->height = ((height - 2) % 5) == 0 ? height : ((height - 2) / 5 * 5 + 2);	// has to be multiple of 5
+	this->width = (width % 2) == 0 ? (width - 1) : width;							// has to be an odd number
+	// force minimum size of the window
+	if ((this->height < Config::MIN_HEIGHT_CLI) or (this->width < Config::MIN_WIDTH_CLI))
+	{
+		if (this->height < Config::MIN_HEIGHT_CLI)
+			this->height = Config::MIN_HEIGHT_CLI;
+		if (this->width < Config::MIN_WIDTH_CLI)
+			this->width = Config::MIN_WIDTH_CLI;
+
+		std::cout << std::format("\033[8;{};{}t", this->height, this->width) << std::endl;
+		LOG_WARN(LogContext::INTERFACE, std::format("Window too small, forced to h: {}, w: {}", this->height, this->width));
+		return;
+	}
 	::resizeterm(this->height, this->width);
 
 	this->mainFrame->resize(
@@ -233,7 +245,7 @@ void GameWindow::resize(int32_t height, int32_t width)
 	// because resize is not handled by ncurses there might be some garbage to read, flush it
 	::flushinp();
 
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Window resized to h: {}, w: {}", height, width));
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Window resized to h: {}, w: {}", this->height, this->width));
 }
 
 void GameWindow::switchNextTab(void) noexcept
