@@ -45,7 +45,7 @@ class GameWindow : public CurseWindow
 		void handleResponse(std::string const& response) noexcept;
 		void handleEvent(std::string const& event) noexcept;
 
-		void show(void) override;
+		void draw(void) override;
 		void clear(void) noexcept override;
 		void readInput(void) override;
 		void resize(int32_t height, int32_t width) override;

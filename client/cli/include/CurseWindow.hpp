@@ -22,7 +22,7 @@ class CurseWindow
 
 		virtual ~CurseWindow(void) noexcept;
 
-		virtual void show(void) = 0;
+		virtual void draw(void) = 0;
 		virtual void clear(void) noexcept = 0;
 		virtual void readInput(void) = 0;
 		virtual void resize(int32_t height, int32_t width) = 0;

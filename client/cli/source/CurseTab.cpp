@@ -587,9 +587,14 @@ void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 		mvwaddstr(this->titleWin, 1, 1, this->title.data());
 		wattroff(this->titleWin, A_BOLD);
 		::wnoutrefresh(this->titleWin);
-
+		// readjust position and size of mainWin
 		::mvwin(this->mainWin, y + 3, x);
 		::wresize(this->mainWin, h - 3, w);
+		// add a div line between title and ouput
+		::wborder(this->mainWin, ' ', ' ', '-', ' ', '-', '-', ' ', ' ');
+		int32_t y, x;
+		getyx(this->mainWin, y, x);
+		::wmove(this->mainWin, y + 1, 0);
 	}
 	this->refresh();
 }
