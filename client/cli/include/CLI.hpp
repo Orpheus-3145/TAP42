@@ -244,7 +244,7 @@ class CLI : public UI
 
 		void start(void) override;
 		void stop(void) noexcept override { this->keepAlive = false; }
-		
+
 	private:
 		void handleResize(void);
 		void handlePollError(void) noexcept;
