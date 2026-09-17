@@ -23,13 +23,31 @@ CLI::CLI(int32_t clientSocket) :
 	this->pollFds[CLI::CMD].fd = this->commandPipe.out;
 	this->pollFds[CLI::CHAT].fd = this->chatPipe.out;
 
-	::initscr();
+	struct winsize termSize;
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
+		throw CliException("Failed to fecth terminal size");
+
+	int32_t height = termSize.ws_row;
+	int32_t width = termSize.ws_col;
+
+	if ((height < Config::MIN_HEIGHT_CLI) or (width < Config::MIN_WIDTH_CLI))
+	{
+		if (height < Config::MIN_HEIGHT_CLI)
+			height = Config::MIN_HEIGHT_CLI;
+		if (width < Config::MIN_WIDTH_CLI)
+			width = Config::MIN_WIDTH_CLI;
+
+		std::cout << std::format("\033[8;{};{}t", height, width) << std::endl;
+		LOG_WARN(LogContext::INTERFACE, std::format("Window too small, forced to h: {}, w: {}", height, width));
+	}
+
+	::initscr();		// check if those functions fail
 	::cbreak();
 	::noecho();
 
-	this->game = std::make_unique<GameWindow>(LINES, COLS, this->commandPipe.in, this->chatPipe.in);
-	// this->settings = std::make_unique<GameWindow>(LINES, COLS);
-	// this->login = std::make_unique<GameWindow>(LINES, COLS);
+	this->game = std::make_unique<GameWindow>(height, width, this->commandPipe.in, this->chatPipe.in);
+	// this->settings = std::make_unique<GameWindow>(height, width);
+	// this->login = std::make_unique<GameWindow>(height, width);
 
 	LOG_INFO(LogContext::INTERFACE, "Done setup CLI");
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Listening to client socket: {}", this->pollFds[CLI::CLIENT].fd));
