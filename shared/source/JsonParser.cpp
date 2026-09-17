@@ -1,6 +1,6 @@
 // A plain recursive-descent parser. Nothing here handles \uXXXX escapes -
 // wasn't worth it for a config file we control ourselves.
-#include "world/json.hpp"
+#include "JsonParser.hpp"
 
 #include <cctype>
 #include <cstdlib>
