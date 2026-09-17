@@ -15,9 +15,12 @@
 class BasicTab
 {
 	public:
-		BasicTab(int32_t borderChar = -1, CurseWindow* parent = nullptr) : 
+		BasicTab(int32_t borderChar = -1, int32_t colorPair = -1, CurseWindow* parent = nullptr) : 
 			borderChar{borderChar},
-			parent{parent} {}
+			colorPair{colorPair},
+			parent{parent} {
+				if (::has_colors() == false) this->colorPair = -1;
+			}
 		BasicTab(BasicTab const& other) noexcept = delete;
 		BasicTab& operator=(BasicTab const& other) noexcept = delete;
 		BasicTab(BasicTab&&) noexcept;
@@ -40,7 +43,7 @@ class BasicTab
 		WINDOW* borderWin{nullptr};
 		WINDOW* mainWin{nullptr};
 
-		int32_t			borderChar;
+		int32_t			borderChar, colorPair;
 		CurseWindow*	parent;
 
 		std::deque<std::string> _state;
@@ -57,6 +60,7 @@ class InputTab : public BasicTab
 			int32_t forwardInputFd,
 			std::vector<std::string> const& hints = std::vector<std::string>(),
 			std::string const& prompt = "<?> ",
+			int32_t colorPair = -1,
 			int32_t borderChar = -1,
 			CurseWindow* parent = nullptr
 		);
@@ -135,8 +139,8 @@ class OutputTab : public BasicTab
 	public:
 		using BasicTab::BasicTab;
 
-		OutputTab(std::string const& title = "", int32_t borderChar = -1, CurseWindow* parent = nullptr) :
-			BasicTab(borderChar, parent),
+		OutputTab(std::string const& title = "", int32_t borderChar = -1, int32_t colorPair = -1, CurseWindow* parent = nullptr) :
+			BasicTab(borderChar, colorPair, parent),
 			title{title} {}
 
 		OutputTab(OutputTab&&) noexcept;
