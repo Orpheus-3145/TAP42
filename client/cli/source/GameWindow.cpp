@@ -28,10 +28,10 @@ GameWindow::GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t
 	this->outputChatTab = std::make_unique<OutputTab>("Chat", 0, this);
 	this->tbdTab = std::make_unique<OutputTab>("TBD", 0, this);
 
-	this->show();
+	this->draw();
 }
 
-void GameWindow::show(void)
+void GameWindow::draw(void)
 {
 	this->mainFrame->draw(
 		this->height,
