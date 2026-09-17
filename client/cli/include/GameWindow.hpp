@@ -56,12 +56,13 @@ class GameWindow : public CurseWindow
 		int32_t commandFd;
 		int32_t messageFd;
 
-		std::unique_ptr<OutputTab>	frame,
-									infoTab,
-									responseTab,
-									eventTab,
-									chatTab,
-									heightTBDTab;
+		std::unique_ptr<BasicTab>	mainFrame, cmdFrame, chatFrame;
 
-		std::unique_ptr<SingleInputTab>	commandTab, messageTab;
+		std::unique_ptr<OutputTab>	infoTab,
+									outputCmdTab,
+									eventsTab,
+									outputChatTab,
+									tbdTab;
+
+		std::unique_ptr<SingleInputTab>	inputCmdTab, inputChatTab;
 };

@@ -125,6 +125,8 @@
 //
 //	werase(win)								<-- cleans the content of the win (i..e fill win buffer with ' '), and does a differential update next frame
 //	wclear(win)								<-- like above but also calls wclearok(win, TRUE) which fprces a full update from scratch instead of differential
+//  mvwin(win, y, x)						<-- moves win to a new pos
+//  wresize(win, h, w)						<-- change size of win
 // ===========================================================================================================================================================================
 // Borders: to separate windows
 //	box(win, vertLineChar, horLineChar)						<-- draws a box around the window, putting vertLineChar
