@@ -52,6 +52,11 @@ class GameWindow : public CurseWindow
 		void switchNextTab(void) noexcept override;
 		void switchPreviousTab(void) noexcept override { this->switchNextTab(); }
 
+		static constexpr int32_t INFO_COLOR = 1;
+		static constexpr int32_t CMD_COLOR = 2;
+		static constexpr int32_t EVENTS_COLOR = 3;
+		static constexpr int32_t CHAT_COLOR = 4;
+
 	protected:
 		int32_t commandFd;
 		int32_t messageFd;

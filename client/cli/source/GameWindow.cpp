@@ -15,18 +15,26 @@ GameWindow::GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t
 	assert(this->messageFd != -1 and "Invalid fd provided for forwarding chat messages");
 
 	this->height = ((this->height - 2) % 5) == 0 ? this->height : ((this->height - 2) / 5 * 5 + 2);		// has to be multiple of 5
-	this->width = (this->width % 2) == 0 ? (this->width - 1) : this->width;				// has to be an odd number
+	this->width = (this->width % 2) == 0 ? (this->width - 1) : this->width;								// has to be an odd number
 
-	this->mainFrame = std::make_unique<BasicTab>(0, this);
-	this->cmdFrame = std::make_unique<BasicTab>(0, this);
-	this->chatFrame = std::make_unique<BasicTab>(0, this);
-	this->inputCmdTab = std::make_unique<SingleInputTab>(this->commandFd, CMD_HINTS, Config::PROMPT, 0, this);
-	this->inputChatTab = std::make_unique<SingleInputTab>(this->messageFd, CHAT_CMD_HINTS, Config::PROMPT, 0, this);
-	this->infoTab = std::make_unique<OutputTab>(0, this);
-	this->outputCmdTab = std::make_unique<OutputTab>("User events", 0, this);
-	this->eventsTab = std::make_unique<OutputTab>("World events", 0, this);
-	this->outputChatTab = std::make_unique<OutputTab>("Chat", 0, this);
-	this->tbdTab = std::make_unique<OutputTab>("TBD", 0, this);
+	::init_pair(GameWindow::INFO_COLOR, COLOR_BLUE, COLOR_BLACK);
+	::init_pair(GameWindow::CMD_COLOR, COLOR_RED, COLOR_BLACK);
+	::init_pair(GameWindow::EVENTS_COLOR, COLOR_GREEN, COLOR_BLACK);
+	::init_pair(GameWindow::CHAT_COLOR, COLOR_YELLOW, COLOR_BLACK);
+
+	this->mainFrame = std::make_unique<BasicTab>(0, GameWindow::INFO_COLOR, this);
+
+	this->cmdFrame = std::make_unique<BasicTab>(0, GameWindow::CMD_COLOR, this);
+	this->inputCmdTab = std::make_unique<SingleInputTab>(this->commandFd, CMD_HINTS, Config::PROMPT, 0, GameWindow::CMD_COLOR, this);
+	this->outputCmdTab = std::make_unique<OutputTab>("User events", 0, GameWindow::CMD_COLOR, this);
+
+	this->chatFrame = std::make_unique<BasicTab>(0, GameWindow::CHAT_COLOR, this);
+	this->inputChatTab = std::make_unique<SingleInputTab>(this->messageFd, CHAT_CMD_HINTS, Config::PROMPT, 0, GameWindow::CHAT_COLOR, this);
+	this->outputChatTab = std::make_unique<OutputTab>("Chat", 0, GameWindow::CHAT_COLOR, this);
+
+	this->infoTab = std::make_unique<OutputTab>(0, GameWindow::INFO_COLOR, this);
+	this->eventsTab = std::make_unique<OutputTab>("World events", 0, GameWindow::EVENTS_COLOR, this);
+	this->tbdTab = std::make_unique<OutputTab>("TBD", 0, -1, this);
 
 	this->draw();
 }
@@ -146,6 +154,7 @@ void GameWindow::resize(int32_t height, int32_t width)
 {
 	this->height = ((height - 2) % 5) == 0 ? height : ((height - 2) / 5 * 5 + 2);	// has to be multiple of 5
 	this->width = (width % 2) == 0 ? (width - 1) : width;							// has to be an odd number
+
 	// force minimum size of the window
 	if ((this->height < Config::MIN_HEIGHT_CLI) or (this->width < Config::MIN_WIDTH_CLI))
 	{

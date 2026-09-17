@@ -154,12 +154,15 @@
 //		COLOR_CYAN    6
 //		COLOR_WHITE   7
 //
+//  has_colors()										<-- true/false if the termial supports colors
+//	start_color()										<-- enables colors in Ncurses (should be called if has_colors() = true)
 //	init_pair(idPair, foreColor, backColor)				<-- creates a couple of two colors (later it can be used with attron(COLOR_PAIR(idPair)) )
 //	init_color(COLOR_NAME, r, g, b)						<-- to change an existing color called COLOR_NAME with the new rgb (ranging from 0 to 1000)
 //
 //	can_change_color()						<-- to check wether the terminal allows chaning colors
 //	color_content(COLOR_NAME)				<-- get foreground/background of COLOR_NAME
 //	pair_content(COLOR_NAME)				<-- get rgb of COLOR_NAME
+//  wbkgd(win, COLOR_PAIR)					<-- sets the color for the whole win, not only for the cells with text with that color in it
 //
 // ===========================================================================================================================================================================
 // Appendix:

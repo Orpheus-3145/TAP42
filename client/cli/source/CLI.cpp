@@ -44,6 +44,10 @@ CLI::CLI(int32_t clientSocket) :
 	::initscr();		// check if those functions fail
 	::cbreak();
 	::noecho();
+	if (::has_colors() == false)
+		LOG_WARN(LogContext::INTERFACE, "Colors not supported");
+	else
+		::start_color();
 
 	this->game = std::make_unique<GameWindow>(height, width, this->commandPipe.in, this->chatPipe.in);
 	// this->settings = std::make_unique<GameWindow>(height, width);

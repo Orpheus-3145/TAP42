@@ -12,6 +12,7 @@ BasicTab::BasicTab(BasicTab&& other) noexcept :
 	borderWin{other.borderWin},
 	mainWin{other.mainWin},
 	borderChar{other.borderChar},
+	colorPair{other.colorPair},
 	parent{other.parent},
 	_state{std::move(other._state)}
 {
@@ -29,6 +30,7 @@ BasicTab& BasicTab::operator=(BasicTab&& other) noexcept
 		this->borderWin = other.borderWin;
 		this->mainWin = other.mainWin;
 		this->borderChar = other.borderChar;
+		this->colorPair = other.colorPair;
 		this->parent = other.parent;
 		this->_state = std::move(other._state);
 
@@ -51,6 +53,8 @@ void BasicTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 			LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
 			throw CliException("Failed to create window");
 		}
+		if (this->colorPair != -1)
+			::wattron(this->borderWin, COLOR_PAIR(this->colorPair));
 		::wborder(
 			this->borderWin,
 			this->borderChar,
@@ -62,6 +66,9 @@ void BasicTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 			this->borderChar,
 			this->borderChar
 		);
+		if (this->colorPair != -1)
+			::wattroff(this->borderWin, COLOR_PAIR(this->colorPair));
+		
 		::wnoutrefresh(this->borderWin);
 
 		h -= 2, w -= 2;
@@ -74,6 +81,7 @@ void BasicTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
 		throw CliException("Failed to create window");
 	}
+
 	::scrollok(this->mainWin, true);
 
 	for (std::string const& line: this->_state)
@@ -142,9 +150,10 @@ InputTab::InputTab(
 	std::vector<std::string> const& hints,
 	std::string const& prompt,
 	int32_t borderChar,
+	int32_t colorPair,
 	CurseWindow* parent
 ) :
-	BasicTab(borderChar, parent),
+	BasicTab(borderChar, colorPair, parent),
 	forwardInputFd{forwardInputFd},
 	hints{hints},
 	prompt{prompt}
@@ -453,9 +462,17 @@ void InputTab::writePromptLine(void) const noexcept
 	::wmove(this->mainWin, y, 0);
 	::wclrtoeol(this->mainWin);
 
-	wattron(this->mainWin, A_BLINK);
+	if (this->colorPair != -1)
+		::wattron(this->mainWin, COLOR_PAIR(this->colorPair) | A_BLINK);
+	else
+		::wattron(this->mainWin, A_BLINK);
+
 	waddstr(this->mainWin, this->prompt.data());
-	wattroff(this->mainWin, A_BLINK);
+
+	if (this->colorPair != -1)
+		::wattroff(this->mainWin, COLOR_PAIR(this->colorPair) | A_BLINK);
+	else
+		::wattroff(this->mainWin, A_BLINK);
 
 	if (this->bufferSize > 0UL)
 		waddnstr(this->mainWin, this->commandBuffer, this->bufferSize);
@@ -574,24 +591,40 @@ void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 			y += 1;
 			x += 1;
 		}
-		assert((w + 2) > static_cast<int32_t>(this->title.size()) and "Tab title longer than tab itself");
-		this->titleWin = ::newwin(3, this->title.size() + 2, y, x);
+		assert((w + 1) > static_cast<int32_t>(this->title.size()) and "Tab title longer than tab itself");
+		this->titleWin = ::newwin(3, this->title.size() + 2, y, x + 1);
 		if (this->borderWin == nullptr)
 		{
 			LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
 			throw CliException("Failed to create window");
 		}
 
+		if (this->colorPair != -1)
+			::wattron(this->titleWin, COLOR_PAIR(this->colorPair) | A_BOLD);
+		else
+			::wattron(this->titleWin, A_BOLD);
+
 		::wborder(this->titleWin, 0, 0, 0, 0, 0, 0, 0, 0);
-		wattron(this->titleWin, A_BOLD);
 		mvwaddstr(this->titleWin, 1, 1, this->title.data());
-		wattroff(this->titleWin, A_BOLD);
+
+		if (this->colorPair != -1)
+			::wattroff(this->titleWin, COLOR_PAIR(this->colorPair) | A_BOLD);
+		else
+			::wattroff(this->titleWin, A_BOLD);
+
 		::wnoutrefresh(this->titleWin);
+
 		// readjust position and size of mainWin
 		::mvwin(this->mainWin, y + 3, x);
 		::wresize(this->mainWin, h - 3, w);
+
 		// add a div line between title and ouput
-		::wborder(this->mainWin, ' ', ' ', '-', ' ', '-', '-', ' ', ' ');
+		if (this->colorPair != -1)
+			::wattron(this->mainWin, COLOR_PAIR(this->colorPair));
+		::wborder(this->mainWin, ' ', ' ', 0, ' ', ' ', ' ', ' ', ' ');
+		if (this->colorPair != -1)
+			::wattroff(this->mainWin, COLOR_PAIR(this->colorPair));
+
 		int32_t y, x;
 		getyx(this->mainWin, y, x);
 		::wmove(this->mainWin, y + 1, 0);
