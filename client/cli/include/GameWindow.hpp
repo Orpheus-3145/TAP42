@@ -43,6 +43,7 @@ class GameWindow : public CurseWindow
 		virtual ~GameWindow(void) noexcept { this->clear(); }
 
 		void handleResponse(std::string const& response) noexcept;
+		void handleChatMsg(std::string const& response) noexcept;
 		void handleEvent(std::string const& event) noexcept;
 
 		void draw(void) override;

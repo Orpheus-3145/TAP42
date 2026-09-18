@@ -28,7 +28,7 @@ class BasicTab
 
 		virtual ~BasicTab(void) { this->clear(); }
 
-		virtual void refresh(void) const noexcept { ::wnoutrefresh(this->mainWin); }
+		virtual void refresh(void) const noexcept;
 
 		virtual void draw(int32_t h, int32_t w, int32_t y, int32_t x);
 		virtual void resize(int32_t h, int32_t w, int32_t y, int32_t x);
@@ -146,6 +146,7 @@ class OutputTab : public BasicTab
 		OutputTab(OutputTab&&) noexcept;
 		OutputTab& operator=(OutputTab&&) noexcept;
 
+		void refresh(void) const noexcept override;
 		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
 
 	protected:
