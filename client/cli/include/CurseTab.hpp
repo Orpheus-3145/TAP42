@@ -83,6 +83,7 @@ class InputTab : public BasicTab
 
 		void setChar(int32_t input);
 
+		void suggestHint(void) noexcept;
 		void suggestPrevious(void) noexcept;
 		void showPrevious(void) noexcept;
 
