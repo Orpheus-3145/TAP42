@@ -89,28 +89,29 @@ void CLI::start(void)
 		this->pollFds[CLI::CHAT].revents = 0;
 		ioUtils::poll(this->pollFds, POLL_SIZE, -1);
 
+		// user type input
 		if (this->pollFds[STDIN].revents & POLLIN)
 			this->game->readInput();
-
+		// resize window
 		if (this->pollFds[RESIZE].revents & POLLIN)
 			this->handleResize();
-
+		// read and show data from server 
 		if (this->pollFds[CLIENT].revents & POLLIN)
 			this->handleInputFromServer();
-
+		// send data to server
 		if (this->pollFds[CLIENT].revents & POLLOUT)
 		{
 			this->handleInputToServer();
 			if (this->toServerSize == 0UL)
 				this->pollFds[CLI::CLIENT].events = POLLIN;
 		}
-
+		// handle error
 		if (this->pollFds[CLIENT].revents & (POLLHUP | POLLERR | POLLNVAL))
 			this->handlePollError();
-
+		// read command from UI (and forward it to server)
 		if (this->pollFds[CMD].revents & POLLIN)
 			this->handleGameCommand();
-
+		// read chat msg/command from UI (and forward it to server)
 		if (this->pollFds[CHAT].revents & POLLIN)
 			this->handleChatCommand();
 
@@ -168,6 +169,8 @@ void CLI::handleGameCommand(void)
 		ssize_t n = ioUtils::read(commandPipe, this->toServerBuffer + this->toServerSize, Config::BUFF_SIZE - this->toServerSize);
 		this->pollFds[CLI::CLIENT].events |= POLLOUT;
 
+		this->game->handleResponse(Config::PROMPT + std::string(this->toServerBuffer + this->toServerSize, n));
+
 		this->toServerSize += n;
 	}
 	catch(const IOException& e)
@@ -187,6 +190,8 @@ void CLI::handleChatCommand(void)
 	{
 		ssize_t n = ioUtils::read(chatPipe, this->toServerBuffer + this->toServerSize, Config::BUFF_SIZE - this->toServerSize);
 		this->pollFds[CLI::CLIENT].events |= POLLOUT;
+
+		this->game->handleChatMsg(Config::PROMPT + std::string(this->toServerBuffer + this->toServerSize, n));
 
 		this->toServerSize += n;
 	}
