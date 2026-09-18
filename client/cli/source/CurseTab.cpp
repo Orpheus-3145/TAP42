@@ -168,10 +168,10 @@ InputTab::InputTab(
 	this->dispatcher[KEY_DC]        = [this] { this->deleteCharForward(); };
 	this->dispatcher[127]           = [this] { this->deleteCharBack(); };
 	this->dispatcher[KEY_BACKSPACE] = [this] { this->deleteCharBack(); };
-	this->dispatcher[KEY_UP]        = [this] { this->suggestPrevious(); };
-	this->dispatcher[KEY_DOWN]      = [this] { this->suggestNext(); };
-	this->dispatcher['\t']          = [this] { if (this->parent) this->parent->switchNextTab(); };
-	this->dispatcher[KEY_BTAB]      = [this] { if (this->parent) this->parent->switchPreviousTab(); };
+	this->dispatcher[KEY_UP]        = [this] { this->showPrevious(); };
+	this->dispatcher[KEY_DOWN]      = [this] { this->showNext(); };
+	this->dispatcher['\t']          = [this] { this->suggestHint(); };
+	this->dispatcher[KEY_BTAB]      = [this] { if (this->parent) this->parent->switchInputTab(); };
 }
 
 InputTab::InputTab(InputTab&& other) noexcept :
@@ -310,6 +310,37 @@ void InputTab::setChar(int32_t input)
 		this->appendCharToInput(input);
 	else							// if got end msg and buffer is not empty store current command
 		this->terminateInput();
+}
+
+void InputTab::suggestHint(void) noexcept
+{
+	if (this->suggestedHintIndexes.size() == 0UL)
+		return;
+	else if (this->currentSuggestedIndex == -1L)	// store the current command it in tmpCommandBuffer and fetch the first hint
+	{
+		this->tmpBufferSize = this->bufferSize;
+		::memcpy(this->tmpCommandBuffer, this->commandBuffer, this->tmpBufferSize);
+		this->currentSuggestedIndex++;
+	}
+
+	if (this->currentSuggestedIndex < static_cast<ssize_t>(this->suggestedHintIndexes.size()))
+	{
+		uint32_t suggestedHintIndex = this->suggestedHintIndexes.at(this->currentSuggestedIndex);
+		std::string const& suggestedHint = this->hints.at(suggestedHintIndex);
+		
+		this->bufferSize = suggestedHint.size(); 
+		::memcpy(this->commandBuffer, suggestedHint.data(), this->bufferSize);
+		this->currentSuggestedIndex++;
+	}
+	else			// show command previously typed
+	{
+		this->currentSuggestedIndex = -1L;
+		this->bufferSize = this->tmpBufferSize;
+		::memcpy(this->commandBuffer, this->tmpCommandBuffer, this->bufferSize);
+		this->tmpBufferSize = 0UL;
+	}
+
+	this->writePromptLine();
 }
 
 void InputTab::suggestPrevious(void) noexcept
