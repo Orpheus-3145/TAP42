@@ -203,37 +203,35 @@
 //		}
 //
 // ASC characters:
-// 		Upper left corner        --> ACS_ULCORNER
-// 		Lower left corner        --> ACS_LLCORNER
-// 		Lower right corner       --> ACS_LRCORNER
-// 		Tee pointing right       --> ACS_LTEE
-// 		Tee pointing left        --> ACS_RTEE
-// 		Tee pointing up          --> ACS_BTEE
-// 		Tee pointing down        --> ACS_TTEE
-// 		Horizontal line          --> ACS_HLINE
-// 		Vertical line            --> ACS_VLINE
-// 		Large Plus or cross over --> ACS_PLUS
-// 		Scan Line 1              --> ACS_S1
-// 		Scan Line 3              --> ACS_S3
-// 		Scan Line 7              --> ACS_S7
-// 		Scan Line 9              --> ACS_S9
-// 		Diamond                  --> ACS_DIAMOND
-// 		Checker board (stipple)  --> ACS_CKBOARD
-// 		Degree Symbol            --> ACS_DEGREE
-// 		Plus/Minus Symbol        --> ACS_PLMINUS
-// 		Bullet                   --> ACS_BULLET
-// 		Arrow Pointing Left      --> ACS_LARROW
-// 		Arrow Pointing Right     --> ACS_RARROW
-// 		Arrow Pointing Down      --> ACS_DARROW
-// 		Arrow Pointing Up        --> ACS_UARROW
-// 		Board of squares         --> ACS_BOARD
-// 		Lantern Symbol           --> ACS_LANTERN
-// 		Solid Square Block       --> ACS_BLOCK
-// 		Less/Equal sign          --> ACS_LEQUAL
-// 		Greater/Equal sign       --> ACS_GEQUAL
-// 		Pi                       --> ACS_PI
-// 		Not equal                --> ACS_NEQUAL
-// 		UK pound sign            --> ACS_STERLING
+// 		ACS_HLINE			─
+// 		ACS_VLINE			│
+// 		ACS_ULCORNER		┌
+// 		ACS_URCORNER		┐
+// 		ACS_LLCORNER		└
+// 		ACS_LRCORNER		┘
+// 		ACS_LTEE			├
+// 		ACS_RTEE			┤
+// 		ACS_TTEE			┬
+// 		ACS_BTEE			┴
+// 		ACS_PLUS			┼
+// 		ACS_LARROW			←
+// 		ACS_RARROW			→
+// 		ACS_UARROW			↑
+// 		ACS_DARROW			↓
+// 		ACS_BLOCK			█
+// 		ACS_CKBOARD			▒
+// 		ACS_BOARD			▓
+// 		ACS_DIAMOND			◆
+// 		ACS_DEGREE			°
+// 		ACS_PLMINUS			±
+// 		ACS_BULLET			·
+// 		ACS_LANTERN			␋
+// 		ACS_LEQUAL			≤
+// 		ACS_GEQUAL			≥
+// 		ACS_NEQUAL			≠
+// 		ACS_PI				π
+// 		ACS_STERLING		£
+//
 // ===========================================================================================================================================================================
 
 

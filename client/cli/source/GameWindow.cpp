@@ -274,11 +274,17 @@ void GameWindow::switchNextTab(void) noexcept
 void GameWindow::handleResponse(std::string const& response) noexcept
 {
 	this->outputCmdTab->appendContent(response);
-	this->inputCmdTab->refresh();
+	this->currentTab->refresh();
+}
+
+void GameWindow::handleChatMsg(std::string const& response) noexcept
+{
+	this->outputChatTab->appendContent(response);
+	this->currentTab->refresh();
 }
 
 void GameWindow::handleEvent(std::string const& event) noexcept
 {
 	this->eventsTab->appendContent(event);
-	this->inputCmdTab->refresh();
+	this->currentTab->refresh();
 }

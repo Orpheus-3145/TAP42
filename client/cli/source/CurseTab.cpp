@@ -40,6 +40,12 @@ BasicTab& BasicTab::operator=(BasicTab&& other) noexcept
 	return *this;
 }
 
+void BasicTab::refresh(void) const noexcept
+{
+	::wnoutrefresh(this->borderWin);
+	::wnoutrefresh(this->mainWin);
+}
+
 void BasicTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 {
 	assert((h > 0) and (w > 0) and "invalid size provided");
@@ -68,8 +74,6 @@ void BasicTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 		);
 		if (this->colorPair != -1)
 			::wattroff(this->borderWin, COLOR_PAIR(this->colorPair));
-		
-		::wnoutrefresh(this->borderWin);
 
 		h -= 2, w -= 2;
 		y += 1, x += 1;
@@ -83,17 +87,16 @@ void BasicTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 	}
 
 	::scrollok(this->mainWin, true);
-
-	for (std::string const& line: this->_state)
-		this->printLine(line);
-
-	::wnoutrefresh(this->mainWin);
+	this->refresh();
 }
 
 void BasicTab::resize(int32_t h, int32_t w, int32_t y, int32_t x)
 {
 	this->clear();
 	this->draw(h, w, y, x);
+
+	for (std::string const& line: this->_state)
+		this->printLine(line);
 }
 
 void BasicTab::appendContent(std::string const& newContent)
@@ -578,6 +581,13 @@ OutputTab& OutputTab::operator=(OutputTab&& other) noexcept
 	return *this;
 }
 
+void OutputTab::refresh(void) const noexcept
+{
+	::wnoutrefresh(this->borderWin);
+	::wnoutrefresh(this->titleWin);
+	::wnoutrefresh(this->mainWin);
+}
+
 void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 {
 	BasicTab::draw(h, w, y, x);
@@ -592,6 +602,7 @@ void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 			x += 1;
 		}
 		assert((w + 1) > static_cast<int32_t>(this->title.size()) and "Tab title longer than tab itself");
+		// adding a title
 		this->titleWin = ::newwin(3, this->title.size() + 2, y, x + 1);
 		if (this->borderWin == nullptr)
 		{
@@ -612,16 +623,14 @@ void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 		else
 			::wattroff(this->titleWin, A_BOLD);
 
-		::wnoutrefresh(this->titleWin);
-
 		// readjust position and size of mainWin
-		::mvwin(this->mainWin, y + 3, x);
-		::wresize(this->mainWin, h - 3, w);
+		::mvwin(this->mainWin, y + 3, x + 1);
+		::wresize(this->mainWin, h - 3, w - 2);
 
 		// add a div line between title and ouput
 		if (this->colorPair != -1)
 			::wattron(this->mainWin, COLOR_PAIR(this->colorPair));
-		::wborder(this->mainWin, ' ', ' ', 0, ' ', ' ', ' ', ' ', ' ');
+		::wborder(this->mainWin, ' ', ' ', 0, ' ', ACS_HLINE, ACS_HLINE, ' ', ' ');
 		if (this->colorPair != -1)
 			::wattroff(this->mainWin, COLOR_PAIR(this->colorPair));
 
