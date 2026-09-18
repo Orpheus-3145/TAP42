@@ -59,7 +59,7 @@ void GameWindow::draw(void)
 	this->infoTab->appendContent("Player: <NAME>");
 	this->infoTab->appendContent("Data: <CLASS | RACE | ...>");
 	this->infoTab->appendContent("Currently in: <LOCATION>");
-	this->infoTab->appendContent("in group?");
+	this->infoTab->appendContent("<IN GROUP | NOT IN GROUP>");
 
 	this->cmdFrame->draw(
 		this->height - 6 - 2,
@@ -257,7 +257,7 @@ void GameWindow::resize(int32_t height, int32_t width)
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Window resized to h: {}, w: {}", this->height, this->width));
 }
 
-void GameWindow::switchNextTab(void) noexcept
+void GameWindow::switchInputTab(void) noexcept
 {
 	if (this->currentTab == this->inputCmdTab.get())
 	{

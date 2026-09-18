@@ -50,8 +50,7 @@ class GameWindow : public CurseWindow
 		void clear(void) noexcept override;
 		void readInput(void) override;
 		void resize(int32_t height, int32_t width) override;
-		void switchNextTab(void) noexcept override;
-		void switchPreviousTab(void) noexcept override { this->switchNextTab(); }
+		void switchInputTab(void) noexcept override;
 
 		static constexpr int32_t INFO_COLOR = 1;
 		static constexpr int32_t CMD_COLOR = 2;
