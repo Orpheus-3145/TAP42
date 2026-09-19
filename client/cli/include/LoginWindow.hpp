@@ -7,23 +7,23 @@
 class LoginWindow : public CurseWindow
 {
 	public:
-		LoginWindow(int32_t height, int32_t width, int32_t commandFd);
+		LoginWindow(int32_t commandFd);
 
 		virtual ~LoginWindow(void) noexcept { this->clear(); }
 
-		void draw(void) override;
+		void draw(int32_t height, int32_t width) override;
 		void clear(void) noexcept override;
 		void readInput(void) override;
 		void resize(int32_t height, int32_t width) override;
 		void switchInputTab(void) noexcept override {}
 		void scrollTab(bool goingUp) noexcept override { (void) goingUp; }
 
-		void handleResponse(std::string const& response) noexcept override { (void) response; }
-		void handleChatMsg(std::string const& response) noexcept override { (void) response; }
-		void handleEvent(std::string const& event) noexcept override { (void) event; }
+		void showResponse(std::string const& response) noexcept override { (void) response; }
+		void showChatMsg(std::string const& response) noexcept override { (void) response; }
+		void showEvent(std::string const& event) noexcept override { (void) event; }
 
 	protected:
-		static constexpr int32_t INFO_COLOR = 1;
+		static constexpr int32_t INFO_COLOR = 5;
 
 		int32_t commandFd;
 		int32_t messageFd;

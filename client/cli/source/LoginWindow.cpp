@@ -6,14 +6,11 @@
 #include <format>
 
 
-LoginWindow::LoginWindow(int32_t height, int32_t width, int32_t commandFd) :
-	CurseWindow(height, width),
+LoginWindow::LoginWindow(int32_t commandFd) :
+	CurseWindow(),
 	commandFd{commandFd}
 {
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding username");
-
-	this->height = (this->height % 4) != 0 ? ((this->height / 4) * 4) : this->height;		// has to be an even number
-	this->width = (this->width % 4) != 0 ? ((this->width / 4) * 4) : this->width;			// has to be an even number
 
 	::init_pair(LoginWindow::INFO_COLOR, COLOR_BLUE, COLOR_BLACK);
 
@@ -23,8 +20,11 @@ LoginWindow::LoginWindow(int32_t height, int32_t width, int32_t commandFd) :
 	this->outputNameTab = std::make_unique<OutputTab>("", -1, LoginWindow::INFO_COLOR, this);
 }
 
-void LoginWindow::draw(void)
+void LoginWindow::draw(int32_t height, int32_t width)
 {
+	this->height = (height % 4) != 0 ? ((height / 4) * 4) : height;		// has to be an even number
+	this->width = (width % 4) != 0 ? ((width / 4) * 4) : width;			// has to be an even number
+
 	this->tmp->draw(
 		this->height, 
 		this->width,

@@ -6,6 +6,7 @@
 
 #include "UI.hpp"
 #include "LoginWindow.hpp"
+#include "PlayerCreateWindow.hpp"
 #include "GameWindow.hpp"
 #include "Utils.hpp"
 
@@ -263,9 +264,9 @@ class CLI : public UI
 		void handleGameCommand(void);
 		void handleChatCommand(void);
 
-		void login(void) override;
-		void startGame(void) override;
-		void createNewPlayer(void) override;
+		void loginPhase(void) override;
+		void gamePhase(void) override;
+		void newPlayerPhase(void) override;
 
 		void handleError(std::string const& errMsg) noexcept override;
 		void handleServerDisconnect(void) noexcept override {}
@@ -286,10 +287,10 @@ class CLI : public UI
 
 		bool keepAlive{true};
 
-		std::unique_ptr<LoginWindow>	loginWin;
-		std::unique_ptr<CurseWindow>	newPlayerWin;
-		std::unique_ptr<GameWindow>		gameWin;
-		std::unique_ptr<CurseWindow>	errorWin;
+		std::unique_ptr<LoginWindow>		loginWin;
+		std::unique_ptr<PlayerCreateWindow>	newPlayerWin;
+		std::unique_ptr<GameWindow>			gameWin;
+		// std::unique_ptr<CurseWindow>		errorWin;
 
 		CurseWindow* currentWindow{nullptr};
 };
