@@ -1,4 +1,5 @@
 #include "CurseTab.hpp"
+#include "UI.hpp"
 #include "Config.hpp"
 #include "Logger.hpp"
 #include "Utils.hpp"
@@ -372,7 +373,7 @@ void InputTab::moveEndLine(void) const noexcept
 
 void InputTab::setChar(int32_t input)
 {
-	if (input != Config::COMMAND_TERM)		// append normal char to buffer
+	if (input != COMMAND_TERM)		// append normal char to buffer
 		this->appendCharToInput(input);
 	else							// if got end msg and buffer is not empty store current command
 		this->terminateInput();

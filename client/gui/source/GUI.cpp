@@ -25,7 +25,7 @@ GUI::GUI(int32_t clientSocket, int32_t height, int32_t width) :
 			LOG_DEBUG(LogContext::INTERFACE, std::format("got: '{}'", cmdStr));
 			this->toServerSize = cmdStr.size();
 			::memcpy(this->toServerBuffer, cmdStr.data(), this->toServerSize);
-			this->handleInputToServer();
+			this->writeInputToServer();
 		}
 	);
 
@@ -36,7 +36,7 @@ GUI::GUI(int32_t clientSocket, int32_t height, int32_t width) :
 		&QSocketNotifier::activated,
 	    this,
 		[this]() {
-			this->handleInputFromServer();
+			this->readInputFromServer();
 		}
 	);
 

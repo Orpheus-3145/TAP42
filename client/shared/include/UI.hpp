@@ -8,10 +8,15 @@
 #include "Config.hpp"
 
 
-static constexpr const char* S_OK = "OK";
-static constexpr const char* S_ERR = "ERR";
-static constexpr const char* S_EVT = "EVT";
-static constexpr const char* QUIT_RESPONSE = "OK bye";
+static constexpr const char*	S_OK = "OK";
+static constexpr const char*	S_ERR = "ERR";
+static constexpr const char*	S_EVT = "EVT";
+static constexpr const char*	QUIT_RESPONSE = "OK bye";
+static constexpr const char*	LOGIN_OK = "OK connected";
+static constexpr const char*	INITIAL_GREETING = "OK hello proto=1";
+static constexpr const char*	CMD_CONNECT = "CONNECT";
+static constexpr const char		COMMAND_TERM = '\n';
+static constexpr const char		COMMAND_SP = ' ';
 
 class UI
 {
@@ -31,8 +36,14 @@ class UI
 		virtual void stop(void) noexcept = 0;
 
 	protected:
-		void handleInputToServer(void);
-		void handleInputFromServer(void);
+		void writeInputToServer(void);
+		void readInputFromServer(void);
+		void handleServerData(std::string const& message);
+		void formatCommand(void) noexcept;
+
+		virtual void login(void) { this->handshakeOk = true; }
+		virtual void startGame(void) { this->loginOk = true; }
+		virtual void createNewPlayer(void) = 0;
 		
 		virtual void handleError(std::string const& errMsg) noexcept = 0;
 		virtual void handleServerDisconnect(void) noexcept = 0;
@@ -43,6 +54,7 @@ class UI
 		void splitIntoMessages(void);
 
 		int32_t clientSocket;
+		bool	handshakeOk{false}, loginOk{false};
 
 		size_t	toServerSize{0UL};
 		char	toServerBuffer[Config::BUFF_SIZE];
