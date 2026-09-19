@@ -52,23 +52,25 @@ CLI::CLI(int32_t clientSocket) :
     ::mousemask(BUTTON4_PRESSED | BUTTON5_PRESSED | ALL_MOUSE_EVENTS, NULL);
     ::mouseinterval(0);       // disable delayed click
 	
-	this->login = std::make_unique<LoginWindow>(height, width, this->commandPipe.in);
-	this->game = std::make_unique<GameWindow>(height, width, this->commandPipe.in, this->chatPipe.in);
-	// this->settings = std::make_unique<GameWindow>(height, width);
+	this->loginWin = std::make_unique<LoginWindow>(height, width, this->commandPipe.in);
+	this->gameWin = std::make_unique<GameWindow>(height, width, this->commandPipe.in, this->chatPipe.in);
+	// this->errorWin = std::make_unique<CurseWindow>(height, width);
+	// this->newPlayerWin = std::make_unique<CurseWindow>(height, width);
 
 	LOG_INFO(LogContext::INTERFACE, "Done setup CLI");
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Listening to client socket: {}", this->pollFds[CLI::CLIENT].fd));
 
-	this->currentWindow = this->login.get();
+	// this->currentWindow = this->error.get();
 }
 
 CLI::~CLI(void) noexcept
 {
 	// empty memory manually because endwin() has to be last
 	// ncurses function to be called
-	this->game.reset();
-	// this->settings.reset();
-	this->login.reset();
+	this->loginWin.reset();
+	// this->newPlayerWin.reset();
+	this->gameWin.reset();
+	// this->errorWin.reset();
 
 	::endwin();
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Cleaned Ncurses data"));
@@ -80,8 +82,6 @@ CLI::~CLI(void) noexcept
 
 void CLI::start(void)
 {
-	this->currentWindow->draw();
-
 	while (this->keepAlive == true)
 	{
 		this->pollFds[CLI::STDIN].events |= POLLIN;
@@ -98,17 +98,20 @@ void CLI::start(void)
 
 		// user type input
 		if (this->pollFds[STDIN].revents & POLLIN)
-			this->currentWindow->readInput();
+		{
+			if (this->handshakeOk == true)
+				this->currentWindow->readInput();
+		}
 		// resize window
 		if (this->pollFds[RESIZE].revents & POLLIN)
 			this->handleResize();
 		// read and show data from server 
 		if (this->pollFds[CLIENT].revents & POLLIN)
-			this->handleInputFromServer();
+			this->readInputFromServer();
 		// send data to server
 		if (this->pollFds[CLIENT].revents & POLLOUT)
 		{
-			this->handleInputToServer();
+			this->writeInputToServer();
 			if (this->toServerSize == 0UL)
 				this->pollFds[CLI::CLIENT].events = POLLIN;
 		}
@@ -142,11 +145,13 @@ void CLI::handlePollError(void) noexcept
 {
 	if (this->pollFds[CLIENT].revents & POLLHUP)
 	{
-		// HTTP client stopped, log, show error tab and close win
+		// HTTP client stopped
+		this->handleError("...");
 	}
 	else if (this->pollFds[CLIENT].revents & POLLERR)
 	{
-		// socket is invalid (poll didn't fail), log, show error tab and close win
+		// socket is invalid (poll didn't fail)
+		this->handleError("...");
 	}
 	else if (this->pollFds[CLIENT].revents & POLLNVAL)
 	{
@@ -156,11 +161,13 @@ void CLI::handlePollError(void) noexcept
 	
 		if (ioUtils::getsockopt(this->clientSocket, SOL_SOCKET, SO_ERROR, &sockErr, &len) < 0)
 		{
-			// getsockopt could also fail, log, show error tab and close win (check strerror(errno))
+			// getsockopt could also fail (check strerror(errno))
+			this->handleError("...");
 		}
 		else if (sockErr != 0)
 		{
 			// log, show error tab and close win (check strerror(sockErr))
+			this->handleError("...");
 		}
 	}
 }
@@ -168,7 +175,6 @@ void CLI::handlePollError(void) noexcept
 void CLI::handleGameCommand(void)
 {
 	int32_t commandPipe = this->pollFds[CMD].fd;
-	// format command, convert it to HTTP command if necessary
 
 	try
 	{
@@ -176,14 +182,11 @@ void CLI::handleGameCommand(void)
 		this->pollFds[CLI::CLIENT].events |= POLLOUT;
 
 		this->currentWindow->handleResponse(Config::PROMPT + std::string(this->toServerBuffer + this->toServerSize, n));
-
 		this->toServerSize += n;
 	}
 	catch(const IOException& e)
 	{
-		std::string errMsg = std::format("I/O error failed to write to client: '{}'", e.what());
-		LOG_ERROR(LogContext::INTERFACE, errMsg);
-		this->handleError(errMsg);
+		this->handleError(std::format("I/O error failed to write to client: '{}'", e.what()));
 	}
 }
 
@@ -198,15 +201,46 @@ void CLI::handleChatCommand(void)
 		this->pollFds[CLI::CLIENT].events |= POLLOUT;
 
 		this->currentWindow->handleChatMsg(Config::PROMPT + std::string(this->toServerBuffer + this->toServerSize, n));
-
 		this->toServerSize += n;
 	}
 	catch(const IOException& e)
 	{
-		std::string errMsg = std::format("I/O error failed to write to client: '{}'", e.what());
-		LOG_ERROR(LogContext::INTERFACE, errMsg);
-		this->handleError(errMsg);
+		this->handleError(std::format("I/O error failed to write to client: '{}'", e.what()));
 	}
+}
+
+void CLI::login(void)
+{
+	UI::login();
+
+	this->currentWindow = this->loginWin.get();
+	this->currentWindow->draw();
+}
+
+void CLI::createNewPlayer(void)
+{
+	this->currentWindow->clear();
+	this->currentWindow = this->newPlayerWin.get();
+	this->currentWindow->draw();
+}
+
+void CLI::startGame(void)
+{
+	UI::startGame();
+
+	this->currentWindow->clear();
+	this->currentWindow = this->gameWin.get();
+	this->currentWindow->draw();
+}
+
+void CLI::handleError(std::string const& errMsg) noexcept
+{
+	LOG_ERROR(LogContext::INTERFACE, errMsg);
+
+	this->currentWindow->clear();
+	// this->error.set(errMsg);		or smt
+	this->currentWindow = this->errorWin.get();
+	this->currentWindow->draw();
 }
 
 void CLI::handleResponse(std::string const& response) noexcept
