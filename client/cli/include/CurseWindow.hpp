@@ -29,6 +29,10 @@ class CurseWindow
 		virtual void switchInputTab(void) noexcept = 0;
 		virtual void scrollTab(bool goingUp) noexcept = 0;
 
+		virtual void handleResponse(std::string const& response) noexcept = 0;
+		virtual void handleChatMsg(std::string const& response) noexcept = 0;
+		virtual void handleEvent(std::string const& event) noexcept = 0;
+
 		void refresh(void) noexcept { ::doupdate(); }
 
 	protected:

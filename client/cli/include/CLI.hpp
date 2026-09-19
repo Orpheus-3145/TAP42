@@ -2,8 +2,10 @@
 
 #include <memory>
 #include <string>
+#include <cstdint>
 
 #include "UI.hpp"
+#include "LoginWindow.hpp"
 #include "GameWindow.hpp"
 #include "Utils.hpp"
 
@@ -282,5 +284,7 @@ class CLI : public UI
 
 		std::unique_ptr<GameWindow> game;
 		std::unique_ptr<GameWindow> settings;
-		std::unique_ptr<GameWindow> login;
+		std::unique_ptr<LoginWindow> login;
+
+		CurseWindow* currentWindow{nullptr};
 };
