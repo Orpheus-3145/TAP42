@@ -51,13 +51,15 @@ CLI::CLI(int32_t clientSocket) :
 	// for callback (scrolling tabs) with mouse wheel
     ::mousemask(BUTTON4_PRESSED | BUTTON5_PRESSED | ALL_MOUSE_EVENTS, NULL);
     ::mouseinterval(0);       // disable delayed click
-
+	
+	this->login = std::make_unique<LoginWindow>(height, width, this->commandPipe.in);
 	this->game = std::make_unique<GameWindow>(height, width, this->commandPipe.in, this->chatPipe.in);
 	// this->settings = std::make_unique<GameWindow>(height, width);
-	// this->login = std::make_unique<GameWindow>(height, width);
 
 	LOG_INFO(LogContext::INTERFACE, "Done setup CLI");
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Listening to client socket: {}", this->pollFds[CLI::CLIENT].fd));
+
+	this->currentWindow = this->login.get();
 }
 
 CLI::~CLI(void) noexcept
@@ -66,7 +68,7 @@ CLI::~CLI(void) noexcept
 	// ncurses function to be called
 	this->game.reset();
 	// this->settings.reset();
-	// this->login.reset();
+	this->login.reset();
 
 	::endwin();
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Cleaned Ncurses data"));
@@ -78,6 +80,8 @@ CLI::~CLI(void) noexcept
 
 void CLI::start(void)
 {
+	this->currentWindow->draw();
+
 	while (this->keepAlive == true)
 	{
 		this->pollFds[CLI::STDIN].events |= POLLIN;
@@ -94,7 +98,7 @@ void CLI::start(void)
 
 		// user type input
 		if (this->pollFds[STDIN].revents & POLLIN)
-			this->game->readInput();
+			this->currentWindow->readInput();
 		// resize window
 		if (this->pollFds[RESIZE].revents & POLLIN)
 			this->handleResize();
@@ -118,7 +122,7 @@ void CLI::start(void)
 		if (this->pollFds[CHAT].revents & POLLIN)
 			this->handleChatCommand();
 
-		this->game->refresh();
+		this->currentWindow->refresh();
 	}
 	LOG_INFO(LogContext::INTERFACE, "CLI stopped");
 }
@@ -131,8 +135,7 @@ void CLI::handleResize(void)
 	struct winsize windowSize;
 	::ioctl(STDOUT_FILENO, TIOCGWINSZ, &windowSize);	// get the size of the resized terminal
 
-	// should do the current window
-	this->game->resize(windowSize.ws_row, windowSize.ws_col);
+	this->currentWindow->resize(windowSize.ws_row, windowSize.ws_col);
 }
 
 void CLI::handlePollError(void) noexcept
@@ -172,7 +175,7 @@ void CLI::handleGameCommand(void)
 		ssize_t n = ioUtils::read(commandPipe, this->toServerBuffer + this->toServerSize, Config::BUFF_SIZE - this->toServerSize);
 		this->pollFds[CLI::CLIENT].events |= POLLOUT;
 
-		this->game->handleResponse(Config::PROMPT + std::string(this->toServerBuffer + this->toServerSize, n));
+		this->currentWindow->handleResponse(Config::PROMPT + std::string(this->toServerBuffer + this->toServerSize, n));
 
 		this->toServerSize += n;
 	}
@@ -194,7 +197,7 @@ void CLI::handleChatCommand(void)
 		ssize_t n = ioUtils::read(chatPipe, this->toServerBuffer + this->toServerSize, Config::BUFF_SIZE - this->toServerSize);
 		this->pollFds[CLI::CLIENT].events |= POLLOUT;
 
-		this->game->handleChatMsg(Config::PROMPT + std::string(this->toServerBuffer + this->toServerSize, n));
+		this->currentWindow->handleChatMsg(Config::PROMPT + std::string(this->toServerBuffer + this->toServerSize, n));
 
 		this->toServerSize += n;
 	}
@@ -208,12 +211,12 @@ void CLI::handleChatCommand(void)
 
 void CLI::handleResponse(std::string const& response) noexcept
 {
-	this->game->handleResponse(response);
+	this->currentWindow->handleResponse(response);
 }
 
 void CLI::handleEvent(std::string const& event) noexcept
 {
-	this->game->handleEvent(event);
+	this->currentWindow->handleEvent(event);
 }
 
 std::unique_ptr<UI> uiFactory(int32_t clientSocket)

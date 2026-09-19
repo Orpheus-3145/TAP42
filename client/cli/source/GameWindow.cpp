@@ -26,7 +26,7 @@ GameWindow::GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t
 
 	this->cmdFrame = std::make_unique<BasicTab>(0, GameWindow::CMD_COLOR, this);
 	this->inputCmdTab = std::make_unique<SingleInputTab>(this->commandFd, CMD_HINTS, Config::PROMPT, 0, GameWindow::CMD_COLOR, this);
-	this->outputCmdTab = std::make_unique<OutputTab>("User events", 0, GameWindow::CMD_COLOR, this);
+	this->outputCmdTab = std::make_unique<OutputTab>("", 0, GameWindow::CMD_COLOR, this);
 
 	this->chatFrame = std::make_unique<BasicTab>(0, GameWindow::CHAT_COLOR, this);
 	this->inputChatTab = std::make_unique<SingleInputTab>(this->messageFd, CHAT_CMD_HINTS, Config::PROMPT, 0, GameWindow::CHAT_COLOR, this);
@@ -35,8 +35,6 @@ GameWindow::GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t
 	this->infoTab = std::make_unique<OutputTab>(0, GameWindow::INFO_COLOR, this);
 	this->eventsTab = std::make_unique<OutputTab>("World events", 0, GameWindow::EVENTS_COLOR, this);
 	this->tbdTab = std::make_unique<OutputTab>("", 0, -1, this);
-
-	this->draw();
 }
 
 void GameWindow::draw(void)
@@ -129,7 +127,7 @@ void GameWindow::draw(void)
 	this->currentTab->refresh();
 	this->refresh();
 
-	LOG_DEBUG(LogContext::INTERFACE, std::format("CLI window size h: {}, w: {}", height, width));
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing game window size h: {}, w: {}", height, width));
 }
 
 void GameWindow::clear(void) noexcept
@@ -160,17 +158,17 @@ void GameWindow::resize(int32_t height, int32_t width)
 	this->width = (width % 2) == 0 ? (width - 1) : width;							// has to be an odd number
 
 	// force minimum size of the window
-	if ((this->height < Config::MIN_HEIGHT_CLI) or (this->width < Config::MIN_WIDTH_CLI))
-	{
-		if (this->height < Config::MIN_HEIGHT_CLI)
-			this->height = Config::MIN_HEIGHT_CLI;
-		if (this->width < Config::MIN_WIDTH_CLI)
-			this->width = Config::MIN_WIDTH_CLI;
+	// if ((this->height < Config::MIN_HEIGHT_CLI) or (this->width < Config::MIN_WIDTH_CLI))
+	// {
+	// 	if (this->height < Config::MIN_HEIGHT_CLI)
+	// 		this->height = Config::MIN_HEIGHT_CLI;
+	// 	if (this->width < Config::MIN_WIDTH_CLI)
+	// 		this->width = Config::MIN_WIDTH_CLI;
 
-		std::cout << std::format("\033[8;{};{}t", this->height, this->width) << std::endl;
-		LOG_WARN(LogContext::INTERFACE, std::format("Window too small, forced to h: {}, w: {}", this->height, this->width));
-		return;
-	}
+	// 	std::cout << std::format("\033[8;{};{}t", this->height, this->width) << std::endl;
+	// 	LOG_WARN(LogContext::INTERFACE, std::format("Window too small, forced to h: {}, w: {}", this->height, this->width));
+	// 	return;
+	// }
 	::resizeterm(this->height, this->width);
 
 	this->mainFrame->resize(
@@ -189,7 +187,7 @@ void GameWindow::resize(int32_t height, int32_t width)
 		2
 	);
 
-	this->cmdFrame->draw(
+	this->cmdFrame->resize(
 		this->height - 6 - 2,
 		widthTabs,
 		7,
@@ -254,7 +252,7 @@ void GameWindow::resize(int32_t height, int32_t width)
 	// because resize is not handled by ncurses there might be some garbage to read, flush it
 	::flushinp();
 
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Window resized to h: {}, w: {}", this->height, this->width));
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Resized game window to h: {}, w: {}", this->height, this->width));
 }
 
 void GameWindow::switchInputTab(void) noexcept
@@ -270,6 +268,7 @@ void GameWindow::switchInputTab(void) noexcept
 		this->inputCmdTab->refresh();
 	}
 }
+
 void GameWindow::scrollTab(bool goingUp) noexcept
 {
 	if (this->currentTab == this->inputCmdTab.get())
