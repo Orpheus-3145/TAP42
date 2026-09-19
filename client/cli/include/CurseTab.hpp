@@ -36,6 +36,9 @@ class BasicTab
 		virtual void appendContent(std::string const& newContent);
 		virtual void printLine(std::string const& newContent) const noexcept;
 
+		virtual void scrollContentUp(void) noexcept;
+		virtual void scrollContentDown(void) noexcept;
+
 		virtual void clear(void) noexcept;
 		
 	protected:
@@ -46,7 +49,8 @@ class BasicTab
 		int32_t			borderChar, colorPair;
 		CurseWindow*	parent;
 
-		std::deque<std::string> _state;
+		std::deque<std::string> state;
+		size_t					topLineScroll{0UL};
 };
 
 class InputTab : public BasicTab
@@ -154,5 +158,6 @@ class OutputTab : public BasicTab
 		virtual void clear(void) noexcept override;
 
 		WINDOW*		titleWin{nullptr};
+		WINDOW*		divLineWin{nullptr};
 		std::string	title;
 };

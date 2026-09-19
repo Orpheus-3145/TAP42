@@ -27,6 +27,7 @@ class CurseWindow
 		virtual void readInput(void) = 0;
 		virtual void resize(int32_t height, int32_t width) = 0;
 		virtual void switchInputTab(void) noexcept = 0;
+		virtual void scrollTab(bool goingUp) noexcept = 0;
 
 		void refresh(void) noexcept { ::doupdate(); }
 

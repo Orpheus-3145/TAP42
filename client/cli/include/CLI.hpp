@@ -165,6 +165,15 @@
 //  wbkgd(win, COLOR_PAIR)					<-- sets the color for the whole win, not only for the cells with text with that color in it
 //
 // ===========================================================================================================================================================================
+// Others:
+//  hline(charType, width ) #			<-- draw an horizontal line of width chars of type charType
+//  vline(charType, width ) #			<-- draw a vertical line of width chars of type charType
+//	wscrl(win, nScrolls)				<-- scrolls the content of the window by nScrolls lines up (nScrolls > 0) or (nScrolls < 0)
+//											N.B. to do so, scrollok(win, true) has to be called on that window when it's created
+//											N.B. calling also idlok(win, true) makes the scroll more natural to see
+//
+//
+// ===========================================================================================================================================================================
 // Appendix:
 // To switch temporarly to normal tty mode and exitLoop ncurses:
 // 		initscr();
