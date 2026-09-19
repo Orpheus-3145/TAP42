@@ -120,7 +120,10 @@ void GameWindow::draw(void)
 		heightEventsTab + heightoutputChatTab + 3 + 1,
 		widthTabs + 3
 	);
-	this->tbdTab->appendContent("TBD... ");
+
+	this->tbdTab->appendContent("");
+	this->tbdTab->appendContent("");
+	this->tbdTab->appendContent("TBD... ", TextAlign::MID_ALIGN);
 
 	this->currentTab = this->inputCmdTab.get();
 	this->currentTab->refresh();
@@ -185,10 +188,6 @@ void GameWindow::resize(int32_t height, int32_t width)
 		1,
 		2
 	);
-	this->infoTab->appendContent("Player: <NAME>");
-	this->infoTab->appendContent("Data: <CLASS | RACE | ...>");
-	this->infoTab->appendContent("Currently in: <LOCATION>");
-	this->infoTab->appendContent("in group?");
 
 	this->cmdFrame->draw(
 		this->height - 6 - 2,
