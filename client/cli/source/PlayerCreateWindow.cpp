@@ -1,4 +1,4 @@
-#include "LoginWindow.hpp"
+#include "PlayerCreateWindow.hpp"
 #include "Logger.hpp"
 #include "Exceptions.hpp"
 
@@ -6,21 +6,21 @@
 #include <format>
 
 
-LoginWindow::LoginWindow(int32_t commandFd) :
+PlayerCreateWindow::PlayerCreateWindow(int32_t commandFd) :
 	CurseWindow(),
 	commandFd{commandFd}
 {
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding username");
 
-	::init_pair(LoginWindow::INFO_COLOR, COLOR_BLUE, COLOR_BLACK);
+	::init_pair(PlayerCreateWindow::INFO_COLOR, COLOR_GREEN, COLOR_BLACK);
 
-	this->tmp = std::make_unique<BasicTab>(-1, LoginWindow::INFO_COLOR, this);
-	this->frame = std::make_unique<BasicTab>(0, LoginWindow::INFO_COLOR, this);
-	this->inputNameTab = std::make_unique<SingleInputTab>(this->commandFd, std::vector<std::string>(), Config::PROMPT, 0, LoginWindow::INFO_COLOR, this);
-	this->outputNameTab = std::make_unique<OutputTab>("", -1, LoginWindow::INFO_COLOR, this);
+	this->tmp = std::make_unique<BasicTab>(-1, PlayerCreateWindow::INFO_COLOR, this);
+	this->frame = std::make_unique<BasicTab>(0, PlayerCreateWindow::INFO_COLOR, this);
+	this->inputNameTab = std::make_unique<SingleInputTab>(this->commandFd, std::vector<std::string>(), Config::PROMPT, 0, PlayerCreateWindow::INFO_COLOR, this);
+	this->outputNameTab = std::make_unique<OutputTab>("", -1, PlayerCreateWindow::INFO_COLOR, this);
 }
 
-void LoginWindow::draw(int32_t height, int32_t width)
+void PlayerCreateWindow::draw(int32_t height, int32_t width)
 {
 	this->height = (height % 4) != 0 ? ((height / 4) * 4) : height;		// has to be an even number
 	this->width = (width % 4) != 0 ? ((width / 4) * 4) : width;			// has to be an even number
@@ -49,7 +49,7 @@ void LoginWindow::draw(int32_t height, int32_t width)
 	);
 
 	this->outputNameTab->appendContent(" ");
-	this->outputNameTab->appendContent(" Insert user name:", TextAlign::MID_ALIGN);
+	this->outputNameTab->appendContent(" Enter a name:", TextAlign::MID_ALIGN);
 
 	this->inputNameTab->draw(
 		3,
@@ -61,17 +61,17 @@ void LoginWindow::draw(int32_t height, int32_t width)
 	this->currentTab = this->inputNameTab.get();
 	this->refresh();
 
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing login window, size h: {}, w: {}", this->height, this->width));
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing create player window, size h: {}, w: {}", this->height, this->width));
 }
 
-void LoginWindow::clear(void) noexcept
+void PlayerCreateWindow::clear(void) noexcept
 {
 	this->frame.reset();
 	this->outputNameTab.reset();
 	this->inputNameTab.reset();
 }
 
-void LoginWindow::resize(int32_t height, int32_t width)
+void PlayerCreateWindow::resize(int32_t height, int32_t width)
 {
 	this->height = (height % 4) != 0 ? ((height / 4) * 4) : height;		// has to be an even number
 	this->width = (width % 4) != 0 ? ((width / 4) * 4) : width;			// has to be an even number
@@ -98,7 +98,7 @@ void LoginWindow::resize(int32_t height, int32_t width)
 	);
 
 	int32_t widthTabs = this->width / 4;
-	int32_t heightTabs = this->height / 4;
+	int32_t heightTabs = this->height / 2;
 
 	this->frame->resize(
 		heightTabs,
@@ -125,10 +125,10 @@ void LoginWindow::resize(int32_t height, int32_t width)
 	::flushinp();
 	
 	this->refresh();
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Resized login window to h: {}, w: {}", this->height, this->width));
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Resized playerCreate window to h: {}, w: {}", this->height, this->width));
 }
 
-void LoginWindow::readInput(void)
+void PlayerCreateWindow::readInput(void)
 {
 	InputTab* inputTab = dynamic_cast<InputTab*>(this->currentTab);
 	assert(inputTab != nullptr and "current input doesn't support handling input");

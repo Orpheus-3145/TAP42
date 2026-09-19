@@ -6,6 +6,7 @@
 #include "Exceptions.hpp"
 
 #include <cassert>
+#include <format>
 
 
 BasicTab::BasicTab(BasicTab&& other) noexcept :
@@ -263,6 +264,11 @@ InputTab::InputTab(InputTab&& other) noexcept :
 void InputTab::handleUserInput(void)
 {
 	int32_t inputChar = ::wgetch(this->mainWin);	// this is blocking
+
+	// ncurses throws many KEY_RESIZE when term is resized, ignore them
+	// since the resizing is handled by catching SIGWINCH
+	if (inputChar == KEY_RESIZE)
+		return;
 
 	// special characters handling
 	auto it = this->dispatcher.find(inputChar);
@@ -530,7 +536,6 @@ void InputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 	::keypad(this->mainWin, true);
 
 	this->writePromptLine();
-	this->refresh();
 }
 
 void InputTab::updateHints(void) noexcept
@@ -577,6 +582,7 @@ void InputTab::writePromptLine(void) const noexcept
 
 	if (this->bufferSize > 0UL)
 		waddnstr(this->mainWin, this->commandBuffer, this->bufferSize);
+
 	this->refresh();
 }
 

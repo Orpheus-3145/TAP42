@@ -52,15 +52,13 @@ CLI::CLI(int32_t clientSocket) :
     ::mousemask(BUTTON4_PRESSED | BUTTON5_PRESSED | ALL_MOUSE_EVENTS, NULL);
     ::mouseinterval(0);       // disable delayed click
 	
-	this->loginWin = std::make_unique<LoginWindow>(height, width, this->commandPipe.in);
-	this->gameWin = std::make_unique<GameWindow>(height, width, this->commandPipe.in, this->chatPipe.in);
-	// this->errorWin = std::make_unique<CurseWindow>(height, width);
-	// this->newPlayerWin = std::make_unique<CurseWindow>(height, width);
+	this->loginWin = std::make_unique<LoginWindow>(this->commandPipe.in);
+	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(this->commandPipe.in);
+	this->gameWin = std::make_unique<GameWindow>(this->commandPipe.in, this->chatPipe.in);
+	// this->errorWin = std::make_unique<CurseWindow>();
 
 	LOG_INFO(LogContext::INTERFACE, "Done setup CLI");
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Listening to client socket: {}", this->pollFds[CLI::CLIENT].fd));
-
-	// this->currentWindow = this->error.get();
 }
 
 CLI::~CLI(void) noexcept
@@ -68,7 +66,7 @@ CLI::~CLI(void) noexcept
 	// empty memory manually because endwin() has to be last
 	// ncurses function to be called
 	this->loginWin.reset();
-	// this->newPlayerWin.reset();
+	this->newPlayerWin.reset();
 	this->gameWin.reset();
 	// this->errorWin.reset();
 
@@ -99,12 +97,15 @@ void CLI::start(void)
 		// user type input
 		if (this->pollFds[STDIN].revents & POLLIN)
 		{
-			if (this->handshakeOk == true)
+			if (this->phase != GamePhase::HANDSHAKE)
 				this->currentWindow->readInput();
 		}
 		// resize window
 		if (this->pollFds[RESIZE].revents & POLLIN)
-			this->handleResize();
+		{
+			if (this->phase != GamePhase::HANDSHAKE)
+				this->handleResize();
+		}
 		// read and show data from server 
 		if (this->pollFds[CLIENT].revents & POLLIN)
 			this->readInputFromServer();
@@ -135,10 +136,15 @@ void CLI::handleResize(void)
 	struct signalfd_siginfo si;
 	ioUtils::read(this->pollFds[CLI::RESIZE].fd, &si, sizeof(si));		// I don't care about the data, flush it
 
-	struct winsize windowSize;
-	::ioctl(STDOUT_FILENO, TIOCGWINSZ, &windowSize);	// get the size of the resized terminal
+	struct winsize termSize;
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
+	{
+		LOG_WARN(LogContext::INTERFACE, "Failed to fetch terminal size, using standard dimension");
+		termSize.ws_row = Config::MIN_HEIGHT_CLI;
+		termSize.ws_col = Config::MIN_WIDTH_CLI;
+	}
 
-	this->currentWindow->resize(windowSize.ws_row, windowSize.ws_col);
+	this->currentWindow->resize(termSize.ws_row, termSize.ws_col);
 }
 
 void CLI::handlePollError(void) noexcept
@@ -193,7 +199,6 @@ void CLI::handleGameCommand(void)
 void CLI::handleChatCommand(void)
 {
 	int32_t chatPipe = this->pollFds[CHAT].fd;
-	// format command, convert it to HTTP command if necessary
 
 	try
 	{
@@ -209,48 +214,94 @@ void CLI::handleChatCommand(void)
 	}
 }
 
-void CLI::login(void)
+void CLI::loginPhase(void)
 {
-	UI::login();
+	UI::loginPhase();
+
+	struct winsize termSize;
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
+	{
+		LOG_WARN(LogContext::INTERFACE, "Failed to fetch terminal size, using standard dimension");
+		termSize.ws_row = Config::MIN_HEIGHT_CLI;
+		termSize.ws_col = Config::MIN_WIDTH_CLI;
+	}
+
+	int32_t height = termSize.ws_row;
+	int32_t width = termSize.ws_col;
 
 	this->currentWindow = this->loginWin.get();
-	this->currentWindow->draw();
+	this->currentWindow->draw(height, width);
 }
 
-void CLI::createNewPlayer(void)
+void CLI::newPlayerPhase(void)
 {
+	UI::newPlayerPhase();
+
+	struct winsize termSize;
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
+	{
+		LOG_WARN(LogContext::INTERFACE, "Failed to fetch terminal size, using standard dimension");
+		termSize.ws_row = Config::MIN_HEIGHT_CLI;
+		termSize.ws_col = Config::MIN_WIDTH_CLI;
+	}
+
+	int32_t height = termSize.ws_row;
+	int32_t width = termSize.ws_col;
+
 	this->currentWindow->clear();
 	this->currentWindow = this->newPlayerWin.get();
-	this->currentWindow->draw();
+	this->currentWindow->draw(height, width);
 }
 
-void CLI::startGame(void)
+void CLI::gamePhase(void)
 {
-	UI::startGame();
+	UI::gamePhase();
+
+	struct winsize termSize;
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
+	{
+		LOG_WARN(LogContext::INTERFACE, "Failed to fetch terminal size, using standard dimension");
+		termSize.ws_row = Config::MIN_HEIGHT_CLI;
+		termSize.ws_col = Config::MIN_WIDTH_CLI;
+	}
+
+	int32_t height = termSize.ws_row;
+	int32_t width = termSize.ws_col;
 
 	this->currentWindow->clear();
 	this->currentWindow = this->gameWin.get();
-	this->currentWindow->draw();
+	this->currentWindow->draw(height, width);
 }
 
 void CLI::handleError(std::string const& errMsg) noexcept
 {
-	LOG_ERROR(LogContext::INTERFACE, errMsg);
+	UI::handleError(errMsg);
+
+	struct winsize termSize;
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
+	{
+		LOG_WARN(LogContext::INTERFACE, "Failed to fetch terminal size, using standard dimension");
+		termSize.ws_row = Config::MIN_HEIGHT_CLI;
+		termSize.ws_col = Config::MIN_WIDTH_CLI;
+	}
+
+	int32_t height = termSize.ws_row;
+	int32_t width = termSize.ws_col;
 
 	this->currentWindow->clear();
 	// this->error.set(errMsg);		or smt
-	this->currentWindow = this->errorWin.get();
-	this->currentWindow->draw();
+	// this->currentWindow = this->errorWin.get();
+	this->currentWindow->draw(height, width);
 }
 
 void CLI::handleResponse(std::string const& response) noexcept
 {
-	this->currentWindow->handleResponse(response);
+	this->currentWindow->showResponse(response);
 }
 
 void CLI::handleEvent(std::string const& event) noexcept
 {
-	this->currentWindow->handleEvent(event);
+	this->currentWindow->showEvent(event);
 }
 
 std::unique_ptr<UI> uiFactory(int32_t clientSocket)
