@@ -98,8 +98,8 @@ void BasicTab::resize(int32_t h, int32_t w, int32_t y, int32_t x)
 	this->clear();
 	this->draw(h, w, y, x);
 
-	for (std::pair<std::string,TextAlign> const& lineData: this->state)
-		this->printLine(lineData.first, lineData.second);
+	for (auto const& [lineContent, align]: this->state)
+		this->printLine(lineContent, align);
 }
 
 void BasicTab::appendContent(std::string const& newContent, TextAlign align)
@@ -116,7 +116,7 @@ void BasicTab::appendContent(std::string const& newContent, TextAlign align)
 		::wscrl(this->mainWin, 1);
 		::wmove(this->mainWin, maxVerticalSpace - 1, 0);
 		::wclrtoeol(this->mainWin);
-		this->topLineScroll++;
+		this->topLineScroll += 1;
 	}
 	this->printLine(newContent, align);
 }
