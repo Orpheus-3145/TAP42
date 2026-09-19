@@ -51,6 +51,7 @@ class GameWindow : public CurseWindow
 		void readInput(void) override;
 		void resize(int32_t height, int32_t width) override;
 		void switchInputTab(void) noexcept override;
+		void scrollTab(bool goingUp) noexcept override;
 
 		static constexpr int32_t INFO_COLOR = 1;
 		static constexpr int32_t CMD_COLOR = 2;

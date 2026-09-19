@@ -165,6 +165,12 @@
 //  wbkgd(win, COLOR_PAIR)					<-- sets the color for the whole win, not only for the cells with text with that color in it
 //
 // ===========================================================================================================================================================================
+// Others:
+//  hline(charType, width ) #			<-- draw an horizontal line of width chars of type charType
+//  vline(charType, width ) #			<-- draw a vertical line of width chars of type charType
+//
+//
+// ===========================================================================================================================================================================
 // Appendix:
 // To switch temporarly to normal tty mode and exitLoop ncurses:
 // 		initscr();

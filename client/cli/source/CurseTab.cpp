@@ -14,7 +14,8 @@ BasicTab::BasicTab(BasicTab&& other) noexcept :
 	borderChar{other.borderChar},
 	colorPair{other.colorPair},
 	parent{other.parent},
-	_state{std::move(other._state)}
+	state{std::move(other.state)},
+	topLineScroll{other.topLineScroll}
 {
 	other.borderWin = nullptr;
 	other.mainWin = nullptr;
@@ -32,7 +33,8 @@ BasicTab& BasicTab::operator=(BasicTab&& other) noexcept
 		this->borderChar = other.borderChar;
 		this->colorPair = other.colorPair;
 		this->parent = other.parent;
-		this->_state = std::move(other._state);
+		this->state = std::move(other.state);
+		this->topLineScroll = other.topLineScroll;
 
 		other.borderWin = nullptr;
 		other.mainWin = nullptr;
@@ -95,24 +97,25 @@ void BasicTab::resize(int32_t h, int32_t w, int32_t y, int32_t x)
 	this->clear();
 	this->draw(h, w, y, x);
 
-	for (std::string const& line: this->_state)
+	for (std::string const& line: this->state)
 		this->printLine(line);
 }
 
 void BasicTab::appendContent(std::string const& newContent)
 {
-	this->_state.push_back(newContent);
+	this->state.push_back(newContent);
 
-	int32_t h, w;
-	(void)w;
-	getmaxyx(this->mainWin, h, w);
+	int32_t maxVerticalSpace, _;
+	(void)_;
+	getmaxyx(this->mainWin, maxVerticalSpace, _);
 
-	if (static_cast<int32_t>(this->_state.size()) > h)
+	if (static_cast<int32_t>(this->state.size()) > maxVerticalSpace)
 	{
 		// reached the end of the tab, rotate le lines and drop the oldest one
 		::wscrl(this->mainWin, 1);
-		::wmove(this->mainWin, h - 1, 0);
+		::wmove(this->mainWin, maxVerticalSpace - 1, 0);
 		::wclrtoeol(this->mainWin);
+		this->topLineScroll++;
 	}
 	this->printLine(newContent);
 }
@@ -128,6 +131,39 @@ void BasicTab::printLine(std::string const& newContent) const noexcept
 
 	this->refresh();
 }
+
+void BasicTab::scrollContentUp(void) noexcept
+{
+	if (this->topLineScroll == 0)
+		return;
+
+	::wscrl(this->mainWin, -1);
+	this->topLineScroll--;
+
+	::wmove(this->mainWin, 0, 0);
+	this->printLine(this->state[this->topLineScroll]);
+	this->refresh();
+}
+
+void BasicTab::scrollContentDown(void) noexcept
+{
+	int32_t maxVerticalSpace, _;
+	(void)_;
+	getmaxyx(this->mainWin, maxVerticalSpace, _);
+
+	if (maxVerticalSpace >= static_cast<int32_t>(this->state.size()))
+		return;
+	else if (this->topLineScroll + maxVerticalSpace == this->state.size())
+		return;
+
+	::wscrl(this->mainWin, 1);
+	this->topLineScroll++;
+
+	::wmove(this->mainWin, maxVerticalSpace - 1, 0);
+	this->printLine(this->state[this->topLineScroll + maxVerticalSpace - 1]);
+	this->refresh();
+}
+
 
 void BasicTab::clear(void) noexcept
 {
@@ -172,6 +208,14 @@ InputTab::InputTab(
 	this->dispatcher[KEY_DOWN]      = [this] { this->showNext(); };
 	this->dispatcher['\t']          = [this] { this->suggestHint(); };
 	this->dispatcher[KEY_BTAB]      = [this] { if (this->parent) this->parent->switchInputTab(); };
+	this->dispatcher[KEY_MOUSE]     = [this] {
+		MEVENT event;
+		if (::getmouse(&event) == OK)
+		{
+			if (event.bstate & BUTTON4_PRESSED)			this->parent->scrollTab(true);
+			else if (event.bstate & BUTTON5_PRESSED)	this->parent->scrollTab(false);
+		}
+	};
 }
 
 InputTab::InputTab(InputTab&& other) noexcept :
@@ -552,7 +596,7 @@ void InputTab::terminateInput(void)
 	std::string command = std::string(this->commandBuffer, this->bufferSize);
 	ioUtils::write(this->forwardInputFd, command.data(), command.size());
 
-	this->_state.push_back(this->prompt + command);
+	this->state.push_back(this->prompt + command);
 	this->history.emplace_front(std::move(command));
 
 	this->bufferSize = 0UL;
@@ -593,8 +637,10 @@ void SingleInputTab::terminateInput(void)
 OutputTab::OutputTab(OutputTab&& other) noexcept :
 	BasicTab(std::move(other)),
 	titleWin{other.titleWin},
+	divLineWin{other.divLineWin},
 	title{std::move(other.title)}
 {
+	other.divLineWin = nullptr;
 	other.titleWin = nullptr;
 }
 
@@ -605,9 +651,11 @@ OutputTab& OutputTab::operator=(OutputTab&& other) noexcept
 		BasicTab::operator=(std::move(other));
 
 		this->titleWin = other.titleWin;
+		this->divLineWin = other.divLineWin;
 		this->title = std::move(other.title);
 
 		other.titleWin = nullptr;
+		other.divLineWin = nullptr;
 	}
 	return *this;
 }
@@ -616,6 +664,7 @@ void OutputTab::refresh(void) const noexcept
 {
 	::wnoutrefresh(this->borderWin);
 	::wnoutrefresh(this->titleWin);
+	::wnoutrefresh(this->divLineWin);
 	::wnoutrefresh(this->mainWin);
 }
 
@@ -633,7 +682,7 @@ void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 			x += 1;
 		}
 		assert((w + 1) > static_cast<int32_t>(this->title.size()) and "Tab title longer than tab itself");
-		// adding a title
+		// add the title
 		this->titleWin = ::newwin(3, this->title.size() + 2, y, x + 1);
 		if (this->borderWin == nullptr)
 		{
@@ -654,20 +703,17 @@ void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 		else
 			::wattroff(this->titleWin, A_BOLD);
 
-		// readjust position and size of mainWin
-		::mvwin(this->mainWin, y + 3, x + 1);
-		::wresize(this->mainWin, h - 3, w - 2);
-
 		// add a div line between title and ouput
+		this->divLineWin = ::newwin(1, w - 2, y + 3, x + 1);
 		if (this->colorPair != -1)
-			::wattron(this->mainWin, COLOR_PAIR(this->colorPair));
-		::wborder(this->mainWin, ' ', ' ', 0, ' ', ACS_HLINE, ACS_HLINE, ' ', ' ');
+			::wattron(this->divLineWin, COLOR_PAIR(this->colorPair));
+		mvwhline(this->divLineWin, 0, 0, ACS_HLINE, w - 2);
 		if (this->colorPair != -1)
-			::wattroff(this->mainWin, COLOR_PAIR(this->colorPair));
+			::wattroff(this->divLineWin, COLOR_PAIR(this->colorPair));
 
-		int32_t y, x;
-		getyx(this->mainWin, y, x);
-		::wmove(this->mainWin, y + 1, 0);
+		// readjust position and size of mainWin
+		::mvwin(this->mainWin, y + 4, x + 1);
+		::wresize(this->mainWin, h - 4, w - 2);
 	}
 	this->refresh();
 }
@@ -682,5 +728,10 @@ void OutputTab::clear(void) noexcept
 		::wclear(this->titleWin);
 		::delwin(this->titleWin);
 		this->titleWin = nullptr;
+
+		::wrefresh(this->divLineWin);
+		::wclear(this->divLineWin);
+		::delwin(this->divLineWin);
+		this->divLineWin = nullptr;
 	}
 }
