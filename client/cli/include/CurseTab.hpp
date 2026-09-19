@@ -12,6 +12,13 @@
 #include <CurseWindow.hpp>
 
 
+enum class TextAlign : uint32_t
+{
+	LEFT_ALIGN = 0,
+	MID_ALIGN = 1,
+	RIGHT_ALIGN = 2,
+};
+
 class BasicTab
 {
 	public:
@@ -33,8 +40,9 @@ class BasicTab
 		virtual void draw(int32_t h, int32_t w, int32_t y, int32_t x);
 		virtual void resize(int32_t h, int32_t w, int32_t y, int32_t x);
 
-		virtual void appendContent(std::string const& newContent);
-		virtual void printLine(std::string const& newContent) const noexcept;
+		virtual void appendContent(std::string const& newContent, TextAlign align = TextAlign::LEFT_ALIGN);
+		virtual void printLine(std::string const& newContent, TextAlign align = TextAlign::LEFT_ALIGN) const noexcept;
+		virtual void printLine(std::pair<std::string,TextAlign> const& content) const noexcept;
 
 		virtual void scrollContentUp(void) noexcept;
 		virtual void scrollContentDown(void) noexcept;
@@ -49,7 +57,7 @@ class BasicTab
 		int32_t			borderChar, colorPair;
 		CurseWindow*	parent;
 
-		std::deque<std::string> state;
+		std::deque<std::pair<std::string,TextAlign>> state;
 		size_t					topLineScroll{0UL};
 };
 
@@ -95,7 +103,7 @@ class InputTab : public BasicTab
 		void showNext(void) noexcept;
 
 		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
-		void appendContent(std::string const& newContent) override;
+		void appendContent(std::string const& newContent, TextAlign align = TextAlign::LEFT_ALIGN) override;
 
 	protected:
 		virtual void appendCharToInput(int32_t input);
@@ -112,7 +120,7 @@ class InputTab : public BasicTab
 
 		InputDispatcher	dispatcher;
 
-		std::deque<std::string>	history;
+		std::deque<std::string>	inputHistory;
 		std::vector<uint32_t>	suggestedHintIndexes;
 
 		ssize_t			currentCommandIndex{-1L};
@@ -133,7 +141,7 @@ class SingleInputTab : public InputTab
 	public:
 		using InputTab::InputTab;
 
-		void appendContent(std::string const& newContent) override { (void) newContent; }
+		void appendContent(std::string const& newContent, TextAlign align = TextAlign::LEFT_ALIGN) override { (void) newContent; (void) align; }
 
 	protected:
 		void terminateInput(void) override;

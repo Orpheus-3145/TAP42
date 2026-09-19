@@ -4,7 +4,6 @@
 #include "Utils.hpp"
 #include "Exceptions.hpp"
 
-#include <ncurses.h>
 #include <cassert>
 
 
@@ -99,13 +98,13 @@ void BasicTab::resize(int32_t h, int32_t w, int32_t y, int32_t x)
 	this->clear();
 	this->draw(h, w, y, x);
 
-	for (std::string const& line: this->state)
-		this->printLine(line);
+	for (std::pair<std::string,TextAlign> const& lineData: this->state)
+		this->printLine(lineData.first, lineData.second);
 }
 
-void BasicTab::appendContent(std::string const& newContent)
+void BasicTab::appendContent(std::string const& newContent, TextAlign align)
 {
-	this->state.push_back(newContent);
+	this->state.emplace_back(newContent, align);
 
 	int32_t maxVerticalSpace, _;
 	(void)_;
@@ -119,19 +118,40 @@ void BasicTab::appendContent(std::string const& newContent)
 		::wclrtoeol(this->mainWin);
 		this->topLineScroll++;
 	}
-	this->printLine(newContent);
+	this->printLine(newContent, align);
 }
 
-void BasicTab::printLine(std::string const& newContent) const noexcept
+void BasicTab::printLine(std::string const& newContent, TextAlign align) const noexcept
 {
-	int32_t y, x;
-	(void)x;
-	getyx(this->mainWin, y, x);
+	int32_t y, _;
+	(void)_;
+	getyx(this->mainWin, y, _);
+
+	if (align != TextAlign::LEFT_ALIGN)
+	{
+		int32_t w;
+		getmaxyx(this->mainWin, _, w);
+
+		uint32_t lenWord = newContent.size();
+		if (w > static_cast<int32_t>(lenWord))
+		{
+			uint32_t startText = 0U;
+			if (align == TextAlign::MID_ALIGN)			startText = (w - lenWord) / 2U;
+			else if (align == TextAlign::RIGHT_ALIGN)	startText = w - lenWord;
+
+			::wmove(this->mainWin, y, startText);
+		}
+	}
 
 	waddstr(this->mainWin, newContent.data());
 	::wmove(this->mainWin, y + 1, 0);
 
 	this->refresh();
+}
+
+void BasicTab::printLine(std::pair<std::string,TextAlign> const& content) const noexcept
+{
+	this->printLine(content.first, content.second);
 }
 
 void BasicTab::scrollContentUp(void) noexcept
@@ -226,7 +246,7 @@ InputTab::InputTab(InputTab&& other) noexcept :
 	hints{std::move(other.hints)},
 	prompt{std::move(other.prompt)},
 	dispatcher{std::move(other.dispatcher)},
-	history{std::move(other.history)},
+	inputHistory{std::move(other.inputHistory)},
 	suggestedHintIndexes{std::move(other.suggestedHintIndexes)},
 	currentCommandIndex{other.currentCommandIndex},
 	currentSuggestedIndex{other.currentSuggestedIndex},
@@ -417,7 +437,7 @@ void InputTab::suggestPrevious(void) noexcept
 
 void InputTab::showPrevious(void) noexcept
 {
-	ssize_t nHistoryItems = this->history.size();
+	ssize_t nHistoryItems = this->inputHistory.size();
 	if ((nHistoryItems == 0L) or (this->currentCommandIndex == nHistoryItems - 1))
 		return;		// skip if history empty or current shown element it the oldest in the history
 	else if (this->currentCommandIndex == -1L)
@@ -427,7 +447,7 @@ void InputTab::showPrevious(void) noexcept
 	}
 	this->currentCommandIndex++;
 
-	std::string const& previousCommand = this->history.at(this->currentCommandIndex);
+	std::string const& previousCommand = this->inputHistory.at(this->currentCommandIndex);
 	this->bufferSize = previousCommand.size(); 
 	::memcpy(this->commandBuffer, previousCommand.data(), this->bufferSize);
 
@@ -478,7 +498,7 @@ void InputTab::showNext(void) noexcept
 	{
 		this->currentCommandIndex--;
 
-		std::string const& previousCommand = this->history.at(this->currentCommandIndex);
+		std::string const& previousCommand = this->inputHistory.at(this->currentCommandIndex);
 		this->bufferSize = previousCommand.size(); 
 		::memcpy(this->commandBuffer, previousCommand.data(), this->bufferSize);
 	}
@@ -486,7 +506,7 @@ void InputTab::showNext(void) noexcept
 	this->writePromptLine();
 }
 
-void InputTab::appendContent(std::string const& newContent)
+void InputTab::appendContent(std::string const& newContent, TextAlign align)
 {
 	int32_t y, x;
 	getyx(this->mainWin, y, x);
@@ -499,7 +519,7 @@ void InputTab::appendContent(std::string const& newContent)
 		::wclrtoeol(this->mainWin);
 	}
 
-	BasicTab::appendContent(newContent);
+	BasicTab::appendContent(newContent, align);
 	this->writePromptLine();
 }
 
@@ -598,8 +618,8 @@ void InputTab::terminateInput(void)
 	std::string command = std::string(this->commandBuffer, this->bufferSize);
 	ioUtils::write(this->forwardInputFd, command.data(), command.size());
 
-	this->state.push_back(this->prompt + command);
-	this->history.emplace_front(std::move(command));
+	this->state.emplace_back(this->prompt + command, TextAlign::LEFT_ALIGN);
+	this->inputHistory.emplace_front(std::move(command));
 
 	this->bufferSize = 0UL;
 	// in case a command from history has been submitted reset move commandIndex as the most recent command 
@@ -621,7 +641,7 @@ void SingleInputTab::terminateInput(void)
 	std::string command = std::string(this->commandBuffer, this->bufferSize);
 	ioUtils::write(this->forwardInputFd, command.data(), command.size());
 
-	this->history.emplace_front(std::move(command));
+	this->inputHistory.emplace_front(std::move(command));
 
 	this->bufferSize = 0UL;
 	// in case a command from history has been submitted reset move commandIndex as the most recent command 
