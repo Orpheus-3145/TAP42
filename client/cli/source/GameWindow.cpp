@@ -34,7 +34,7 @@ GameWindow::GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t
 
 	this->infoTab = std::make_unique<OutputTab>(0, GameWindow::INFO_COLOR, this);
 	this->eventsTab = std::make_unique<OutputTab>("World events", 0, GameWindow::EVENTS_COLOR, this);
-	this->tbdTab = std::make_unique<OutputTab>("TBD", 0, -1, this);
+	this->tbdTab = std::make_unique<OutputTab>("", 0, -1, this);
 
 	this->draw();
 }
@@ -120,6 +120,7 @@ void GameWindow::draw(void)
 		heightEventsTab + heightoutputChatTab + 3 + 1,
 		widthTabs + 3
 	);
+	this->tbdTab->appendContent("TBD... ");
 
 	this->currentTab = this->inputCmdTab.get();
 	this->currentTab->refresh();
@@ -268,6 +269,23 @@ void GameWindow::switchInputTab(void) noexcept
 	{
 		this->currentTab = this->inputCmdTab.get();
 		this->inputCmdTab->refresh();
+	}
+}
+void GameWindow::scrollTab(bool goingUp) noexcept
+{
+	if (this->currentTab == this->inputCmdTab.get())
+	{
+		if (goingUp)	this->outputCmdTab->scrollContentUp();
+		else 			this->outputCmdTab->scrollContentDown();
+
+		this->inputCmdTab->refresh();
+	}
+	else if (this->currentTab == this->inputChatTab.get())
+	{
+		if (goingUp)	this->outputChatTab->scrollContentUp();
+		else			this->outputChatTab->scrollContentDown();
+
+		this->inputChatTab->refresh();
 	}
 }
 

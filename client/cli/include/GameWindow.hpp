@@ -42,15 +42,16 @@ class GameWindow : public CurseWindow
 
 		virtual ~GameWindow(void) noexcept { this->clear(); }
 
-		void handleResponse(std::string const& response) noexcept;
-		void handleChatMsg(std::string const& response) noexcept;
-		void handleEvent(std::string const& event) noexcept;
-
 		void draw(void) override;
 		void clear(void) noexcept override;
 		void readInput(void) override;
 		void resize(int32_t height, int32_t width) override;
 		void switchInputTab(void) noexcept override;
+		void scrollTab(bool goingUp) noexcept override;
+
+		void handleResponse(std::string const& response) noexcept;
+		void handleChatMsg(std::string const& response) noexcept;
+		void handleEvent(std::string const& event) noexcept;
 
 		static constexpr int32_t INFO_COLOR = 1;
 		static constexpr int32_t CMD_COLOR = 2;
