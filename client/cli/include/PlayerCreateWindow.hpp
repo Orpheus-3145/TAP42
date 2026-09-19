@@ -4,12 +4,12 @@
 #include "CurseTab.hpp"
 
 
-class LoginWindow : public CurseWindow
+class PlayerCreateWindow : public CurseWindow
 {
 	public:
-		LoginWindow(int32_t commandFd);
+		PlayerCreateWindow(int32_t commandFd);
 
-		virtual ~LoginWindow(void) noexcept { this->clear(); }
+		virtual ~PlayerCreateWindow(void) noexcept { this->clear(); }
 
 		void draw(int32_t height, int32_t width) override;
 		void clear(void) noexcept override;
@@ -23,7 +23,7 @@ class LoginWindow : public CurseWindow
 		void showEvent(std::string const& event) noexcept override { (void) event; }
 
 	protected:
-		static constexpr int32_t INFO_COLOR = 5;
+		static constexpr int32_t INFO_COLOR = 6;
 
 		int32_t commandFd;
 		int32_t messageFd;

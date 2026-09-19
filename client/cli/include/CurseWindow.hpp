@@ -11,9 +11,7 @@ class BasicTab;
 class CurseWindow
 {
 	public:
-		CurseWindow(int32_t height, int32_t width) :
-			height{height},
-			width{width} {}
+		CurseWindow(void) noexcept = default;
 
 		CurseWindow(CurseWindow const& other) = delete;
 		CurseWindow& operator=(CurseWindow const& other) = delete;
@@ -22,22 +20,22 @@ class CurseWindow
 
 		virtual ~CurseWindow(void) noexcept;
 
-		virtual void draw(void) = 0;
+		virtual void draw(int32_t height, int32_t width) = 0;
 		virtual void clear(void) noexcept = 0;
 		virtual void readInput(void) = 0;
 		virtual void resize(int32_t height, int32_t width) = 0;
 		virtual void switchInputTab(void) noexcept = 0;
 		virtual void scrollTab(bool goingUp) noexcept = 0;
 
-		virtual void handleResponse(std::string const& response) noexcept = 0;
-		virtual void handleChatMsg(std::string const& response) noexcept = 0;
-		virtual void handleEvent(std::string const& event) noexcept = 0;
+		virtual void showResponse(std::string const& response) noexcept = 0;
+		virtual void showChatMsg(std::string const& response) noexcept = 0;
+		virtual void showEvent(std::string const& event) noexcept = 0;
 
 		void refresh(void) noexcept { ::doupdate(); }
 
 	protected:
-		int32_t height;
-		int32_t width;
+		int32_t height{0};
+		int32_t width{0};
 
 		BasicTab* currentTab{nullptr};
 };

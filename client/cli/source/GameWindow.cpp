@@ -6,16 +6,13 @@
 #include <cassert>
 
 
-GameWindow::GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t messageFd) :
-	CurseWindow(height, width),
+GameWindow::GameWindow(int32_t commandFd, int32_t messageFd) :
+	CurseWindow(),
 	commandFd{commandFd},
 	messageFd{messageFd}
 {
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding commands");
 	assert(this->messageFd != -1 and "Invalid fd provided for forwarding chat messages");
-
-	this->height = ((this->height - 2) % 5) == 0 ? this->height : ((this->height - 2) / 5 * 5 + 2);		// has to be multiple of 5
-	this->width = (this->width % 2) == 0 ? (this->width - 1) : this->width;								// has to be an odd number
 
 	::init_pair(GameWindow::INFO_COLOR, COLOR_BLUE, COLOR_BLACK);
 	::init_pair(GameWindow::CMD_COLOR, COLOR_RED, COLOR_BLACK);
@@ -37,8 +34,11 @@ GameWindow::GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t
 	this->tbdTab = std::make_unique<OutputTab>("", 0, -1, this);
 }
 
-void GameWindow::draw(void)
+void GameWindow::draw(int32_t height, int32_t width)
 {
+	this->height = ((height - 2) % 5) == 0 ? height : ((height - 2) / 5 * 5 + 2);		// has to be multiple of 5
+	this->width = (width % 2) == 0 ? (width - 1) : width;								// has to be an odd number
+
 	this->mainFrame->draw(
 		this->height,
 		this->width,
@@ -293,13 +293,13 @@ void GameWindow::handleResponse(std::string const& response) noexcept
 	this->currentTab->refresh();
 }
 
-void GameWindow::handleChatMsg(std::string const& response) noexcept
+void GameWindow::showChatMsg(std::string const& response) noexcept
 {
 	this->outputChatTab->appendContent(response);
 	this->currentTab->refresh();
 }
 
-void GameWindow::handleEvent(std::string const& event) noexcept
+void GameWindow::showEvent(std::string const& event) noexcept
 {
 	this->eventsTab->appendContent(event);
 	this->currentTab->refresh();

@@ -29,7 +29,6 @@ void UI::writeInputToServer(void)
 		}
 		else
 			LOG_WARN(LogContext::INTERFACE, "Client socket buffer is busy, try again later");
-
 	}
 	catch(const IOException& e)
 	{
@@ -84,23 +83,31 @@ void UI::splitIntoMessages(void)
 
 void UI::handleServerData(std::string const& message)
 {
-	if (this->handshakeOk == false)
+	if (this->phase == GamePhase::HANDSHAKE)
 	{
 		if (message == INITIAL_GREETING)
-			this->login();
+			this->loginPhase();
 		else
 			LOG_WARN(LogContext::INTERFACE, std::format("Unexpected message: '{}'", message));
 	}
-	else if ((this->handshakeOk == true) and (this->loginOk == false))
+	else if (this->phase == GamePhase::LOGIN)
 	{
 		if (message == LOGIN_OK)
-			this->startGame();
+			this->gamePhase();
 		else if (message.find(S_ERR) == 0UL)
-			this->createNewPlayer();
+			this->newPlayerPhase();
+			// this->handleError("Username doesn't exist");
 		else
 			LOG_WARN(LogContext::INTERFACE, std::format("Unexpected message: '{}'", message));
 	}
-	else if ((this->handshakeOk == true) and (this->loginOk == true))
+	else if (this->phase == GamePhase::PLAYER_CREATE)
+	{
+		if (message == LOGIN_OK)
+			this->gamePhase();
+		else
+			LOG_WARN(LogContext::INTERFACE, std::format("Unexpected message: '{}'", message));
+	}
+	else if (this->phase == GamePhase::GAME)
 	{
 		if (message == QUIT_RESPONSE)
 			this->stop();
@@ -117,7 +124,7 @@ void UI::handleServerData(std::string const& message)
 
 void UI::formatCommand(void) noexcept
 {
-	if (this->loginOk == false)
+	if ((this->phase == GamePhase::LOGIN) or (this->phase == GamePhase::PLAYER_CREATE))
 	{
 		// move to the right to insert CMD_CONNECT at the beginning of the command
 		::memmove(this->toServerBuffer + ::strlen(CMD_CONNECT) + 1, this->toServerBuffer, this->toServerSize);
@@ -127,4 +134,28 @@ void UI::formatCommand(void) noexcept
 	}
 	::memcpy(this->toServerBuffer + this->toServerSize, &COMMAND_TERM, 1);
 	this->toServerSize++;
+}
+
+void UI::loginPhase(void)
+{
+	LOG_DEBUG(LogContext::INTERFACE, "Handshake with server successful, moving to login");
+	this->phase = GamePhase::LOGIN;
+}
+
+void UI::newPlayerPhase(void)
+{
+	LOG_DEBUG(LogContext::INTERFACE, "Creating new player");
+	this->phase = GamePhase::PLAYER_CREATE;
+}
+
+void UI::gamePhase(void)
+{
+	LOG_DEBUG(LogContext::INTERFACE, "Login successful, retrieving game session");
+	this->phase = GamePhase::GAME;
+}
+
+void UI::handleError(std::string const& errMsg) noexcept
+{
+	LOG_ERROR(LogContext::INTERFACE, errMsg);
+	this->phase = GamePhase::ERROR;
 }

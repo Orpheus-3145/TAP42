@@ -38,20 +38,20 @@ class GameWindow : public CurseWindow
 	public:
 		using CurseWindow::CurseWindow;
 
-		GameWindow(int32_t height, int32_t width, int32_t commandFd, int32_t messageFd);
+		GameWindow(int32_t commandFd, int32_t messageFd);
 
 		virtual ~GameWindow(void) noexcept { this->clear(); }
 
-		void draw(void) override;
+		void draw(int32_t height, int32_t width) override;
 		void clear(void) noexcept override;
 		void readInput(void) override;
 		void resize(int32_t height, int32_t width) override;
 		void switchInputTab(void) noexcept override;
 		void scrollTab(bool goingUp) noexcept override;
 
-		void handleResponse(std::string const& response) noexcept override;
-		void handleChatMsg(std::string const& response) noexcept override;
-		void handleEvent(std::string const& event) noexcept override;
+		void showResponse(std::string const& response) noexcept override;
+		void showChatMsg(std::string const& response) noexcept override;
+		void showEvent(std::string const& event) noexcept override;
 
 	protected:
 		static constexpr int32_t INFO_COLOR = 1;
