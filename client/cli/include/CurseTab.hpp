@@ -30,38 +30,24 @@ class BasicTab
 			}
 		BasicTab(BasicTab const& other) noexcept = delete;
 		BasicTab& operator=(BasicTab const& other) noexcept = delete;
-		BasicTab(BasicTab&&) noexcept;
-		BasicTab& operator=(BasicTab&&) noexcept;
+		BasicTab(BasicTab&& other) noexcept;
+		BasicTab& operator=(BasicTab&& other) noexcept;
 
 		virtual ~BasicTab(void) { this->clear(); }
 
 		virtual void refresh(void) const noexcept;
-
 		virtual void draw(int32_t h, int32_t w, int32_t y, int32_t x);
+		virtual void clear(void) noexcept;
 		virtual void resize(int32_t h, int32_t w, int32_t y, int32_t x);
 
-		virtual void appendContent(std::string const& newContent, TextAlign align = TextAlign::LEFT_ALIGN);
-		virtual void printLine(std::string const& newContent, TextAlign align = TextAlign::LEFT_ALIGN) const noexcept;
-		virtual void printLine(std::pair<std::string,TextAlign> const& content) const noexcept;
-
-		virtual void scrollContentUp(void) noexcept;
-		virtual void scrollContentDown(void) noexcept;
-
-		virtual void clear(void) noexcept;
-		
 	protected:
-
 		WINDOW* borderWin{nullptr};
-		WINDOW* mainWin{nullptr};
 
 		int32_t			borderChar, colorPair;
 		CurseWindow*	parent;
-
-		std::deque<std::pair<std::string,TextAlign>> state;
-		size_t					topLineScroll{0UL};
 };
 
-class InputTab : public BasicTab
+class InputTab : public virtual BasicTab
 {
 	using InputDispatcher = std::unordered_map<int32_t,std::function<void()>>;
 
@@ -77,10 +63,10 @@ class InputTab : public BasicTab
 			CurseWindow* parent = nullptr
 		);
 
-		InputTab(InputTab&&) noexcept;
-		InputTab& operator=(InputTab&&) = delete;
+		InputTab(InputTab&& other) noexcept;
+		InputTab& operator=(InputTab&& other) = delete;
 
-		virtual ~InputTab(void) { ::keypad(this->mainWin, false); }
+		virtual ~InputTab(void) { ::keypad(this->inputWin, false); }
 
 		void handleUserInput(void);
 
@@ -102,13 +88,11 @@ class InputTab : public BasicTab
 		void suggestNext(void) noexcept;
 		void showNext(void) noexcept;
 
+		void refresh(void) const noexcept override;
 		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
-		void appendContent(std::string const& newContent, TextAlign align = TextAlign::LEFT_ALIGN) override;
+		void clear(void) noexcept override;
 
 	protected:
-		virtual void appendCharToInput(int32_t input);
-		virtual void terminateInput(void);
-
 		void updateHints(void) noexcept;
 		void clearHints(void) noexcept;
 		void writePromptLine(void) const noexcept;
@@ -118,6 +102,7 @@ class InputTab : public BasicTab
 		std::vector<std::string> const	hints;
 		std::string const				prompt;
 
+		WINDOW*			inputWin{nullptr};
 		InputDispatcher	dispatcher;
 
 		std::deque<std::string>	inputHistory;
@@ -136,18 +121,7 @@ class InputTab : public BasicTab
 		bool	autocompleteMode{false};
 };
 
-class SingleInputTab : public InputTab
-{
-	public:
-		using InputTab::InputTab;
-
-		void appendContent(std::string const& newContent, TextAlign align = TextAlign::LEFT_ALIGN) override { (void) newContent; (void) align; }
-
-	protected:
-		void terminateInput(void) override;
-};
-
-class OutputTab : public BasicTab
+class OutputTab : public virtual BasicTab
 {
 	public:
 		using BasicTab::BasicTab;
@@ -156,16 +130,58 @@ class OutputTab : public BasicTab
 			BasicTab(borderChar, colorPair, parent),
 			title{title} {}
 
-		OutputTab(OutputTab&&) noexcept;
-		OutputTab& operator=(OutputTab&&) noexcept;
+		OutputTab(OutputTab&& other) noexcept;
+		OutputTab& operator=(OutputTab&& other) = delete;
 
 		void refresh(void) const noexcept override;
 		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
+		void clear(void) noexcept override;
+		void resize(int32_t h, int32_t w, int32_t y, int32_t x) override;
+
+		void appendContent(std::string const& newContent, TextAlign align = TextAlign::LEFT_ALIGN);
+		void scrollContentUp(void) noexcept;
+		void scrollContentDown(void) noexcept;
+
+		void printLine(std::string const& newContent, TextAlign align = TextAlign::LEFT_ALIGN) const noexcept;
+		void printLine(std::pair<std::string,TextAlign> const& content) const noexcept
+			{ this->printLine(content.first, content.second); }
 
 	protected:
-		virtual void clear(void) noexcept override;
+		WINDOW*	titleWin{nullptr};
+		WINDOW*	divLineWin{nullptr};
+		WINDOW*	outputWin{nullptr};
 
-		WINDOW*		titleWin{nullptr};
-		WINDOW*		divLineWin{nullptr};
-		std::string	title;
+		std::string const	title;
+
+		std::deque<std::pair<std::string,TextAlign>> state;
+
+		size_t		topLineScroll{0UL};
+};
+
+class InOutTab : public InputTab, public OutputTab
+{
+	public:
+		InOutTab(
+			int32_t forwardInputFd,
+			std::vector<std::string> const& hints = std::vector<std::string>(),
+			std::string const& prompt = "<?> ",
+			std::string const& title = "",
+			int32_t borderChar = -1,
+			int32_t colorPair = -1,
+			CurseWindow* parent = nullptr
+		);
+
+		InOutTab(InOutTab const& other) noexcept = delete;
+		InOutTab& operator=(InOutTab const& other) noexcept = delete;
+		InOutTab(InOutTab&& other) noexcept;
+		InOutTab& operator=(InOutTab&& other) = delete;
+
+		virtual ~InOutTab(void) { this->clear(); }
+
+		void refresh(void) const noexcept override;
+		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
+		void clear(void) noexcept override;
+
+	protected:
+		WINDOW*	inputFrame{nullptr};
 };

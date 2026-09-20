@@ -17,13 +17,8 @@ GameWindow::GameWindow(int32_t commandFd, int32_t messageFd) :
 
 	this->mainFrame = std::make_unique<BasicTab>(0, BLUE_COLOR, this);
 
-	this->cmdFrame = std::make_unique<BasicTab>(0, RED_COLOR, this);
-	this->inputCmdTab = std::make_unique<SingleInputTab>(this->commandFd, CMD_HINTS, Config::PROMPT, 0, RED_COLOR, this);
-	this->outputCmdTab = std::make_unique<OutputTab>("User Events", 0, RED_COLOR, this);
-
-	this->chatFrame = std::make_unique<BasicTab>(0, GREEN_COLOR, this);
-	this->inputChatTab = std::make_unique<SingleInputTab>(this->messageFd, CHAT_CMD_HINTS, Config::PROMPT, 0, GREEN_COLOR, this);
-	this->outputChatTab = std::make_unique<OutputTab>("Chat", 0, GREEN_COLOR, this);
+	this->commandTab = std::make_unique<InOutTab>(this->commandFd, CMD_HINTS, Config::PROMPT, "User Events", 0, RED_COLOR, this);
+	this->chatTab = std::make_unique<InOutTab>(this->messageFd, CHAT_CMD_HINTS, Config::PROMPT, "Chat", 0, GREEN_COLOR, this);
 
 	this->infoTab = std::make_unique<OutputTab>(0, BLUE_COLOR, this);
 	this->eventsTab = std::make_unique<OutputTab>("World events", 0, YELLOW_COLOR, this);
@@ -55,30 +50,15 @@ void GameWindow::draw(int32_t height, int32_t width)
 	this->infoTab->appendContent("Currently in: <LOCATION>");
 	this->infoTab->appendContent("<IN GROUP | NOT IN GROUP>");
 
-	this->cmdFrame->draw(
+	this->commandTab->draw(
 		this->height - 6 - 2,
 		widthTabs,
 		7,
 		2
 	);
 
-	this->outputCmdTab->draw(
-		this->height - 6 - 7,
-		widthTabs - 2,
-		8,
-		3
-	);
-
-	this->inputCmdTab->draw(
-		3,
-		widthTabs - 2,
-		this->height - 5,
-		3
-	);
-	// right panel
 	int32_t tmpHeight = this->height - 2;
 	int32_t heightEventsTab = tmpHeight * 2 / 5;
-	int32_t heightoutputChatTab = tmpHeight * 2 / 5 - 3;
 	int32_t tbdTab = tmpHeight / 5;
 	this->eventsTab->draw(
 		heightEventsTab,
@@ -87,39 +67,25 @@ void GameWindow::draw(int32_t height, int32_t width)
 		widthTabs + 3
 	);
 
-	this->chatFrame->draw(
+	this->chatTab->draw(
 		heightEventsTab,
 		widthTabs,
 		heightEventsTab + 1,
 		widthTabs + 3
 	);
 
-	this->outputChatTab->draw(
-		heightoutputChatTab - 2,
-		widthTabs - 2,
-		heightEventsTab + 2,
-		widthTabs + 4
-	);
-
-	this->inputChatTab->draw(
-		3,
-		widthTabs - 2,
-		heightEventsTab + heightoutputChatTab,
-		widthTabs + 4
-	);
-
 	this->tbdTab->draw(
 		tbdTab,
 		widthTabs,
-		heightEventsTab + heightoutputChatTab + 3 + 1,
+		heightEventsTab * 2 + 1,
 		widthTabs + 3
 	);
 
 	this->tbdTab->appendContent("");
 	this->tbdTab->appendContent("");
-	this->tbdTab->appendContent("TBD... ", TextAlign::MID_ALIGN);
+	this->tbdTab->appendContent("TBD ", TextAlign::MID_ALIGN);
 
-	this->currentTab = this->inputCmdTab.get();
+	this->currentTab = this->commandTab.get();
 	this->currentTab->refresh();
 	this->refresh();
 
@@ -129,14 +95,10 @@ void GameWindow::draw(int32_t height, int32_t width)
 void GameWindow::clear(void) noexcept
 {
 	this->mainFrame.reset();
-	this->cmdFrame.reset();
-	this->chatFrame.reset();
-	this->inputCmdTab.reset();
-	this->inputChatTab.reset();
+	this->commandTab.reset();
+	this->chatTab.reset();
 	this->infoTab.reset();
-	this->outputCmdTab.reset();
 	this->eventsTab.reset();
-	this->outputChatTab.reset();
 	this->tbdTab.reset();
 }
 
@@ -160,7 +122,7 @@ void GameWindow::resize(int32_t height, int32_t width)
 	// 		this->height = Config::MIN_HEIGHT_CLI;
 	// 	if (this->width < Config::MIN_WIDTH_CLI)
 	// 		this->width = Config::MIN_WIDTH_CLI;
-
+	//
 	// 	std::cout << std::format("\033[8;{};{}t", this->height, this->width) << std::endl;
 	// 	LOG_WARN(LogContext::INTERFACE, std::format("Window too small, forced to h: {}, w: {}", this->height, this->width));
 	// 	return;
@@ -174,8 +136,8 @@ void GameWindow::resize(int32_t height, int32_t width)
 		0
 	);
 
-	// left panel
 	int32_t widthTabs = (this->width - 2) / 2 - 1;
+	// left panel
 	this->infoTab->resize(
 		6,
 		widthTabs,
@@ -183,29 +145,15 @@ void GameWindow::resize(int32_t height, int32_t width)
 		2
 	);
 
-	this->cmdFrame->resize(
+	this->commandTab->resize(
 		this->height - 6 - 2,
 		widthTabs,
 		7,
 		2
 	);
-	this->outputCmdTab->resize(
-		this->height - 6 - 7,
-		widthTabs - 2,
-		8,
-		3
-	);
 
-	this->inputCmdTab->resize(
-		3,
-		widthTabs - 2,
-		this->height - 5,
-		3
-	);
-	// right panel
 	int32_t tmpHeight = this->height - 2;
 	int32_t heightEventsTab = tmpHeight * 2 / 5;
-	int32_t heightoutputChatTab = tmpHeight * 2 / 5 - 3;
 	int32_t tbdTab = tmpHeight / 5;
 	this->eventsTab->resize(
 		heightEventsTab,
@@ -214,31 +162,17 @@ void GameWindow::resize(int32_t height, int32_t width)
 		widthTabs + 3
 	);
 
-	this->chatFrame->resize(
+	this->chatTab->resize(
 		heightEventsTab,
 		widthTabs,
 		heightEventsTab + 1,
 		widthTabs + 3
 	);
 
-	this->outputChatTab->resize(
-		heightoutputChatTab - 2,
-		widthTabs - 2,
-		heightEventsTab + 2,
-		widthTabs + 4
-	);
-
-	this->inputChatTab->resize(
-		3,
-		widthTabs - 2,
-		heightEventsTab + heightoutputChatTab,
-		widthTabs + 4
-	);
-
 	this->tbdTab->resize(
 		tbdTab,
 		widthTabs,
-		heightEventsTab + heightoutputChatTab + 3 + 1,
+		heightEventsTab * 2 + 1,
 		widthTabs + 3
 	);
 
@@ -253,45 +187,40 @@ void GameWindow::resize(int32_t height, int32_t width)
 
 void GameWindow::switchInputTab(void) noexcept
 {
-	if (this->currentTab == this->inputCmdTab.get())
+	if (this->currentTab == this->commandTab.get())
 	{
-		this->currentTab = this->inputChatTab.get();
-		this->inputChatTab->refresh();
+		this->currentTab = this->chatTab.get();
+		this->chatTab->refresh();
 	}
-	else if (this->currentTab == this->inputChatTab.get())
+	else if (this->currentTab == this->chatTab.get())
 	{
-		this->currentTab = this->inputCmdTab.get();
-		this->inputCmdTab->refresh();
+		this->currentTab = this->commandTab.get();
+		this->commandTab->refresh();
 	}
 }
 
 void GameWindow::scrollTab(bool goingUp) noexcept
 {
-	if (this->currentTab == this->inputCmdTab.get())
-	{
-		if (goingUp)	this->outputCmdTab->scrollContentUp();
-		else 			this->outputCmdTab->scrollContentDown();
+	InOutTab* tab = dynamic_cast<InOutTab*>(this->currentTab);
+	assert(tab != nullptr and "current tab doesn't support mouse scrolling");
 
-		this->inputCmdTab->refresh();
-	}
-	else if (this->currentTab == this->inputChatTab.get())
-	{
-		if (goingUp)	this->outputChatTab->scrollContentUp();
-		else			this->outputChatTab->scrollContentDown();
+	if (goingUp)
+		tab->scrollContentUp();
+	else
+		tab->scrollContentDown();
 
-		this->inputChatTab->refresh();
-	}
+	tab->refresh();
 }
 
 void GameWindow::showResponse(std::string const& response) noexcept
 {
-	this->outputCmdTab->appendContent(response);
+	this->commandTab->appendContent(response);
 	this->currentTab->refresh();
 }
 
 void GameWindow::showChatMsg(std::string const& response) noexcept
 {
-	this->outputChatTab->appendContent(response);
+	this->chatTab->appendContent(response);
 	this->currentTab->refresh();
 }
 
