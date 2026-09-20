@@ -84,11 +84,9 @@ void GameWindow::draw(int32_t height, int32_t width)
 	this->tbdTab->appendContent("");
 	this->tbdTab->appendContent("");
 	this->tbdTab->appendContent("TBD ", TextAlign::MID_ALIGN);
-
+	
+	this->commandTab->activate();
 	this->currentTab = this->commandTab.get();
-	this->currentTab->refresh();
-	this->refresh();
-
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing game window size h: {}, w: {}", height, width));
 }
 
@@ -189,27 +187,27 @@ void GameWindow::switchInputTab(void) noexcept
 {
 	if (this->currentTab == this->commandTab.get())
 	{
+		this->commandTab->deactivate();
+		this->chatTab->activate();
 		this->currentTab = this->chatTab.get();
-		this->chatTab->refresh();
 	}
 	else if (this->currentTab == this->chatTab.get())
 	{
+		this->chatTab->deactivate();
+		this->commandTab->activate();
 		this->currentTab = this->commandTab.get();
-		this->commandTab->refresh();
 	}
 }
 
 void GameWindow::scrollTab(bool goingUp) noexcept
 {
-	InOutTab* tab = dynamic_cast<InOutTab*>(this->currentTab);
+	OutputTab* tab = dynamic_cast<OutputTab*>(this->currentTab);
 	assert(tab != nullptr and "current tab doesn't support mouse scrolling");
 
 	if (goingUp)
 		tab->scrollContentUp();
 	else
 		tab->scrollContentDown();
-
-	tab->refresh();
 }
 
 void GameWindow::showResponse(std::string const& response) noexcept
