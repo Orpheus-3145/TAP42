@@ -21,7 +21,6 @@ class LoginWindow : public CurseWindow
 	protected:
 		int32_t commandFd;
 
-		std::unique_ptr<BasicTab>		tmp, frame;
-		std::unique_ptr<OutputTab>		outputNameTab;
-		std::unique_ptr<SingleInputTab>	inputNameTab;
+		std::unique_ptr<BasicTab>	frame;
+		std::unique_ptr<InOutTab>	usernameTab;
 };
