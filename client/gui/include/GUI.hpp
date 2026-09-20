@@ -33,8 +33,8 @@ class GUI : public QObject, public UI
 		void handleError(std::string const& errMsg) noexcept override { (void) errMsg; }
 		void handleServerDisconnect(void) noexcept override {}
 
-		void handleResponse(std::string const& response) noexcept override;
-		void handleEvent(std::string const& event) noexcept override;
+		void showResponse(std::string const& response) noexcept override;
+		void showEvent(std::string const& event) noexcept override;
 
 		std::unique_ptr<QApplication>	app;
 		std::unique_ptr<GameWindow>		gameWin;

@@ -49,16 +49,16 @@ class UI
 		void writeInputToServer(void);
 		void readInputFromServer(void);
 		void handleServerData(std::string const& message);
-		void formatCommand(void) noexcept;
 
 		virtual void loginPhase(void);
 		virtual void newPlayerPhase(void);
 		virtual void gamePhase(void);
-		virtual void handleError(std::string const& errMsg) noexcept;
 
+		virtual void handleError(std::string const& errMsg) noexcept;
 		virtual void handleServerDisconnect(void) noexcept = 0;
-		virtual void handleResponse(std::string const& response) noexcept = 0;
-		virtual void handleEvent(std::string const& event) noexcept = 0;
+
+		virtual void showResponse(std::string const& response) noexcept = 0;
+		virtual void showEvent(std::string const& event) noexcept = 0;
 
 		void splitIntoMessages(void);
 

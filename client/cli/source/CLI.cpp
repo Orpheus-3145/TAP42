@@ -23,12 +23,8 @@ CLI::CLI(int32_t clientSocket) :
 	this->pollFds[CLI::CMD].fd = this->commandPipe.out;
 	this->pollFds[CLI::CHAT].fd = this->chatPipe.out;
 
-	struct winsize termSize;
-	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
-		throw CliException("Failed to fecth terminal size");
-
-	int32_t height = termSize.ws_row;
-	int32_t width = termSize.ws_col;
+	int32_t height, width;
+	this->getTerminalSize(height, width);
 
 	if ((height < Config::MIN_HEIGHT_CLI) or (width < Config::MIN_WIDTH_CLI))
 	{
@@ -47,7 +43,13 @@ CLI::CLI(int32_t clientSocket) :
 	if (::has_colors() == false)
 		LOG_WARN(LogContext::INTERFACE, "Colors not supported");
 	else
+	{
 		::start_color();
+		::init_pair(BLUE_COLOR, COLOR_BLUE, COLOR_BLACK);
+		::init_pair(RED_COLOR, COLOR_RED, COLOR_BLACK);
+		::init_pair(GREEN_COLOR, COLOR_GREEN, COLOR_BLACK);
+		::init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
+	}
 	// for callback (scrolling tabs) with mouse wheel
     ::mousemask(BUTTON4_PRESSED | BUTTON5_PRESSED | ALL_MOUSE_EVENTS, NULL);
     ::mouseinterval(0);       // disable delayed click
@@ -131,64 +133,80 @@ void CLI::start(void)
 	LOG_INFO(LogContext::INTERFACE, "CLI stopped");
 }
 
+void CLI::getTerminalSize(int32_t& height, int32_t& width) const noexcept
+{
+	struct winsize termSize;
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
+	{
+		LOG_WARN(LogContext::INTERFACE, "Failed to fetch terminal size, using standard dimension");
+		height = Config::MIN_HEIGHT_CLI;
+		width = Config::MIN_WIDTH_CLI;
+	}
+	else
+	{
+		height = termSize.ws_row;
+		width = termSize.ws_col;
+	}
+}
+
 void CLI::handleResize(void)
 {
 	struct signalfd_siginfo si;
 	ioUtils::read(this->pollFds[CLI::RESIZE].fd, &si, sizeof(si));		// I don't care about the data, flush it
 
-	struct winsize termSize;
-	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
-	{
-		LOG_WARN(LogContext::INTERFACE, "Failed to fetch terminal size, using standard dimension");
-		termSize.ws_row = Config::MIN_HEIGHT_CLI;
-		termSize.ws_col = Config::MIN_WIDTH_CLI;
-	}
+	int32_t height, width;
+	this->getTerminalSize(height, width);
 
-	this->currentWindow->resize(termSize.ws_row, termSize.ws_col);
+	this->currentWindow->resize(height, width);
 }
 
 void CLI::handlePollError(void) noexcept
 {
-	if (this->pollFds[CLIENT].revents & POLLHUP)
-	{
-		// HTTP client stopped
+	if (this->pollFds[CLIENT].revents & POLLHUP)		// HTTP client stopped
 		this->handleError("...");
-	}
-	else if (this->pollFds[CLIENT].revents & POLLERR)
-	{
-		// socket is invalid (poll didn't fail)
+	else if (this->pollFds[CLIENT].revents & POLLERR)	// socket is invalid (poll didn't fail)
 		this->handleError("...");
-	}
-	else if (this->pollFds[CLIENT].revents & POLLNVAL)
+	else if (this->pollFds[CLIENT].revents & POLLNVAL)	// something actually went wrong with poll
 	{
-		// something actually went wrong with poll
 		int32_t sockErr = 0;
 		socklen_t len = sizeof(sockErr);
 	
-		if (ioUtils::getsockopt(this->clientSocket, SOL_SOCKET, SO_ERROR, &sockErr, &len) < 0)
-		{
-			// getsockopt could also fail (check strerror(errno))
+		if (ioUtils::getsockopt(this->clientSocket, SOL_SOCKET, SO_ERROR, &sockErr, &len) < 0)	// getsockopt could also fail (check strerror(errno))
 			this->handleError("...");
-		}
-		else if (sockErr != 0)
-		{
-			// log, show error tab and close win (check strerror(sockErr))
+		else if (sockErr != 0)		// log, show error tab and close win (check strerror(sockErr))
 			this->handleError("...");
-		}
 	}
 }
 
 void CLI::handleGameCommand(void)
 {
-	int32_t commandPipe = this->pollFds[CMD].fd;
+	char buffer[Config::BUFF_SIZE];
 
 	try
 	{
-		ssize_t n = ioUtils::read(commandPipe, this->toServerBuffer + this->toServerSize, Config::BUFF_SIZE - this->toServerSize);
-		this->pollFds[CLI::CLIENT].events |= POLLOUT;
+		ssize_t n = ioUtils::read(this->commandPipe.out, buffer, Config::BUFF_SIZE);
 
-		this->currentWindow->handleResponse(Config::PROMPT + std::string(this->toServerBuffer + this->toServerSize, n));
+		if (this->phase == GamePhase::GAME)
+		{
+			GameWindow* gameWin = dynamic_cast<GameWindow*>(this->currentWindow);
+			assert(gameWin != nullptr and "current window doesn't support handling a response");
+			gameWin->showResponse(Config::PROMPT + std::string(buffer, n));
+		}
+		if ((this->phase == GamePhase::LOGIN) or (this->phase == GamePhase::PLAYER_CREATE))
+		{
+			// move to the right to insert CMD_CONNECT and a space at the beginning of the command
+			::memmove(buffer + ::strlen(CMD_CONNECT) + 1, buffer, n);
+			::memcpy(buffer + ::strlen(CMD_CONNECT), &COMMAND_SP, 1);
+			::memcpy(buffer, CMD_CONNECT, ::strlen(CMD_CONNECT));
+			n += ::strlen(CMD_CONNECT) + 1;
+		}
+
+		::memcpy(buffer + n, &COMMAND_TERM, 1);
+		n++;
+		// store formatted command, ready to be sento to client
+		::memcpy(this->toServerBuffer + this->toServerSize, buffer, n);
 		this->toServerSize += n;
+		this->pollFds[CLI::CLIENT].events |= POLLOUT;
 	}
 	catch(const IOException& e)
 	{
@@ -198,15 +216,25 @@ void CLI::handleGameCommand(void)
 
 void CLI::handleChatCommand(void)
 {
-	int32_t chatPipe = this->pollFds[CHAT].fd;
+	char buffer[Config::BUFF_SIZE];
 
 	try
 	{
-		ssize_t n = ioUtils::read(chatPipe, this->toServerBuffer + this->toServerSize, Config::BUFF_SIZE - this->toServerSize);
-		this->pollFds[CLI::CLIENT].events |= POLLOUT;
+		ssize_t n = ioUtils::read(this->chatPipe.out, buffer, Config::BUFF_SIZE);
 
-		this->currentWindow->handleChatMsg(Config::PROMPT + std::string(this->toServerBuffer + this->toServerSize, n));
+		if (this->phase == GamePhase::GAME)
+		{
+			GameWindow* gameWin = dynamic_cast<GameWindow*>(this->currentWindow);
+			assert(gameWin != nullptr and "current window doesn't support handling a response");
+			gameWin->showChatMsg(Config::PROMPT + std::string(buffer, n));
+		}
+
+		::memcpy(buffer + n, &COMMAND_TERM, 1);
+		n++;
+		// store formatted command, ready to be sento to client
+		::memcpy(this->toServerBuffer + this->toServerSize, buffer, n);
 		this->toServerSize += n;
+		this->pollFds[CLI::CLIENT].events |= POLLOUT;
 	}
 	catch(const IOException& e)
 	{
@@ -218,16 +246,8 @@ void CLI::loginPhase(void)
 {
 	UI::loginPhase();
 
-	struct winsize termSize;
-	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
-	{
-		LOG_WARN(LogContext::INTERFACE, "Failed to fetch terminal size, using standard dimension");
-		termSize.ws_row = Config::MIN_HEIGHT_CLI;
-		termSize.ws_col = Config::MIN_WIDTH_CLI;
-	}
-
-	int32_t height = termSize.ws_row;
-	int32_t width = termSize.ws_col;
+	int32_t height, width;
+	this->getTerminalSize(height, width);
 
 	this->currentWindow = this->loginWin.get();
 	this->currentWindow->draw(height, width);
@@ -237,16 +257,8 @@ void CLI::newPlayerPhase(void)
 {
 	UI::newPlayerPhase();
 
-	struct winsize termSize;
-	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
-	{
-		LOG_WARN(LogContext::INTERFACE, "Failed to fetch terminal size, using standard dimension");
-		termSize.ws_row = Config::MIN_HEIGHT_CLI;
-		termSize.ws_col = Config::MIN_WIDTH_CLI;
-	}
-
-	int32_t height = termSize.ws_row;
-	int32_t width = termSize.ws_col;
+	int32_t height, width;
+	this->getTerminalSize(height, width);
 
 	this->currentWindow->clear();
 	this->currentWindow = this->newPlayerWin.get();
@@ -257,16 +269,8 @@ void CLI::gamePhase(void)
 {
 	UI::gamePhase();
 
-	struct winsize termSize;
-	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
-	{
-		LOG_WARN(LogContext::INTERFACE, "Failed to fetch terminal size, using standard dimension");
-		termSize.ws_row = Config::MIN_HEIGHT_CLI;
-		termSize.ws_col = Config::MIN_WIDTH_CLI;
-	}
-
-	int32_t height = termSize.ws_row;
-	int32_t width = termSize.ws_col;
+	int32_t height, width;
+	this->getTerminalSize(height, width);
 
 	this->currentWindow->clear();
 	this->currentWindow = this->gameWin.get();
@@ -277,16 +281,8 @@ void CLI::handleError(std::string const& errMsg) noexcept
 {
 	UI::handleError(errMsg);
 
-	struct winsize termSize;
-	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
-	{
-		LOG_WARN(LogContext::INTERFACE, "Failed to fetch terminal size, using standard dimension");
-		termSize.ws_row = Config::MIN_HEIGHT_CLI;
-		termSize.ws_col = Config::MIN_WIDTH_CLI;
-	}
-
-	int32_t height = termSize.ws_row;
-	int32_t width = termSize.ws_col;
+	int32_t height, width;
+	this->getTerminalSize(height, width);
 
 	this->currentWindow->clear();
 	// this->error.set(errMsg);		or smt
@@ -294,14 +290,26 @@ void CLI::handleError(std::string const& errMsg) noexcept
 	this->currentWindow->draw(height, width);
 }
 
-void CLI::handleResponse(std::string const& response) noexcept
+void CLI::showResponse(std::string const& response) noexcept
 {
-	this->currentWindow->showResponse(response);
+	GameWindow* gameWin = dynamic_cast<GameWindow*>(this->currentWindow);
+	assert(gameWin != nullptr and "current window doesn't support handling a response");
+
+	// if (response is chat type)
+	// 	gameWin->showChatMsg(response);
+	// else
+	gameWin->showResponse(response);
 }
 
-void CLI::handleEvent(std::string const& event) noexcept
+void CLI::showEvent(std::string const& event) noexcept
 {
-	this->currentWindow->showEvent(event);
+	GameWindow* gameWin = dynamic_cast<GameWindow*>(this->currentWindow);
+	assert(gameWin != nullptr and "current window doesn't support handling an event");
+
+	// if (event is chat type)
+	// 	gameWin->showChatMsg(event);
+	// else
+	gameWin->showEvent(event);
 }
 
 std::unique_ptr<UI> uiFactory(int32_t clientSocket)
