@@ -49,16 +49,11 @@ class GameWindow : public CurseWindow
 		void switchInputTab(void) noexcept override;
 		void scrollTab(bool goingUp) noexcept override;
 
-		void showResponse(std::string const& response) noexcept override;
-		void showChatMsg(std::string const& response) noexcept override;
-		void showEvent(std::string const& event) noexcept override;
+		void showResponse(std::string const& response) noexcept;
+		void showChatMsg(std::string const& response) noexcept;
+		void showEvent(std::string const& event) noexcept;
 
 	protected:
-		static constexpr int32_t INFO_COLOR = 1;
-		static constexpr int32_t CMD_COLOR = 2;
-		static constexpr int32_t EVENTS_COLOR = 3;
-		static constexpr int32_t CHAT_COLOR = 4;
-
 		int32_t commandFd;
 		int32_t messageFd;
 

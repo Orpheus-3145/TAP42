@@ -1,4 +1,5 @@
 #include "GameWindow.hpp"
+#include "CLI.hpp"
 #include "Logger.hpp"
 #include "Exceptions.hpp"
 
@@ -14,23 +15,18 @@ GameWindow::GameWindow(int32_t commandFd, int32_t messageFd) :
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding commands");
 	assert(this->messageFd != -1 and "Invalid fd provided for forwarding chat messages");
 
-	::init_pair(GameWindow::INFO_COLOR, COLOR_BLUE, COLOR_BLACK);
-	::init_pair(GameWindow::CMD_COLOR, COLOR_RED, COLOR_BLACK);
-	::init_pair(GameWindow::EVENTS_COLOR, COLOR_GREEN, COLOR_BLACK);
-	::init_pair(GameWindow::CHAT_COLOR, COLOR_YELLOW, COLOR_BLACK);
+	this->mainFrame = std::make_unique<BasicTab>(0, BLUE_COLOR, this);
 
-	this->mainFrame = std::make_unique<BasicTab>(0, GameWindow::INFO_COLOR, this);
+	this->cmdFrame = std::make_unique<BasicTab>(0, RED_COLOR, this);
+	this->inputCmdTab = std::make_unique<SingleInputTab>(this->commandFd, CMD_HINTS, Config::PROMPT, 0, RED_COLOR, this);
+	this->outputCmdTab = std::make_unique<OutputTab>("User Events", 0, RED_COLOR, this);
 
-	this->cmdFrame = std::make_unique<BasicTab>(0, GameWindow::CMD_COLOR, this);
-	this->inputCmdTab = std::make_unique<SingleInputTab>(this->commandFd, CMD_HINTS, Config::PROMPT, 0, GameWindow::CMD_COLOR, this);
-	this->outputCmdTab = std::make_unique<OutputTab>("", 0, GameWindow::CMD_COLOR, this);
+	this->chatFrame = std::make_unique<BasicTab>(0, GREEN_COLOR, this);
+	this->inputChatTab = std::make_unique<SingleInputTab>(this->messageFd, CHAT_CMD_HINTS, Config::PROMPT, 0, GREEN_COLOR, this);
+	this->outputChatTab = std::make_unique<OutputTab>("Chat", 0, GREEN_COLOR, this);
 
-	this->chatFrame = std::make_unique<BasicTab>(0, GameWindow::CHAT_COLOR, this);
-	this->inputChatTab = std::make_unique<SingleInputTab>(this->messageFd, CHAT_CMD_HINTS, Config::PROMPT, 0, GameWindow::CHAT_COLOR, this);
-	this->outputChatTab = std::make_unique<OutputTab>("Chat", 0, GameWindow::CHAT_COLOR, this);
-
-	this->infoTab = std::make_unique<OutputTab>(0, GameWindow::INFO_COLOR, this);
-	this->eventsTab = std::make_unique<OutputTab>("World events", 0, GameWindow::EVENTS_COLOR, this);
+	this->infoTab = std::make_unique<OutputTab>(0, BLUE_COLOR, this);
+	this->eventsTab = std::make_unique<OutputTab>("World events", 0, YELLOW_COLOR, this);
 	this->tbdTab = std::make_unique<OutputTab>("", 0, -1, this);
 }
 
@@ -287,7 +283,7 @@ void GameWindow::scrollTab(bool goingUp) noexcept
 	}
 }
 
-void GameWindow::handleResponse(std::string const& response) noexcept
+void GameWindow::showResponse(std::string const& response) noexcept
 {
 	this->outputCmdTab->appendContent(response);
 	this->currentTab->refresh();
