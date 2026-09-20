@@ -504,15 +504,15 @@ void InputTab::writePromptLine(void) const noexcept
 	::wclrtoeol(this->inputWin);
 
 	if (this->colorPair != -1)
-		::wattron(this->inputWin, COLOR_PAIR(this->colorPair) | A_BLINK);
-	else
+		::wattron(this->inputWin, COLOR_PAIR(this->colorPair));
+	if (this->isActive == true)
 		::wattron(this->inputWin, A_BLINK);
 
 	waddstr(this->inputWin, this->prompt.data());
 
 	if (this->colorPair != -1)
-		::wattroff(this->inputWin, COLOR_PAIR(this->colorPair) | A_BLINK);
-	else
+		::wattroff(this->inputWin, COLOR_PAIR(this->colorPair));
+	if (this->isActive == true)
 		::wattroff(this->inputWin, A_BLINK);
 
 	if (this->bufferSize > 0UL)
@@ -521,6 +521,17 @@ void InputTab::writePromptLine(void) const noexcept
 	this->refresh();
 }
 
+void InputTab::activate(void) noexcept
+{
+	this->isActive = true;
+	this->writePromptLine();
+}
+
+void InputTab::deactivate(void) noexcept
+{
+	this->isActive = false;
+	this->writePromptLine();
+}
 
 OutputTab::OutputTab(OutputTab&& other) noexcept :
 	BasicTab(std::move(other)),

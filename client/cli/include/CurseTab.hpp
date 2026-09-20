@@ -92,6 +92,9 @@ class InputTab : public virtual BasicTab
 		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
 		void clear(void) noexcept override;
 
+		void activate(void) noexcept;
+		void deactivate(void) noexcept;
+
 	protected:
 		void updateHints(void) noexcept;
 		void clearHints(void) noexcept;
@@ -104,6 +107,7 @@ class InputTab : public virtual BasicTab
 
 		WINDOW*			inputWin{nullptr};
 		InputDispatcher	dispatcher;
+		bool			isActive{false};
 
 		std::deque<std::string>	inputHistory;
 		std::vector<uint32_t>	suggestedHintIndexes;
