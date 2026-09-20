@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ncurses.h>
 #include <memory>
 #include <string>
 #include <cstdint>
@@ -247,6 +248,11 @@
 // ===========================================================================================================================================================================
 
 
+static constexpr int32_t BLUE_COLOR = 1;
+static constexpr int32_t RED_COLOR = 2;
+static constexpr int32_t GREEN_COLOR = 3;
+static constexpr int32_t YELLOW_COLOR = 4;
+
 class CLI : public UI
 {
 	public:
@@ -257,6 +263,8 @@ class CLI : public UI
 
 		void start(void) override;
 		void stop(void) noexcept override { this->keepAlive = false; }
+
+		void getTerminalSize(int32_t& height, int32_t& width) const noexcept;
 
 	private:
 		void handleResize(void);
@@ -271,8 +279,8 @@ class CLI : public UI
 		void handleError(std::string const& errMsg) noexcept override;
 		void handleServerDisconnect(void) noexcept override {}
 
-		void handleResponse(std::string const& response) noexcept override;
-		void handleEvent(std::string const& event) noexcept override;
+		void showResponse(std::string const& response) noexcept override;
+		void showEvent(std::string const& event) noexcept override;
 
 		static constexpr size_t POLL_SIZE = 5UL;
 		static constexpr size_t STDIN = 0UL;

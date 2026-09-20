@@ -1,4 +1,5 @@
 #include "PlayerCreateWindow.hpp"
+#include "CLI.hpp"
 #include "Logger.hpp"
 #include "Exceptions.hpp"
 
@@ -12,12 +13,10 @@ PlayerCreateWindow::PlayerCreateWindow(int32_t commandFd) :
 {
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding username");
 
-	::init_pair(PlayerCreateWindow::INFO_COLOR, COLOR_GREEN, COLOR_BLACK);
-
-	this->tmp = std::make_unique<BasicTab>(-1, PlayerCreateWindow::INFO_COLOR, this);
-	this->frame = std::make_unique<BasicTab>(0, PlayerCreateWindow::INFO_COLOR, this);
-	this->inputNameTab = std::make_unique<SingleInputTab>(this->commandFd, std::vector<std::string>(), Config::PROMPT, 0, PlayerCreateWindow::INFO_COLOR, this);
-	this->outputNameTab = std::make_unique<OutputTab>("", -1, PlayerCreateWindow::INFO_COLOR, this);
+	this->tmp = std::make_unique<BasicTab>(-1, GREEN_COLOR, this);
+	this->frame = std::make_unique<BasicTab>(0, GREEN_COLOR, this);
+	this->inputNameTab = std::make_unique<SingleInputTab>(this->commandFd, std::vector<std::string>(), Config::PROMPT, 0, GREEN_COLOR, this);
+	this->outputNameTab = std::make_unique<OutputTab>("", -1, GREEN_COLOR, this);
 }
 
 void PlayerCreateWindow::draw(int32_t height, int32_t width)
@@ -76,18 +75,6 @@ void PlayerCreateWindow::resize(int32_t height, int32_t width)
 	this->height = (height % 4) != 0 ? ((height / 4) * 4) : height;		// has to be an even number
 	this->width = (width % 4) != 0 ? ((width / 4) * 4) : width;			// has to be an even number
 
-	// force minimum size of the window
-	// if ((this->height < Config::MIN_HEIGHT_CLI) or (this->width < Config::MIN_WIDTH_CLI))
-	// {
-	// 	if (this->height < Config::MIN_HEIGHT_CLI)
-	// 		this->height = Config::MIN_HEIGHT_CLI;
-	// 	if (this->width < Config::MIN_WIDTH_CLI)
-	// 		this->width = Config::MIN_WIDTH_CLI;
-
-	// 	std::cout << std::format("\033[8;{};{}t", this->height, this->width) << std::endl;
-	// 	LOG_WARN(LogContext::INTERFACE, std::format("Window too small, forced to h: {}, w: {}", this->height, this->width));
-	// 	return;
-	// }
 	::resizeterm(this->height, this->width);
 
 	this->tmp->resize(

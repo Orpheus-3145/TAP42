@@ -9,7 +9,6 @@
 
 void UI::writeInputToServer(void)
 {
-	this->formatCommand();		// NB doesn't work if multiple commands are inside the buffer
 	try
 	{
 		ssize_t n = ioUtils::writeNonBlock(this->clientSocket, this->toServerBuffer, this->toServerSize);
@@ -112,28 +111,14 @@ void UI::handleServerData(std::string const& message)
 		if (message == QUIT_RESPONSE)
 			this->stop();
 		else if ((message.find(S_OK) == 0UL) or (message.find(S_ERR) == 0UL))
-			this->handleResponse(message);
+			this->showResponse(message);
 		else if (message.find(S_EVT) == 0UL)
-			this->handleEvent(message);
+			this->showEvent(message);
 		else
 			LOG_WARN(LogContext::INTERFACE, std::format("Unexpected message: '{}'", message));
 	}
 	else
 		LOG_WARN(LogContext::INTERFACE, std::format("Unexpected message: '{}'", message));
-}
-
-void UI::formatCommand(void) noexcept
-{
-	if ((this->phase == GamePhase::LOGIN) or (this->phase == GamePhase::PLAYER_CREATE))
-	{
-		// move to the right to insert CMD_CONNECT at the beginning of the command
-		::memmove(this->toServerBuffer + ::strlen(CMD_CONNECT) + 1, this->toServerBuffer, this->toServerSize);
-		::memcpy(this->toServerBuffer + ::strlen(CMD_CONNECT), &COMMAND_SP, 1);
-		::memcpy(this->toServerBuffer, CMD_CONNECT, ::strlen(CMD_CONNECT));
-		this->toServerSize += ::strlen(CMD_CONNECT) + 1;
-	}
-	::memcpy(this->toServerBuffer + this->toServerSize, &COMMAND_TERM, 1);
-	this->toServerSize++;
 }
 
 void UI::loginPhase(void)
