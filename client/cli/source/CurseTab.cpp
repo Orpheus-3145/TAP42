@@ -533,6 +533,7 @@ void InputTab::deactivate(void) noexcept
 	this->writePromptLine();
 }
 
+
 OutputTab::OutputTab(OutputTab&& other) noexcept :
 	BasicTab(std::move(other)),
 	titleWin{other.titleWin},
@@ -558,16 +559,16 @@ void OutputTab::refresh(void) const noexcept
 void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 {
 	BasicTab::draw(h, w, y, x);
+	if (this->borderWin != nullptr)		// if there's a border adjust position and size of the title
+	{
+		h -= 2;
+		w -= 2;
+		y += 1;
+		x += 1;
+	}
 
 	if (this->title.empty() == false)
 	{
-		if (this->borderWin != nullptr)		// if there's a border adjust position and size of the title
-		{
-			h -= 2;
-			w -= 2;
-			y += 1;
-			x += 1;
-		}
 		assert((w + 1) > static_cast<int32_t>(this->title.size()) and "Tab title longer than tab itself");
 		// add the title
 		this->titleWin = ::newwin(3, this->title.size() + 2, y, x + 1);
@@ -600,13 +601,6 @@ void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 
 		h -= 4, w -= 2;
 		y += 4, x += 1;
-	}
-	else if (this->borderWin != nullptr)		// if there's a border adjust position and size of the title
-	{
-		h -= 2;
-		w -= 2;
-		y += 1;
-		x += 1;
 	}
 
 	this->outputWin = ::newwin(h, w, y, x);
@@ -665,10 +659,37 @@ void OutputTab::appendContent(std::string const& newContent, TextAlign align)
 
 void OutputTab::resize(int32_t h, int32_t w, int32_t y, int32_t x)
 {
-	BasicTab::resize(h, w, y, x);
+	int32_t oldMaxheight, newMaxheight, _, delta;
+	(void)_;
+	getmaxyx(this->outputWin, oldMaxheight, _);
 
-	for (auto const& [lineContent, align]: this->state)
-		this->printLine(lineContent, align);
+	BasicTab::resize(h, w, y, x);
+	getmaxyx(this->outputWin, newMaxheight, _);
+
+	delta = newMaxheight - oldMaxheight;
+
+	if (delta > 0)		// vertical size increased after resize
+	{
+		if (static_cast<int32_t>(this->topLineScroll) < delta)
+			this->topLineScroll = 0;
+		else
+			this->topLineScroll -= delta;
+	}
+	else if (delta < 0)		// vertical size reduced after resize
+	{
+		delta *= -1;
+		if ((this->topLineScroll + delta) >= this->state.size())
+			this->topLineScroll = this->state.size() - 1UL;
+		else
+			this->topLineScroll += delta;
+	}
+
+	for (size_t i = this->topLineScroll; i < this->state.size(); i++)
+	{
+		if (static_cast<int32_t>(i - this->topLineScroll) >= newMaxheight)
+			break;
+		this->printLine(this->state[i]);
+	}
 }
 
 void OutputTab::printLine(std::string const& newContent, TextAlign align) const noexcept
@@ -824,6 +845,9 @@ void InOutTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
 		throw CliException("Failed to create window");
 	}
+	::scrollok(this->outputWin, true);
+	::idlok(this->outputWin, true);
+
 	// frame input tab
 	this->inputFrame = ::newwin(3, w, y + h - 3, x);
 	if (this->inputFrame == nullptr)
