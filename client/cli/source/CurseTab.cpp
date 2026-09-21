@@ -592,12 +592,17 @@ void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 			::wattroff(this->titleWin, A_BOLD);
 
 		// add a div line between title and ouput
-		this->divLineWin = ::newwin(1, w - 2, y + 3, x + 1);
+		this->divLineWin = ::newwin(1, w - 3 - this->title.size() - 2, y + 2, x + 2 + this->title.size() + 2);
 		if (this->colorPair != -1)
-			::wattron(this->divLineWin, COLOR_PAIR(this->colorPair));
-		mvwhline(this->divLineWin, 0, 0, ACS_HLINE, w - 2);
+			::wattron(this->divLineWin, COLOR_PAIR(this->colorPair) | A_BOLD);
+		else
+			::wattron(this->divLineWin, A_BOLD);
+		mvwhline(this->divLineWin, 0, 0, ACS_HLINE, w);
 		if (this->colorPair != -1)
-			::wattroff(this->divLineWin, COLOR_PAIR(this->colorPair));
+			::wattroff(this->divLineWin, COLOR_PAIR(this->colorPair) | A_BOLD);
+		else
+			::wattroff(this->divLineWin, A_BOLD);
+
 
 		h -= 4, w -= 2;
 		y += 4, x += 1;
@@ -788,18 +793,18 @@ void InOutTab::refresh(void) const noexcept
 void InOutTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 {
 	BasicTab::draw(h, w, y, x);
+	if (this->borderWin != nullptr)		// if there's a border adjust position and size of the title
+	{
+		h -= 2;
+		w -= 2;
+		y += 1;
+		x += 1;
+	}
 
 	if (this->title.empty() == false)
 	{
-		if (this->borderWin != nullptr)		// if there's a border adjust position and size of the title
-		{
-			h -= 2;
-			w -= 2;
-			y += 1;
-			x += 1;
-		}
 		assert((w + 1) > static_cast<int32_t>(this->title.size()) and "Tab title longer than tab itself");
-		// add the title
+		// title
 		this->titleWin = ::newwin(3, this->title.size() + 2, y, x + 1);
 		if (this->borderWin == nullptr)
 		{
@@ -821,23 +826,21 @@ void InOutTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 			::wattroff(this->titleWin, A_BOLD);
 
 		// add a div line between title and ouput
-		this->divLineWin = ::newwin(1, w - 2, y + 3, x + 1);
+		this->divLineWin = ::newwin(1, w - 3 - this->title.size() - 2, y + 2, x + 2 + this->title.size() + 2);
 		if (this->colorPair != -1)
-			::wattron(this->divLineWin, COLOR_PAIR(this->colorPair));
-		mvwhline(this->divLineWin, 0, 0, ACS_HLINE, w - 2);
+			::wattron(this->divLineWin, COLOR_PAIR(this->colorPair) | A_BOLD);
+		else
+			::wattron(this->divLineWin, A_BOLD);
+		mvwhline(this->divLineWin, 0, 0, ACS_HLINE, w);
 		if (this->colorPair != -1)
-			::wattroff(this->divLineWin, COLOR_PAIR(this->colorPair));
+			::wattroff(this->divLineWin, COLOR_PAIR(this->colorPair) | A_BOLD);
+		else
+			::wattroff(this->divLineWin, A_BOLD);
 
 		h -= 4, w -= 2;
 		y += 4, x += 1;
 	}
-	else if (this->borderWin != nullptr)		// if there's a border adjust position and size of the title
-	{
-		h -= 2;
-		w -= 2;
-		y += 1;
-		x += 1;
-	}
+
 	// output tab
 	this->outputWin = ::newwin(h - 3, w, y, x);
 	if (this->outputWin == nullptr)
