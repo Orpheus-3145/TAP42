@@ -21,13 +21,10 @@ enum class TextAlign : uint32_t
 
 class BasicTab
 {
+	using InputDispatcher = std::unordered_map<int32_t,std::function<void()>>;
+
 	public:
-		BasicTab(int32_t borderChar = -1, int32_t colorPair = -1, CurseWindow* parent = nullptr) : 
-			borderChar{borderChar},
-			colorPair{colorPair},
-			parent{parent} {
-				if (::has_colors() == false) this->colorPair = -1;
-			}
+		BasicTab(int32_t borderChar = -1, int32_t colorPair = -1, CurseWindow* parent = nullptr);
 		BasicTab(BasicTab const& other) noexcept = delete;
 		BasicTab& operator=(BasicTab const& other) noexcept = delete;
 		BasicTab(BasicTab&& other) noexcept;
@@ -37,20 +34,25 @@ class BasicTab
 
 		virtual void refresh(void) const noexcept;
 		virtual void draw(int32_t h, int32_t w, int32_t y, int32_t x);
-		virtual void clear(void) noexcept;
 		virtual void resize(int32_t h, int32_t w, int32_t y, int32_t x);
+		virtual void clear(void) noexcept;
+		virtual void handleUserInput(void);
+
+		virtual void activate(void) { this->isActive = true; }
+		virtual void deactivate(void) { this->isActive = false; }
 
 	protected:
 		WINDOW* borderWin{nullptr};
 
 		int32_t			borderChar, colorPair;
 		CurseWindow*	parent;
+
+		InputDispatcher	dispatcher{};
+		bool			isActive{false};
 };
 
 class InputTab : public virtual BasicTab
 {
-	using InputDispatcher = std::unordered_map<int32_t,std::function<void()>>;
-
 	public:
 		using BasicTab::BasicTab;
 
@@ -67,8 +69,6 @@ class InputTab : public virtual BasicTab
 		InputTab& operator=(InputTab&& other) = delete;
 
 		virtual ~InputTab(void) { ::keypad(this->inputWin, false); }
-
-		void handleUserInput(void);
 
 		void deleteCharForward(void) noexcept;
 		void deleteCharBack(void) noexcept;
@@ -91,9 +91,10 @@ class InputTab : public virtual BasicTab
 		void refresh(void) const noexcept override;
 		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
 		void clear(void) noexcept override;
+		void handleUserInput(void) override;
 
-		void activate(void) noexcept;
-		void deactivate(void) noexcept;
+		void activate(void) override;
+		void deactivate(void) override;
 
 	protected:
 		void updateHints(void) noexcept;
@@ -105,9 +106,7 @@ class InputTab : public virtual BasicTab
 		std::vector<std::string> const	hints;
 		std::string const				prompt;
 
-		WINDOW*			inputWin{nullptr};
-		InputDispatcher	dispatcher;
-		bool			isActive{false};
+		WINDOW*	inputWin{nullptr};
 
 		std::deque<std::string>	inputHistory;
 		std::vector<uint32_t>	suggestedHintIndexes;
@@ -130,9 +129,7 @@ class OutputTab : public virtual BasicTab
 	public:
 		using BasicTab::BasicTab;
 
-		OutputTab(std::string const& title = "", int32_t borderChar = -1, int32_t colorPair = -1, CurseWindow* parent = nullptr) :
-			BasicTab(borderChar, colorPair, parent),
-			title{title} {}
+		OutputTab(std::string const& title = "", int32_t borderChar = -1, int32_t colorPair = -1, CurseWindow* parent = nullptr);
 
 		OutputTab(OutputTab&& other) noexcept;
 		OutputTab& operator=(OutputTab&& other) = delete;
@@ -141,6 +138,9 @@ class OutputTab : public virtual BasicTab
 		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
 		void clear(void) noexcept override;
 		void resize(int32_t h, int32_t w, int32_t y, int32_t x) override;
+
+		void activate(void) override;
+		void deactivate(void) override;
 
 		void appendContent(std::string const& newContent, TextAlign align = TextAlign::LEFT_ALIGN);
 		void scrollContentUp(void) noexcept;
@@ -185,6 +185,9 @@ class InOutTab : public InputTab, public OutputTab
 		void refresh(void) const noexcept override;
 		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
 		void clear(void) noexcept override;
+
+		void activate(void) override;
+		void deactivate(void) override;
 
 	protected:
 		WINDOW*	inputFrame{nullptr};
