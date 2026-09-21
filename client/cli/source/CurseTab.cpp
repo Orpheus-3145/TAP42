@@ -9,11 +9,24 @@
 #include <format>
 
 
+BasicTab::BasicTab(int32_t borderChar, int32_t colorPair, CurseWindow* parent) : 
+	borderChar{borderChar},
+	colorPair{colorPair},
+	parent{parent}
+{
+	if (::has_colors() == false)
+		this->colorPair = -1;
+
+	this->dispatcher[KEY_BTAB] = [this] { if (this->parent) this->parent->switchActiveTab(); };
+}
+
 BasicTab::BasicTab(BasicTab&& other) noexcept :
 	borderWin{other.borderWin},
 	borderChar{other.borderChar},
 	colorPair{other.colorPair},
-	parent{other.parent}
+	parent{other.parent},
+	dispatcher{std::move(other.dispatcher)},
+	isActive{other.isActive}
 {
 	other.borderWin = nullptr;
 }
@@ -28,6 +41,8 @@ BasicTab& BasicTab::operator=(BasicTab&& other) noexcept
 		this->borderChar = other.borderChar;
 		this->colorPair = other.colorPair;
 		this->parent = other.parent;
+		this->dispatcher = std::move(other.dispatcher);
+		this->isActive = other.isActive;
 
 		other.borderWin = nullptr;
 	}
@@ -58,7 +73,7 @@ void BasicTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 		if (this->colorPair != -1)
 			::wattroff(this->borderWin, COLOR_PAIR(this->colorPair));
 	}
-
+	::keypad(this->borderWin, true);
 	this->refresh();
 }
 
@@ -76,6 +91,21 @@ void BasicTab::clear(void) noexcept
 	this->borderWin = nullptr;
 }
 
+void BasicTab::handleUserInput(void)
+{
+	int32_t inputChar = ::wgetch(this->borderWin);	// this is blocking
+
+	// ncurses throws many KEY_RESIZE when term is resized, ignore them
+	// since the resizing is handled by catching SIGWINCH
+	if (inputChar == KEY_RESIZE)
+		return;
+
+	// special characters handling
+	auto it = this->dispatcher.find(inputChar);
+	if (it != this->dispatcher.end())
+		it->second();
+}
+
 
 InputTab::InputTab(
 	int32_t forwardInputFd,
@@ -86,7 +116,7 @@ InputTab::InputTab(
 	CurseWindow* parent
 ) :
 	BasicTab(borderChar, colorPair, parent),
-	forwardInputFd{forwardInputFd},
+forwardInputFd{forwardInputFd},
 	hints{hints},
 	prompt{prompt}
 {
@@ -100,15 +130,6 @@ InputTab::InputTab(
 	this->dispatcher[KEY_UP]        = [this] { this->showPrevious(); };
 	this->dispatcher[KEY_DOWN]      = [this] { this->showNext(); };
 	this->dispatcher['\t']          = [this] { this->suggestHint(); };
-	this->dispatcher[KEY_BTAB]      = [this] { if (this->parent) this->parent->switchInputTab(); };
-	this->dispatcher[KEY_MOUSE]     = [this] {
-		MEVENT event;
-		if (::getmouse(&event) == OK)
-		{
-			if (event.bstate & BUTTON4_PRESSED)			this->parent->scrollTab(true);
-			else if (event.bstate & BUTTON5_PRESSED)	this->parent->scrollTab(false);
-		}
-	};
 }
 
 InputTab::InputTab(InputTab&& other) noexcept :
@@ -117,7 +138,6 @@ InputTab::InputTab(InputTab&& other) noexcept :
 	hints{std::move(other.hints)},
 	prompt{std::move(other.prompt)},
 	inputWin{other.inputWin},
-	dispatcher{std::move(other.dispatcher)},
 	inputHistory{std::move(other.inputHistory)},
 	suggestedHintIndexes{std::move(other.suggestedHintIndexes)},
 	currentCommandIndex{other.currentCommandIndex},
@@ -453,11 +473,6 @@ void InputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
 		throw CliException("Failed to create window");
 	}
-	if (this->colorPair != -1)
-		::wattron(this->inputWin, COLOR_PAIR(this->colorPair));
-	::box(this->inputWin, 0, 0);
-	if (this->colorPair != -1)
-		::wattroff(this->inputWin, COLOR_PAIR(this->colorPair));
 
 	::keypad(this->inputWin, true);
 	this->writePromptLine();
@@ -507,6 +522,7 @@ void InputTab::writePromptLine(void) const noexcept
 		::wattron(this->inputWin, COLOR_PAIR(this->colorPair));
 	if (this->isActive == true)
 		::wattron(this->inputWin, A_BLINK);
+	::wattron(this->inputWin, A_BOLD);
 
 	waddstr(this->inputWin, this->prompt.data());
 
@@ -514,6 +530,7 @@ void InputTab::writePromptLine(void) const noexcept
 		::wattroff(this->inputWin, COLOR_PAIR(this->colorPair));
 	if (this->isActive == true)
 		::wattroff(this->inputWin, A_BLINK);
+	::wattroff(this->inputWin, A_BOLD);
 
 	if (this->bufferSize > 0UL)
 		waddnstr(this->inputWin, this->commandBuffer, this->bufferSize);
@@ -521,18 +538,56 @@ void InputTab::writePromptLine(void) const noexcept
 	this->refresh();
 }
 
-void InputTab::activate(void) noexcept
+void InputTab::activate(void)
 {
-	this->isActive = true;
+	BasicTab::activate();
+
+	if (this->colorPair != -1)
+		::wattron(this->inputWin, COLOR_PAIR(this->colorPair));
+	::wattron(this->inputWin, A_BOLD | A_BLINK);
+
+	::box(this->inputWin, 0, 0);
+
+	if (this->colorPair != -1)
+		::wattroff(this->inputWin, COLOR_PAIR(this->colorPair));
+	::wattroff(this->inputWin, A_BOLD | A_BLINK);
+
 	this->writePromptLine();
 }
 
-void InputTab::deactivate(void) noexcept
+void InputTab::deactivate(void)
 {
-	this->isActive = false;
+	BasicTab::deactivate();
+
+	if (this->colorPair != -1)
+		::wattron(this->inputWin, COLOR_PAIR(this->colorPair));
+	::wattron(this->inputWin, A_BOLD);
+
+	::box(this->inputWin, 0, 0);
+
+	if (this->colorPair != -1)
+		::wattroff(this->inputWin, COLOR_PAIR(this->colorPair));
+	::wattroff(this->inputWin, A_BOLD);
+
 	this->writePromptLine();
 }
 
+
+OutputTab::OutputTab(std::string const& title, int32_t borderChar, int32_t colorPair, CurseWindow* parent) :
+	BasicTab(borderChar, colorPair, parent),
+	title{title}
+{
+	this->dispatcher[KEY_UP]        = [this] { this->scrollContentUp(); };
+	this->dispatcher[KEY_DOWN]      = [this] { this->scrollContentDown(); };
+	// this->dispatcher[KEY_MOUSE]     = [this] {
+	// 	MEVENT event;
+	// 	if (::getmouse(&event) == OK)
+	// 	{
+	// 		if (event.bstate & BUTTON4_PRESSED)			this->scrollContentUp();
+	// 		else if (event.bstate & BUTTON5_PRESSED)	this->scrollContentDown();
+	// 	}
+	// };
+}
 
 OutputTab::OutputTab(OutputTab&& other) noexcept :
 	BasicTab(std::move(other)),
@@ -572,37 +627,34 @@ void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 		assert((w + 1) > static_cast<int32_t>(this->title.size()) and "Tab title longer than tab itself");
 		// add the title
 		this->titleWin = ::newwin(3, this->title.size() + 2, y, x + 1);
-		if (this->borderWin == nullptr)
+		if (this->titleWin == nullptr)
 		{
 			LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
 			throw CliException("Failed to create window");
 		}
 
 		if (this->colorPair != -1)
-			::wattron(this->titleWin, COLOR_PAIR(this->colorPair) | A_BOLD);
-		else
-			::wattron(this->titleWin, A_BOLD);
+			::wattron(this->titleWin, COLOR_PAIR(this->colorPair));
+		::wattron(this->titleWin, A_BOLD);
 
 		::wborder(this->titleWin, 0, 0, 0, 0, 0, 0, 0, 0);
 		mvwaddstr(this->titleWin, 1, 1, this->title.data());
 
 		if (this->colorPair != -1)
-			::wattroff(this->titleWin, COLOR_PAIR(this->colorPair) | A_BOLD);
-		else
-			::wattroff(this->titleWin, A_BOLD);
+			::wattroff(this->titleWin, COLOR_PAIR(this->colorPair));
+		::wattroff(this->titleWin, A_BOLD);
 
 		// add a div line between title and ouput
 		this->divLineWin = ::newwin(1, w - 3 - this->title.size() - 2, y + 2, x + 2 + this->title.size() + 2);
 		if (this->colorPair != -1)
-			::wattron(this->divLineWin, COLOR_PAIR(this->colorPair) | A_BOLD);
-		else
-			::wattron(this->divLineWin, A_BOLD);
-		mvwhline(this->divLineWin, 0, 0, ACS_HLINE, w);
-		if (this->colorPair != -1)
-			::wattroff(this->divLineWin, COLOR_PAIR(this->colorPair) | A_BOLD);
-		else
-			::wattroff(this->divLineWin, A_BOLD);
+			::wattron(this->divLineWin, COLOR_PAIR(this->colorPair));
+		::wattron(this->divLineWin, A_BOLD);
 
+		mvwhline(this->divLineWin, 0, 0, ACS_HLINE, w);
+
+		if (this->colorPair != -1)
+			::wattroff(this->divLineWin, COLOR_PAIR(this->colorPair));
+		::wattroff(this->divLineWin, A_BOLD);
 
 		h -= 4, w -= 2;
 		y += 4, x += 1;
@@ -614,6 +666,7 @@ void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
 		throw CliException("Failed to create window");
 	}
+	::keypad(this->outputWin, true);
 	::scrollok(this->outputWin, true);
 	::idlok(this->outputWin, true);
 
@@ -641,6 +694,54 @@ void OutputTab::clear(void) noexcept
 	::wclear(this->outputWin);
 	::delwin(this->outputWin);
 	this->outputWin = nullptr;
+}
+
+void OutputTab::activate(void)
+{
+	BasicTab::activate();
+	curs_set(0);
+
+	if (this->divLineWin == nullptr)
+		return;
+
+	int32_t _, widthDivLine;
+	getmaxyx(this->divLineWin, _, widthDivLine);
+
+	if (this->colorPair != -1)
+		::wattron(this->divLineWin, COLOR_PAIR(this->colorPair));
+	::wattron(this->divLineWin, A_BOLD | A_BLINK);
+
+	mvwhline(this->divLineWin, 0, 0, ACS_HLINE, widthDivLine);
+
+	if (this->colorPair != -1)
+		::wattroff(this->divLineWin, COLOR_PAIR(this->colorPair));
+	::wattroff(this->divLineWin, A_BOLD | A_BLINK);
+
+	this->refresh();
+}
+
+void OutputTab::deactivate(void)
+{
+	BasicTab::deactivate();
+	curs_set(1);
+
+	if (this->divLineWin == nullptr)
+		return;
+
+	int32_t _, widthDivLine;
+	getmaxyx(this->divLineWin, _, widthDivLine);
+
+	if (this->colorPair != -1)
+		::wattron(this->divLineWin, COLOR_PAIR(this->colorPair));
+	::wattron(this->divLineWin, A_BOLD);
+
+	mvwhline(this->divLineWin, 0, 0, ACS_HLINE, widthDivLine);
+
+	if (this->colorPair != -1)
+		::wattroff(this->divLineWin, COLOR_PAIR(this->colorPair));
+	::wattroff(this->divLineWin, A_BOLD);
+
+	this->refresh();
 }
 
 void OutputTab::appendContent(std::string const& newContent, TextAlign align)
@@ -673,14 +774,15 @@ void OutputTab::resize(int32_t h, int32_t w, int32_t y, int32_t x)
 
 	delta = newMaxheight - oldMaxheight;
 
-	if (delta > 0)		// vertical size increased after resize
+	// if resize changed the vertical size, adjust the index of the first line shown
+	if (delta > 0)		// vertical size increased
 	{
 		if (static_cast<int32_t>(this->topLineScroll) < delta)
 			this->topLineScroll = 0;
 		else
 			this->topLineScroll -= delta;
 	}
-	else if (delta < 0)		// vertical size reduced after resize
+	else if (delta < 0)		// vertical size reduced
 	{
 		delta *= -1;
 		if ((this->topLineScroll + delta) >= this->state.size())
@@ -813,29 +915,27 @@ void InOutTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 		}
 
 		if (this->colorPair != -1)
-			::wattron(this->titleWin, COLOR_PAIR(this->colorPair) | A_BOLD);
-		else
-			::wattron(this->titleWin, A_BOLD);
+			::wattron(this->titleWin, COLOR_PAIR(this->colorPair));
+		::wattron(this->titleWin, A_BOLD);
 
 		::wborder(this->titleWin, 0, 0, 0, 0, 0, 0, 0, 0);
 		mvwaddstr(this->titleWin, 1, 1, this->title.data());
 
 		if (this->colorPair != -1)
-			::wattroff(this->titleWin, COLOR_PAIR(this->colorPair) | A_BOLD);
-		else
-			::wattroff(this->titleWin, A_BOLD);
+			::wattroff(this->titleWin, COLOR_PAIR(this->colorPair));
+		::wattroff(this->titleWin, A_BOLD);
 
 		// add a div line between title and ouput
 		this->divLineWin = ::newwin(1, w - 3 - this->title.size() - 2, y + 2, x + 2 + this->title.size() + 2);
 		if (this->colorPair != -1)
-			::wattron(this->divLineWin, COLOR_PAIR(this->colorPair) | A_BOLD);
-		else
-			::wattron(this->divLineWin, A_BOLD);
+			::wattron(this->divLineWin, COLOR_PAIR(this->colorPair));
+		::wattron(this->divLineWin, A_BOLD);
+
 		mvwhline(this->divLineWin, 0, 0, ACS_HLINE, w);
+
 		if (this->colorPair != -1)
-			::wattroff(this->divLineWin, COLOR_PAIR(this->colorPair) | A_BOLD);
-		else
-			::wattroff(this->divLineWin, A_BOLD);
+			::wattroff(this->divLineWin, COLOR_PAIR(this->colorPair));
+		::wattroff(this->divLineWin, A_BOLD);
 
 		h -= 4, w -= 2;
 		y += 4, x += 1;
@@ -886,4 +986,19 @@ void InOutTab::clear(void) noexcept
 	::wclear(this->inputFrame);
 	::delwin(this->inputFrame);
 	this->inputFrame = nullptr;
+}
+
+void InOutTab::activate(void)
+{
+	BasicTab::activate();
+	OutputTab::activate();
+	curs_set(1);			// Output hides the cursor when it activates
+	InputTab::activate();
+}
+
+void InOutTab::deactivate(void)
+{
+	BasicTab::deactivate();
+	OutputTab::deactivate();
+	InputTab::deactivate();
 }

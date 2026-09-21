@@ -40,6 +40,7 @@ CLI::CLI(int32_t clientSocket) :
 	::initscr();		// check if those functions fail
 	::cbreak();
 	::noecho();
+	curs_set(1);
 	if (::has_colors() == false)
 		LOG_WARN(LogContext::INTERFACE, "Colors not supported");
 	else
@@ -50,9 +51,9 @@ CLI::CLI(int32_t clientSocket) :
 		::init_pair(GREEN_COLOR, COLOR_GREEN, COLOR_BLACK);
 		::init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
 	}
-	// for callback (scrolling tabs) with mouse wheel
-    ::mousemask(BUTTON4_PRESSED | BUTTON5_PRESSED | ALL_MOUSE_EVENTS, NULL);
-    ::mouseinterval(0);       // disable delayed click
+	// // for callback (scrolling tabs) with mouse wheel
+    // ::mousemask(BUTTON4_PRESSED | BUTTON5_PRESSED | ALL_MOUSE_EVENTS, NULL);
+    // ::mouseinterval(0);       // disable delayed click
 	
 	this->loginWin = std::make_unique<LoginWindow>(this->commandPipe.in);
 	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(this->commandPipe.in);
@@ -82,6 +83,8 @@ CLI::~CLI(void) noexcept
 
 void CLI::start(void)
 {
+	this->loginPhase();
+
 	while (this->keepAlive == true)
 	{
 		this->pollFds[CLI::STDIN].events |= POLLIN;
@@ -100,7 +103,9 @@ void CLI::start(void)
 		if (this->pollFds[STDIN].revents & POLLIN)
 		{
 			if (this->phase != GamePhase::HANDSHAKE)
-				this->currentWindow->readInput();
+				this->currentWindow->getActiveTab()->handleUserInput();
+			else
+				(void) getch();
 		}
 		// resize window
 		if (this->pollFds[RESIZE].revents & POLLIN)
