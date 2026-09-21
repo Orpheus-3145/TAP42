@@ -9,6 +9,12 @@
 
 void UI::writeInputToServer(void)
 {
+	if (this->handShakeDone == false)
+	{
+		this->handleError(std::format("Attempted login ('{}') but handshake hasn't been performed", escapeNewLine(this->toServerBuffer, this->toServerSize)));
+		return;
+	}
+
 	try
 	{
 		ssize_t n = ioUtils::writeNonBlock(this->clientSocket, this->toServerBuffer, this->toServerSize);
@@ -82,16 +88,14 @@ void UI::splitIntoMessages(void)
 
 void UI::handleServerData(std::string const& message)
 {
-	if (this->phase == GamePhase::HANDSHAKE)
+	if (this->phase == GamePhase::LOGIN)
 	{
 		if (message == INITIAL_GREETING)
-			this->loginPhase();
-		else
-			LOG_WARN(LogContext::INTERFACE, std::format("Unexpected message: '{}'", message));
-	}
-	else if (this->phase == GamePhase::LOGIN)
-	{
-		if (message == LOGIN_OK)
+		{
+			this->handShakeDone = true;
+			LOG_DEBUG(LogContext::INTERFACE, std::format("Handshake with server performed: {}", message));
+		}
+		else if (message == LOGIN_OK)
 			this->gamePhase();
 		else if (message.find(S_ERR) == 0UL)
 			this->newPlayerPhase();
@@ -123,18 +127,27 @@ void UI::handleServerData(std::string const& message)
 
 void UI::loginPhase(void)
 {
-	LOG_DEBUG(LogContext::INTERFACE, "Handshake with server successful, moving to login");
 	this->phase = GamePhase::LOGIN;
 }
 
 void UI::newPlayerPhase(void)
 {
+	if (this->handShakeDone == false)
+	{
+		this->handleError("Handshake must be performed before moving to character creation");
+		return;
+	}
 	LOG_DEBUG(LogContext::INTERFACE, "Creating new player");
 	this->phase = GamePhase::PLAYER_CREATE;
 }
 
 void UI::gamePhase(void)
 {
+	if (this->handShakeDone == false)
+	{
+		this->handleError("Handshake must be performed before moving to game session");
+		return;
+	}
 	LOG_DEBUG(LogContext::INTERFACE, "Login successful, retrieving game session");
 	this->phase = GamePhase::GAME;
 }
