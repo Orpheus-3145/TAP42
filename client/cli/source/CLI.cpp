@@ -101,18 +101,10 @@ void CLI::start(void)
 
 		// user type input
 		if (this->pollFds[STDIN].revents & POLLIN)
-		{
-			if (this->phase != GamePhase::HANDSHAKE)
-				this->currentWindow->getActiveTab()->handleUserInput();
-			else
-				(void) getch();
-		}
+			this->currentWindow->getActiveTab()->handleUserInput();
 		// resize window
 		if (this->pollFds[RESIZE].revents & POLLIN)
-		{
-			if (this->phase != GamePhase::HANDSHAKE)
-				this->handleResize();
-		}
+			this->handleResize();
 		// read and show data from server 
 		if (this->pollFds[CLIENT].revents & POLLIN)
 			this->readInputFromServer();
@@ -191,7 +183,7 @@ void CLI::handleGameCommand(void)
 	{
 		ssize_t n = ioUtils::read(this->commandPipe.out, buffer, Config::BUFF_SIZE);
 
-		if (this->phase == GamePhase::GAME)
+		if (this->phase == GamePhase::GAME)			// NB remove
 		{
 			GameWindow* gameWin = dynamic_cast<GameWindow*>(this->currentWindow);
 			assert(gameWin != nullptr and "current window doesn't support handling a response");

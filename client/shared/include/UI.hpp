@@ -21,11 +21,10 @@ static constexpr const char		COMMAND_SP = ' ';
 
 enum class GamePhase : uint32_t
 {
-	HANDSHAKE = 0U,
-	LOGIN = 1U,
-	PLAYER_CREATE = 2U,
-	GAME = 3U,
-	ERROR = 4U,
+	LOGIN = 0U,
+	PLAYER_CREATE = 1U,
+	GAME = 2U,
+	ERROR = 3U,
 };
 
 class UI
@@ -64,7 +63,8 @@ class UI
 
 		int32_t clientSocket;
 
-		GamePhase phase{GamePhase::HANDSHAKE};
+		GamePhase	phase{GamePhase::LOGIN};
+		bool		handShakeDone{false};
 
 		size_t	toServerSize{0UL};
 		char	toServerBuffer[Config::BUFF_SIZE];
