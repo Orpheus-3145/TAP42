@@ -184,6 +184,7 @@ void InputTab::suggestHint(void) noexcept
 		
 		this->bufferSize = suggestedHint.size(); 
 		::memcpy(this->commandBuffer, suggestedHint.data(), this->bufferSize);
+		this->commandBuffer[this->bufferSize++] = COMMAND_SP;
 		this->currentSuggestedIndex++;
 	}
 	else			// show command previously typed
@@ -406,11 +407,18 @@ void InputTab::setChar(int32_t input)
 
 void InputTab::appendInputChar(int32_t input)
 {
+	if (this->bufferSize >= Config::CMD_BUFFER_SIZE)
+	{
+		if (this->bufferSize > Config::CMD_BUFFER_SIZE)
+			return;
+
+		waddch(this->inputWin, '-');
+		this->bufferSize++;
+		this->refresh();
+	}
+
 	int32_t y, x;
 	bool resetCursorPos = false;
-
-	if (this->bufferSize == Config::CMD_BUFFER_SIZE)
-		throw CliException("Command buffer overflow");
 
 	getyx(this->inputWin, y, x);
 	x -= this->startX;
