@@ -183,12 +183,6 @@ void CLI::handleGameCommand(void)
 	{
 		ssize_t n = ioUtils::read(this->commandPipe.out, buffer, Config::BUFF_SIZE);
 
-		if (this->phase == GamePhase::GAME)			// NB remove
-		{
-			GameWindow* gameWin = dynamic_cast<GameWindow*>(this->currentWindow);
-			assert(gameWin != nullptr and "current window doesn't support handling a response");
-			gameWin->showResponse(Config::PROMPT + std::string(buffer, n));
-		}
 		if ((this->phase == GamePhase::LOGIN) or (this->phase == GamePhase::PLAYER_CREATE))
 		{
 			// move to the right to insert CMD_CONNECT and a space at the beginning of the command

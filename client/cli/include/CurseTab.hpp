@@ -79,8 +79,6 @@ class InputTab : public virtual BasicTab
 		void moveStartLine(void) const noexcept;
 		void moveEndLine(void) const noexcept;
 
-		void setChar(int32_t input);
-
 		void suggestHint(void) noexcept;
 		void suggestPrevious(void) noexcept;
 		void showPrevious(void) noexcept;
@@ -95,6 +93,11 @@ class InputTab : public virtual BasicTab
 
 		void activate(void) override;
 		void deactivate(void) override;
+
+		void setChar(int32_t input);
+
+		virtual void appendInputChar(int32_t input);
+		virtual void terminateInput(void);
 
 	protected:
 		void updateHints(void) noexcept;
@@ -188,6 +191,8 @@ class InOutTab : public InputTab, public OutputTab
 
 		void activate(void) override;
 		void deactivate(void) override;
+
+		void terminateInput(void) override;
 
 	protected:
 		WINDOW*	inputFrame{nullptr};
