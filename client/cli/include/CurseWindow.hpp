@@ -2,6 +2,8 @@
 
 #include <ncurses.h>
 #include <memory>
+#include <vector>
+#include <set>
 
 #include "Config.hpp"
 
@@ -21,17 +23,19 @@ class CurseWindow
 		virtual ~CurseWindow(void) noexcept;
 
 		virtual void draw(int32_t height, int32_t width) = 0;
-		virtual void clear(void) noexcept = 0;
-		virtual void readInput(void) = 0;
 		virtual void resize(int32_t height, int32_t width) = 0;
-		virtual void switchInputTab(void) noexcept = 0;
-		virtual void scrollTab(bool goingUp) noexcept = 0;
+		virtual void clear(void) noexcept;
+
+		virtual void	switchActiveTab(int32_t index = -1);
+		BasicTab*		getActiveTab(void) { return this->tabs.at(this->activeTabIndex).get(); }
 
 		void refresh(void) noexcept { ::doupdate(); }
 
 	protected:
+		std::vector<std::unique_ptr<BasicTab>>	tabs{};
+		std::set<size_t>						tabsToSkip{};
+
 		int32_t height{0};
 		int32_t width{0};
-
-		BasicTab* currentTab{nullptr};
+		int32_t activeTabIndex{0};
 };

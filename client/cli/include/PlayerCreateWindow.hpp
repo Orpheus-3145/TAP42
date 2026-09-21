@@ -12,15 +12,12 @@ class PlayerCreateWindow : public CurseWindow
 		virtual ~PlayerCreateWindow(void) noexcept { this->clear(); }
 
 		void draw(int32_t height, int32_t width) override;
-		void clear(void) noexcept override;
-		void readInput(void) override;
 		void resize(int32_t height, int32_t width) override;
-		void switchInputTab(void) noexcept override {}
-		void scrollTab(bool goingUp) noexcept override { (void) goingUp; }
 
 	protected:
-		int32_t commandFd;
+		static constexpr size_t N_TABS = 2UL;
+		static constexpr size_t FRAME = 0UL;
+		static constexpr size_t USERNAME = 1UL;
 
-		std::unique_ptr<BasicTab>	frame;
-		std::unique_ptr<InOutTab>	usernameTab;
+		int32_t commandFd;
 };
