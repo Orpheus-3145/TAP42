@@ -2,10 +2,9 @@
 
 #include <ncurses.h>
 #include <memory>
+#include <cstdint>
 
 #include "CurseWindow.hpp"
-#include "CurseTab.hpp"
-#include "Config.hpp"
 
 
 static std::vector<std::string> CMD_HINTS

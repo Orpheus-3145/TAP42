@@ -1,4 +1,5 @@
 #include "PlayerCreateWindow.hpp"
+#include "InOutTab.hpp"
 #include "CLI.hpp"
 #include "Logger.hpp"
 #include "Exceptions.hpp"
