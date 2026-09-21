@@ -51,6 +51,7 @@ CLI::CLI(int32_t clientSocket) :
 		::init_pair(RED_COLOR, COLOR_RED, COLOR_BLACK);
 		::init_pair(GREEN_COLOR, COLOR_GREEN, COLOR_BLACK);
 		::init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
+		::init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
 	}
 	// // for callback (scrolling tabs) with mouse wheel
     // ::mousemask(BUTTON4_PRESSED | BUTTON5_PRESSED | ALL_MOUSE_EVENTS, NULL);
@@ -59,7 +60,7 @@ CLI::CLI(int32_t clientSocket) :
 	this->loginWin = std::make_unique<LoginWindow>(this->commandPipe.in);
 	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(this->commandPipe.in);
 	this->gameWin = std::make_unique<GameWindow>(this->commandPipe.in, this->chatPipe.in);
-	// this->errorWin = std::make_unique<CurseWindow>();
+	this->errorWin = std::make_unique<ErrorWindow>();
 
 	LOG_INFO(LogContext::INTERFACE, "Done setup CLI");
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Listening to client socket: {}", this->pollFds[CLI::CLIENT].fd));
@@ -72,7 +73,7 @@ CLI::~CLI(void) noexcept
 	this->loginWin.reset();
 	this->newPlayerWin.reset();
 	this->gameWin.reset();
-	// this->errorWin.reset();
+	this->errorWin.reset();
 
 	::endwin();
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Cleaned Ncurses data"));
@@ -84,6 +85,7 @@ CLI::~CLI(void) noexcept
 
 void CLI::start(void)
 {
+	// this->handShakeDone = true;
 	this->loginPhase();
 
 	while (this->keepAlive == true)
@@ -280,8 +282,11 @@ void CLI::handleError(std::string const& errMsg) noexcept
 
 	if (this->currentWindow)
 		this->currentWindow->clear();
-	// this->error.set(errMsg);		or smt
-	// this->currentWindow = this->errorWin.get();
+
+	this->errorWin->updateDescription(errMsg);
+	this->errorWin->setAction1("CLOSE", [this] { this->stop(); });
+	// this->errorWin->setAction2("RELOAD", [this] { this->gamePhase(); });
+	this->currentWindow = this->errorWin.get();
 	this->currentWindow->draw(height, width);
 }
 

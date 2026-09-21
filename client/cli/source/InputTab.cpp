@@ -50,27 +50,6 @@ InputTab::InputTab(InputTab&& other) noexcept :
 	other.inputWin = nullptr;
 }
 
-void InputTab::handleUserInput(void)
-{
-	int32_t inputChar = ::wgetch(this->inputWin);	// this is blocking
-
-	// ncurses throws many KEY_RESIZE when term is resized, ignore them
-	// since the resizing is handled by catching SIGWINCH
-	if (inputChar == KEY_RESIZE)
-		return;
-
-	// special characters handling
-	auto it = this->dispatcher.find(inputChar);
-	if (it != this->dispatcher.end())
-	{
-		it->second();
-		return;
-	}
-
-	// Default handling
-	this->setChar(inputChar);
-}
-
 void InputTab::deleteCharForward(void) noexcept
 {
 	int32_t y, x;
@@ -331,6 +310,28 @@ void InputTab::clear(void) noexcept
 	::wclear(this->inputWin);
 	::delwin(this->inputWin);
 	this->inputWin = nullptr;
+}
+
+void InputTab::handleUserInput(void)
+{
+	int32_t inputChar = ::wgetch(this->inputWin);	// this is blocking
+
+	// ncurses throws many KEY_RESIZE when term is resized, ignore them
+	// since the resizing is handled by catching SIGWINCH
+	if (inputChar == KEY_RESIZE)
+		return;
+
+	LOG_DEBUG(LogContext::INTERFACE, std::format("input: {}", inputChar));
+	// special characters handling
+	auto it = this->dispatcher.find(inputChar);
+	if (it != this->dispatcher.end())
+	{
+		it->second();
+		return;
+	}
+
+	// Default handling
+	this->setChar(inputChar);
 }
 
 void InputTab::updateHints(void) noexcept
