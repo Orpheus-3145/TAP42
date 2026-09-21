@@ -3,6 +3,7 @@
 #include <ncurses.h>
 #include <memory>
 #include <cstdint>
+#include <vector>
 
 #include "CurseWindow.hpp"
 
@@ -49,7 +50,6 @@ class GameWindow : public CurseWindow
 		void showEvent(std::string const& event);
 
 	protected:
-		static constexpr size_t N_TABS = 5UL;
 		static constexpr size_t FRAME = 0UL;
 		static constexpr size_t INFO = 1UL;
 		static constexpr size_t CMD = 2UL;

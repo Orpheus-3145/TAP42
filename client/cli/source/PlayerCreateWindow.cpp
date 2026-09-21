@@ -14,7 +14,6 @@ PlayerCreateWindow::PlayerCreateWindow(int32_t commandFd) :
 {
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding username");
 
-	this->tabs.resize(PlayerCreateWindow::N_TABS);
 	this->tabs[PlayerCreateWindow::FRAME] = std::make_unique<BasicTab>(-1, GREEN_COLOR, this);
 	this->tabs[PlayerCreateWindow::USERNAME] = std::make_unique<InOutTab>(this->commandFd, std::vector<std::string>(), Config::PROMPT, "", 0, GREEN_COLOR, this);
 
@@ -44,11 +43,10 @@ void PlayerCreateWindow::draw(int32_t height, int32_t width)
 		(this->width - widthTabs) / 2
 	);
 	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(PlayerCreateWindow::USERNAME).get());
-	assert(tab != nullptr and "current tab doesn't supportappending content");
+	assert(tab != nullptr and "current tab doesn't support appending content");
 	tab->appendContent(" ");
 	tab->appendContent(" Enter new username:", TextAlign::MID_ALIGN);
 
-	this->switchActiveTab(PlayerCreateWindow::USERNAME);
 	this->refresh();
 
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing create player window, size h: {}, w: {}", this->height, this->width));

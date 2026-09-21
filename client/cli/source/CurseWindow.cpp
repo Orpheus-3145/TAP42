@@ -10,8 +10,8 @@ CurseWindow::~CurseWindow(void) noexcept
 
 void CurseWindow::clear(void) noexcept
 {
-	for (std::unique_ptr<BasicTab>& tab : this->tabs)
-		tab.reset();
+	for (auto const& [_, tab] : this->tabs)
+		tab->clear();
 }
 
 void CurseWindow::handleUserInput(void)
