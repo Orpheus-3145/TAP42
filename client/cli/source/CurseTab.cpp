@@ -269,59 +269,6 @@ void InputTab::moveEndLine(void) const noexcept
 	this->refresh();
 }
 
-void InputTab::setChar(int32_t input)
-{
-	int32_t y, x;
-	bool resetCursorPos = false;
-
-	if (input != COMMAND_TERM)		// append normal char to buffer
-	{
-		if (this->bufferSize == Config::CMD_BUFFER_SIZE)
-			throw CliException("Command buffer overflow");
-
-		getyx(this->inputWin, y, x);
-		x -= this->startX;
-
-		if (x < static_cast<int32_t>(this->bufferSize))			// in case the cursor is not at the end of the buffer
-		{
-			resetCursorPos = true;
-			::memmove(this->commandBuffer + x + 1, this->commandBuffer + x, static_cast<int32_t>(this->bufferSize) - x);
-		}
-
-		this->commandBuffer[x] = static_cast<char>(input);		// could overflow if not ASCII value
-		this->bufferSize++;
-
-		this->updateHints();		// got at least one input use hints now instead of history for suggestions
-	}
-	else							// if got end msg and buffer is not empty store current command
-	{
-		if (this->bufferSize == 0UL)
-			return;
-
-		std::string command = std::string(this->commandBuffer, this->bufferSize);
-		ioUtils::write(this->forwardInputFd, command.data(), command.size());
-
-		this->inputHistory.emplace_front(std::move(command));
-
-		this->bufferSize = 0UL;
-		// in case a command from history has been submitted reset move commandIndex as the most recent command 
-		this->currentCommandIndex = -1L;
-
-		getyx(this->inputWin, y, x);
-		wmove(this->inputWin, y, 0);
-
-		this->clearHints();
-	}
-
-	this->writePromptLine();
-	// move cursor back where it was originally
-	if (resetCursorPos)
-	{
-		::wmove(this->inputWin, y, x + this->startX + 1);
-		this->refresh();
-	}
-}
-
 void InputTab::suggestHint(void) noexcept
 {
 	if (this->suggestedHintIndexes.size() == 0UL)
@@ -569,6 +516,66 @@ void InputTab::deactivate(void)
 		::wattroff(this->inputWin, COLOR_PAIR(this->colorPair));
 	::wattroff(this->inputWin, A_BOLD);
 
+	this->writePromptLine();
+}
+
+void InputTab::setChar(int32_t input)
+{
+	if (input != COMMAND_TERM)		// append normal char to buffer
+		this->appendInputChar(input);
+	else							// if got end msg and buffer is not empty store current command
+		this->terminateInput();
+}
+
+void InputTab::appendInputChar(int32_t input)
+{
+	int32_t y, x;
+	bool resetCursorPos = false;
+
+	if (this->bufferSize == Config::CMD_BUFFER_SIZE)
+		throw CliException("Command buffer overflow");
+
+	getyx(this->inputWin, y, x);
+	x -= this->startX;
+
+	if (x < static_cast<int32_t>(this->bufferSize))			// in case the cursor is not at the end of the buffer
+	{
+		resetCursorPos = true;
+		::memmove(this->commandBuffer + x + 1, this->commandBuffer + x, static_cast<int32_t>(this->bufferSize) - x);
+	}
+
+	this->commandBuffer[x] = static_cast<char>(input);		// could overflow if not ASCII value
+	this->bufferSize++;
+
+	this->updateHints();		// got at least one input use hints now instead of history for suggestions
+	this->writePromptLine();
+	// move cursor back where it was originally
+	if (resetCursorPos)
+	{
+		::wmove(this->inputWin, y, x + this->startX + 1);
+		this->refresh();
+	}
+}
+
+void InputTab::terminateInput(void)
+{
+	if (this->bufferSize == 0UL)
+		return;
+
+	int32_t y, x;
+	std::string command = std::string(this->commandBuffer, this->bufferSize);
+	ioUtils::write(this->forwardInputFd, command.data(), command.size());
+
+	this->inputHistory.emplace_front(std::move(command));
+
+	this->bufferSize = 0UL;
+	// in case a command from history has been submitted reset move commandIndex as the most recent command 
+	this->currentCommandIndex = -1L;
+
+	getyx(this->inputWin, y, x);
+	wmove(this->inputWin, y, 0);
+
+	this->clearHints();
 	this->writePromptLine();
 }
 
@@ -1001,4 +1008,13 @@ void InOutTab::deactivate(void)
 	BasicTab::deactivate();
 	OutputTab::deactivate();
 	InputTab::deactivate();
+}
+
+void InOutTab::terminateInput(void)
+{
+	InputTab::terminateInput();
+
+	this->state.emplace_back(this->inputHistory.front(), TextAlign::LEFT_ALIGN);
+	// show last input
+	this->appendContent(this->inputHistory.front());
 }
