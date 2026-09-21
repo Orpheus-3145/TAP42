@@ -260,7 +260,8 @@ void CLI::newPlayerPhase(void)
 	int32_t height, width;
 	this->getTerminalSize(height, width);
 
-	this->currentWindow->clear();
+	if (this->currentWindow)
+		this->currentWindow->clear();
 	this->currentWindow = this->newPlayerWin.get();
 	this->currentWindow->draw(height, width);
 }
@@ -272,7 +273,8 @@ void CLI::gamePhase(void)
 	int32_t height, width;
 	this->getTerminalSize(height, width);
 
-	this->currentWindow->clear();
+	if (this->currentWindow)
+		this->currentWindow->clear();
 	this->currentWindow = this->gameWin.get();
 	this->currentWindow->draw(height, width);
 }
@@ -284,7 +286,8 @@ void CLI::handleError(std::string const& errMsg) noexcept
 	int32_t height, width;
 	this->getTerminalSize(height, width);
 
-	this->currentWindow->clear();
+	if (this->currentWindow)
+		this->currentWindow->clear();
 	// this->error.set(errMsg);		or smt
 	// this->currentWindow = this->errorWin.get();
 	this->currentWindow->draw(height, width);

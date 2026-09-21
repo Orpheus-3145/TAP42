@@ -22,13 +22,12 @@ GameWindow::GameWindow(int32_t commandFd, int32_t messageFd) :
 
 	this->infoTab = std::make_unique<OutputTab>(0, BLUE_COLOR, this);
 	this->eventsTab = std::make_unique<OutputTab>("World events", 0, YELLOW_COLOR, this);
-	this->tbdTab = std::make_unique<OutputTab>("", 0, -1, this);
 }
 
 void GameWindow::draw(int32_t height, int32_t width)
 {
-	this->height = ((height - 2) % 5) == 0 ? height : ((height - 2) / 5 * 5 + 2);		// has to be multiple of 5
-	this->width = (width % 2) == 0 ? (width - 1) : width;								// has to be an odd number
+	this->height = (height % 2) == 0 ? height : height - 1;
+	this->width = (width % 2) == 0 ? width : width - 1;
 
 	this->mainFrame->draw(
 		this->height,
@@ -37,11 +36,11 @@ void GameWindow::draw(int32_t height, int32_t width)
 		0
 	);
 
-	int32_t widthTabs = (this->width - 2) / 2 - 1;
+	int32_t widthTab = (this->width - 2) / 2 - 1;
 	// left panel
 	this->infoTab->draw(
 		6,
-		widthTabs,
+		widthTab,
 		1,
 		2
 	);
@@ -52,39 +51,27 @@ void GameWindow::draw(int32_t height, int32_t width)
 
 	this->commandTab->draw(
 		this->height - 6 - 2,
-		widthTabs,
+		widthTab,
 		7,
 		2
 	);
 
-	int32_t tmpHeight = this->height - 2;
-	int32_t heightEventsTab = tmpHeight * 2 / 5;
-	int32_t tbdTab = tmpHeight / 5;
+	int32_t heightTab = (this->height - 2) / 2;
+
 	this->eventsTab->draw(
-		heightEventsTab,
-		widthTabs,
+		heightTab,
+		widthTab,
 		1,
-		widthTabs + 3
+		widthTab + 3
 	);
 
 	this->chatTab->draw(
-		heightEventsTab,
-		widthTabs,
-		heightEventsTab + 1,
-		widthTabs + 3
+		heightTab,
+		widthTab,
+		heightTab + 1,
+		widthTab + 3
 	);
 
-	this->tbdTab->draw(
-		tbdTab,
-		widthTabs,
-		heightEventsTab * 2 + 1,
-		widthTabs + 3
-	);
-
-	this->tbdTab->appendContent("");
-	this->tbdTab->appendContent("");
-	this->tbdTab->appendContent("TBD ", TextAlign::MID_ALIGN);
-	
 	this->commandTab->activate();
 	this->currentTab = this->commandTab.get();
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing game window size h: {}, w: {}", height, width));
@@ -97,7 +84,6 @@ void GameWindow::clear(void) noexcept
 	this->chatTab.reset();
 	this->infoTab.reset();
 	this->eventsTab.reset();
-	this->tbdTab.reset();
 }
 
 void GameWindow::readInput(void)
@@ -110,8 +96,8 @@ void GameWindow::readInput(void)
 
 void GameWindow::resize(int32_t height, int32_t width)
 {
-	this->height = ((height - 2) % 5) == 0 ? height : ((height - 2) / 5 * 5 + 2);	// has to be multiple of 5
-	this->width = (width % 2) == 0 ? (width - 1) : width;							// has to be an odd number
+	this->height = (height % 2) == 0 ? height : height - 1;
+	this->width = (width % 2) == 0 ? width : width - 1;
 
 	// force minimum size of the window
 	// if ((this->height < Config::MIN_HEIGHT_CLI) or (this->width < Config::MIN_WIDTH_CLI))
@@ -134,44 +120,32 @@ void GameWindow::resize(int32_t height, int32_t width)
 		0
 	);
 
-	int32_t widthTabs = (this->width - 2) / 2 - 1;
-	// left panel
+	int32_t widthTab = (this->width - 2) / 2 - 1;
 	this->infoTab->resize(
 		6,
-		widthTabs,
+		widthTab,
 		1,
 		2
 	);
-
 	this->commandTab->resize(
 		this->height - 6 - 2,
-		widthTabs,
+		widthTab,
 		7,
 		2
 	);
 
-	int32_t tmpHeight = this->height - 2;
-	int32_t heightEventsTab = tmpHeight * 2 / 5;
-	int32_t tbdTab = tmpHeight / 5;
+	int32_t heightTab = (this->height - 2) / 2;
 	this->eventsTab->resize(
-		heightEventsTab,
-		widthTabs,
+		heightTab,
+		widthTab,
 		1,
-		widthTabs + 3
+		widthTab + 3
 	);
-
 	this->chatTab->resize(
-		heightEventsTab,
-		widthTabs,
-		heightEventsTab + 1,
-		widthTabs + 3
-	);
-
-	this->tbdTab->resize(
-		tbdTab,
-		widthTabs,
-		heightEventsTab * 2 + 1,
-		widthTabs + 3
+		heightTab,
+		widthTab,
+		heightTab + 1,
+		widthTab + 3
 	);
 
 	this->currentTab->refresh();
