@@ -1,5 +1,5 @@
 #include "CurseWindow.hpp"
-#include "CurseTab.hpp"
+#include "BasicTab.hpp"
 
 #include <cassert>
 
@@ -12,6 +12,11 @@ void CurseWindow::clear(void) noexcept
 {
 	for (std::unique_ptr<BasicTab>& tab : this->tabs)
 		tab.reset();
+}
+
+void CurseWindow::handleUserInput(void)
+{
+	this->getActiveTab()->handleUserInput();
 }
 
 void CurseWindow::switchActiveTab(int32_t index)

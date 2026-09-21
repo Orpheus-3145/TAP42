@@ -1,7 +1,8 @@
 #pragma once
 
 #include "CurseWindow.hpp"
-#include "CurseTab.hpp"
+
+#include <cstdint>
 
 
 class PlayerCreateWindow : public CurseWindow
