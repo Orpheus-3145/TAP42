@@ -2,7 +2,7 @@
 
 #include <ncurses.h>
 #include <memory>
-#include <vector>
+#include <map>
 #include <set>
 #include <cstdint>
 
@@ -32,8 +32,8 @@ class CurseWindow
 		void refresh(void) noexcept { ::doupdate(); }
 
 	protected:
-		std::vector<std::unique_ptr<BasicTab>>	tabs{};
-		std::set<size_t>						tabsToSkip{};
+		std::map<size_t,std::unique_ptr<BasicTab>>	tabs{};
+		std::set<size_t>							tabsToSkip{};
 
 		int32_t height{0};
 		int32_t width{0};

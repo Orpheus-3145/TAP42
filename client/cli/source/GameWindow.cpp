@@ -15,10 +15,9 @@ GameWindow::GameWindow(int32_t commandFd, int32_t messageFd) :
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding commands");
 	assert(this->messageFd != -1 and "Invalid fd provided for forwarding chat messages");
 
-	this->tabs.resize(GameWindow::N_TABS);
 	this->tabs[GameWindow::FRAME] = std::make_unique<BasicTab>(0, BLUE_COLOR, this);
 
-	this->tabs[GameWindow::CMD] = std::make_unique<InOutTab>(this->commandFd, CMD_HINTS, Config::PROMPT, "User Events", 0, RED_COLOR, this);
+	this->tabs[GameWindow::CMD] = std::make_unique<InOutTab>(this->commandFd, CMD_HINTS, Config::PROMPT, "User Events", 0, CYAN_COLOR, this);
 	this->tabs[GameWindow::CHAT] = std::make_unique<InOutTab>(this->messageFd, CHAT_CMD_HINTS, Config::PROMPT, "Chat", 0, GREEN_COLOR, this);
 
 	this->tabs[GameWindow::INFO] = std::make_unique<OutputTab>(0, BLUE_COLOR, this);
@@ -50,7 +49,7 @@ void GameWindow::draw(int32_t height, int32_t width)
 		2
 	);
 	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(GameWindow::INFO).get());
-	assert(tab != nullptr and "current tab doesn't supportappending content");
+	assert(tab != nullptr and "current tab doesn't support appending content");
 	tab->appendContent("Player: <NAME>");
 	tab->appendContent("Data: <CLASS | RACE | ...>");
 	tab->appendContent("Currently in: <LOCATION>");

@@ -16,7 +16,6 @@ class LoginWindow : public CurseWindow
 		void resize(int32_t height, int32_t width) override;
 
 	protected:
-		static constexpr size_t N_TABS = 2UL;
 		static constexpr size_t FRAME = 0UL;
 		static constexpr size_t USERNAME = 1UL;
 

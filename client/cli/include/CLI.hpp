@@ -9,6 +9,7 @@
 #include "LoginWindow.hpp"
 #include "PlayerCreateWindow.hpp"
 #include "GameWindow.hpp"
+#include "ErrorWindow.hpp"
 #include "Utils.hpp"
 
 
@@ -252,6 +253,7 @@ static constexpr int32_t BLUE_COLOR = 1;
 static constexpr int32_t RED_COLOR = 2;
 static constexpr int32_t GREEN_COLOR = 3;
 static constexpr int32_t YELLOW_COLOR = 4;
+static constexpr int32_t CYAN_COLOR = 5;
 
 class CLI : public UI
 {
@@ -298,7 +300,7 @@ class CLI : public UI
 		std::unique_ptr<LoginWindow>		loginWin;
 		std::unique_ptr<PlayerCreateWindow>	newPlayerWin;
 		std::unique_ptr<GameWindow>			gameWin;
-		// std::unique_ptr<CurseWindow>		errorWin;
+		std::unique_ptr<ErrorWindow>		errorWin;
 
 		CurseWindow* currentWindow{nullptr};
 };

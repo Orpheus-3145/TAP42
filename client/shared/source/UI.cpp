@@ -12,6 +12,7 @@ void UI::writeInputToServer(void)
 	if (this->handShakeDone == false)
 	{
 		this->handleError(std::format("Attempted login ('{}') but handshake hasn't been performed", escapeNewLine(this->toServerBuffer, this->toServerSize)));
+		this->toServerSize = 0;
 		return;
 	}
 
@@ -97,9 +98,8 @@ void UI::handleServerData(std::string const& message)
 		}
 		else if (message == LOGIN_OK)
 			this->gamePhase();
-		else if (message.find(S_ERR) == 0UL)
-			this->newPlayerPhase();
-			// this->handleError("Username doesn't exist");
+		// else if (message.find(S_ERR) == 0UL)
+		// 	this->handleError("Username doesn't exist");	
 		else
 			LOG_WARN(LogContext::INTERFACE, std::format("Unexpected message: '{}'", message));
 	}
