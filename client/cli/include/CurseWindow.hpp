@@ -4,8 +4,7 @@
 #include <memory>
 #include <vector>
 #include <set>
-
-#include "Config.hpp"
+#include <cstdint>
 
 
 class BasicTab;
@@ -26,6 +25,7 @@ class CurseWindow
 		virtual void resize(int32_t height, int32_t width) = 0;
 		virtual void clear(void) noexcept;
 
+		virtual void	handleUserInput(void);
 		virtual void	switchActiveTab(int32_t index = -1);
 		BasicTab*		getActiveTab(void) { return this->tabs.at(this->activeTabIndex).get(); }
 

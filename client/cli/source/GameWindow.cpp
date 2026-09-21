@@ -1,7 +1,7 @@
 #include "GameWindow.hpp"
 #include "CLI.hpp"
 #include "Logger.hpp"
-#include "Exceptions.hpp"
+#include "InOutTab.hpp"
 
 #include <format>
 #include <cassert>
@@ -137,7 +137,7 @@ void GameWindow::resize(int32_t height, int32_t width)
 		heightTab + 1,
 		widthTab + 3
 	);
-
+	this->getActiveTab()->refresh();
 	this->refresh();
 
 	// because resize is not handled by ncurses there might be some garbage to read, flush it

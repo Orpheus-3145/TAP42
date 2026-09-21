@@ -5,6 +5,7 @@
 
 #include <format>
 #include <cassert>
+#include <cstring>
 #include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/signalfd.h>
@@ -101,7 +102,7 @@ void CLI::start(void)
 
 		// user type input
 		if (this->pollFds[STDIN].revents & POLLIN)
-			this->currentWindow->getActiveTab()->handleUserInput();
+			this->currentWindow->handleUserInput();
 		// resize window
 		if (this->pollFds[RESIZE].revents & POLLIN)
 			this->handleResize();
