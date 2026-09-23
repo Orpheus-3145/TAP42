@@ -54,15 +54,10 @@ void BasicTab::refresh(void) const noexcept
 
 void BasicTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 {
-	assert((h > 0) and (w > 0) and "invalid size provided");
-	assert((y > -1) and (x > -1) and "invalid position provided");
-
 	this->borderWin = ::newwin(h, w, y, x);
 	if (this->borderWin == nullptr)
-	{
-		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
-		throw CliException("Failed to create window");
-	}
+		throw AppException(ErrorCode::UI_INVALID_SIZE);
+
 	if (this->borderChar != -1)
 	{
 		if (this->colorPair != -1)
@@ -98,7 +93,6 @@ void BasicTab::handleUserInput(void)
 	if (inputChar == KEY_RESIZE)
 		return;
 
-	// special characters handling
 	auto it = this->dispatcher.find(inputChar);
 	if (it != this->dispatcher.end())
 		it->second();

@@ -33,7 +33,7 @@ void ButtonTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 
 	this->borderWin = ::newwin(3, this->content.size() + 2, y, x);
 	if (this->borderWin == nullptr)
-		throw CliException("Failed to create window");
+		throw AppException(ErrorCode::UI_INVALID_SIZE);
 
 	if (this->colorPair != -1)
 		::wattron(this->borderWin, COLOR_PAIR(this->colorPair));
@@ -47,7 +47,7 @@ void ButtonTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 
 	this->btnWin = ::newwin(1, this->content.size(), y + 1, x + 1);
 	if (this->btnWin == nullptr)
-		throw CliException("Failed to create window");
+		throw AppException(ErrorCode::UI_INVALID_SIZE);
 
 	if (this->colorPair != -1)
 		::wattron(this->btnWin, COLOR_PAIR(this->colorPair));

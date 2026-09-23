@@ -53,10 +53,7 @@ void InOutTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 		// title
 		this->titleWin = ::newwin(3, this->title.size() + 2, y, x + 1);
 		if (this->borderWin == nullptr)
-		{
-			LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
-			throw CliException("Failed to create window");
-		}
+			throw AppException(ErrorCode::UI_INVALID_SIZE);
 
 		if (this->colorPair != -1)
 			::wattron(this->titleWin, COLOR_PAIR(this->colorPair));
@@ -71,6 +68,9 @@ void InOutTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 
 		// add a div line between title and ouput
 		this->divLineWin = ::newwin(1, w - 3 - this->title.size() - 2, y + 2, x + 2 + this->title.size() + 2);
+		if (this->divLineWin == nullptr)
+			throw AppException(ErrorCode::UI_INVALID_SIZE);
+
 		if (this->colorPair != -1)
 			::wattron(this->divLineWin, COLOR_PAIR(this->colorPair));
 		if (this->isActive == true)
@@ -92,20 +92,16 @@ void InOutTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 	// output tab
 	this->outputWin = ::newwin(h - 3, w, y, x);
 	if (this->outputWin == nullptr)
-	{
-		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
-		throw CliException("Failed to create window");
-	}
+		throw AppException(ErrorCode::UI_INVALID_SIZE);
+
 	::scrollok(this->outputWin, true);
 	::idlok(this->outputWin, true);
 
 	// frame input tab
 	this->inputFrame = ::newwin(3, w, y + h - 3, x);
 	if (this->inputFrame == nullptr)
-	{
-		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
-		throw CliException("Failed to create window");
-	}
+		throw AppException(ErrorCode::UI_INVALID_SIZE);
+
 	if (this->colorPair != -1)
 		::wattron(this->inputFrame, COLOR_PAIR(this->colorPair));
 	::box(this->inputFrame, 0, 0);
@@ -115,10 +111,7 @@ void InOutTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 	// input tab
 	this->inputWin = ::newwin(1, w - 2, y + h - 3 + 1, x + 1);
 	if (this->inputWin == nullptr)
-	{
-		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
-		throw CliException("Failed to create window");
-	}
+		throw AppException(ErrorCode::UI_INVALID_SIZE);
 
 	::keypad(this->inputWin, true);
 	this->writePromptLine();
