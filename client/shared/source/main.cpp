@@ -48,9 +48,11 @@ int32_t main(int32_t argc, char** argv)
 			std::cout << HOW_TO << std::endl;
 			return (EXIT_SUCCESS);
 		}
-	} catch (ParsingException& err) {
-		std::cout << HOW_TO << std::endl;
-		return (EXIT_FAILURE);
+	} catch (AppException const& err) {
+		if (err.getCode() == ErrorCode::BAD_FORMAT_ARGS)
+			std::cout << HOW_TO << std::endl;
+		else
+			throw err;
 	}
 
 	run(options.host, options.port);

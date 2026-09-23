@@ -80,6 +80,6 @@ void PlayerCreateWindow::resize(int32_t height, int32_t width)
 
 	// because resize is not handled by ncurses there might be some garbage to read, flush it
 	::flushinp();
-	
+
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Resized playerCreate window to h: {}, w: {}", this->height, this->width));
 }

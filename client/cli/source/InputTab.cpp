@@ -3,6 +3,8 @@
 #include "Utils.hpp"
 #include "UI.hpp"
 
+#include <format>
+
 
 InputTab::InputTab(
 	int32_t forwardInputFd,
@@ -293,10 +295,7 @@ void InputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 	}
 	this->inputWin = ::newwin(h, w, y, x);
 	if (this->inputWin == nullptr)
-	{
-		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
-		throw CliException("Failed to create window");
-	}
+		throw AppException(ErrorCode::UI_INVALID_SIZE);
 
 	::keypad(this->inputWin, true);
 	this->writePromptLine();
@@ -321,7 +320,6 @@ void InputTab::handleUserInput(void)
 	if (inputChar == KEY_RESIZE)
 		return;
 
-	LOG_DEBUG(LogContext::INTERFACE, std::format("input: {}", inputChar));
 	// special characters handling
 	auto it = this->dispatcher.find(inputChar);
 	if (it != this->dispatcher.end())

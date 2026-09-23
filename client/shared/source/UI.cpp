@@ -1,7 +1,6 @@
 #include "UI.hpp"
 #include "Utils.hpp"
 #include "Logger.hpp"
-#include "Exceptions.hpp"
 
 #include <cstring>
 #include <format>
@@ -10,60 +9,38 @@
 void UI::writeInputToServer(void)
 {
 	if (this->handShakeDone == false)
+		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE);
+		
+	ssize_t n = ioUtils::writeNonBlock(this->clientSocket, this->toServerBuffer, this->toServerSize);
+	if (n < 0L)
+		throw AppException(ErrorCode::CLIENT_DISCONNECTED);	// NB set pollFD to POLLHUP
+	else if (n > 0L)	
 	{
-		this->handleError(std::format("Attempted login ('{}') but handshake hasn't been performed", escapeNewLine(this->toServerBuffer, this->toServerSize)));
-		this->toServerSize = 0;
-		return;
-	}
+		std::string gameData = escapeNewLine(this->toServerBuffer, n);
+		LOG_DEBUG(LogContext::INTERFACE, std::format("Sent to client: '{}'", gameData));
 
-	try
-	{
-		ssize_t n = ioUtils::writeNonBlock(this->clientSocket, this->toServerBuffer, this->toServerSize);
-
-		if (n < 0L)
-			this->handleError("Client socket disconnected");
-		else if (n > 0L)	
-		{
-			std::string gameData = escapeNewLine(this->toServerBuffer, n);
-			LOG_DEBUG(LogContext::INTERFACE, std::format("Sent to client: '{}'", gameData));
-
-			if (std::string(this->toServerBuffer, n - 1) == "quit")		// NB only for debugging purpuses 
-				this->stop();
-			this->toServerSize -= n;
-			if (this->toServerSize > 0UL)
-				::memmove(this->toServerBuffer, this->toServerBuffer + n, this->toServerSize);
-		}
-		else
-			LOG_WARN(LogContext::INTERFACE, "Client socket buffer is busy, try again later");
+		if (std::string(this->toServerBuffer, n - 1) == "quit")		// NB only for debugging purpuses 
+			this->stop();
+		this->toServerSize -= n;
+		if (this->toServerSize > 0UL)
+			::memmove(this->toServerBuffer, this->toServerBuffer + n, this->toServerSize);
 	}
-	catch(const IOException& e)
-	{
-		this->handleError(std::format("I/O error failed to write to client: '{}'", e.what()));
-	}
+	else
+		LOG_WARN(LogContext::INTERFACE, "Client socket buffer is busy, try again later");
 }
 
 void UI::readInputFromServer(void)
 {
-	try
+	ssize_t n = ioUtils::readNonBlock(this->clientSocket, this->fromServerBuffer + this->fromServerSize, Config::BUFF_SIZE - this->fromServerSize);
+	if (n < 0L)
+		throw AppException(ErrorCode::CLIENT_DISCONNECTED);	// NB set pollFD to POLLHUP
+	else if (n > 0L)
 	{
-		ssize_t n = ioUtils::readNonBlock(this->clientSocket, this->fromServerBuffer + this->fromServerSize, Config::BUFF_SIZE - this->fromServerSize);
-		if (n < 0L)
-		{
-			LOG_WARN(LogContext::INTERFACE, "Client unexpectedly terminated connection, closing session");
-			throw IOException("Client unexpectedly terminated connection, closing session");
-		}
-		else if (n > 0L)
-		{
-			std::string serverData = escapeNewLine(this->fromServerBuffer + this->fromServerSize, n);
-			LOG_DEBUG(LogContext::INTERFACE, std::format("Read from client: '{}'", serverData));
-	
-			this->fromServerSize += n;
-			this->splitIntoMessages();
-		}
-	}
-	catch(const IOException& e)
-	{
-		this->handleError(std::format("I/O error failed to read from client: '{}'", e.what()));
+		std::string serverData = escapeNewLine(this->fromServerBuffer + this->fromServerSize, n);
+		LOG_DEBUG(LogContext::INTERFACE, std::format("Read from client: '{}'", serverData));
+
+		this->fromServerSize += n;
+		this->splitIntoMessages();
 	}
 }
 
@@ -78,7 +55,18 @@ void UI::splitIntoMessages(void)
 
 		ssize_t lenMsg = endMsg - startMsg;
 
-		this->handleServerData(std::string(startMsg, lenMsg));
+		try
+		{
+			this->handleServerData(std::string(startMsg, lenMsg));
+		}
+		catch(AppException const& e)
+		{
+			startMsg += lenMsg + 1UL;
+			this->fromServerSize -= lenMsg + 1UL;
+			if (this->fromServerSize > 0UL)
+				::memmove(this->fromServerBuffer, startMsg, this->fromServerSize);
+			throw e;
+		}
 
 		startMsg += lenMsg + 1UL;
 		this->fromServerSize -= lenMsg + 1UL;
@@ -89,40 +77,61 @@ void UI::splitIntoMessages(void)
 
 void UI::handleServerData(std::string const& message)
 {
-	if (this->phase == GamePhase::LOGIN)
+	if (message == INITIAL_GREETING)
 	{
-		if (message == INITIAL_GREETING)
-		{
-			this->handShakeDone = true;
-			LOG_DEBUG(LogContext::INTERFACE, std::format("Handshake with server performed: {}", message));
-		}
-		else if (message == LOGIN_OK)
-			this->gamePhase();
-		// else if (message.find(S_ERR) == 0UL)
-		// 	this->handleError("Username doesn't exist");	
-		else
-			LOG_WARN(LogContext::INTERFACE, std::format("Unexpected message: '{}'", message));
+		this->doHandshake();
+		return;
 	}
-	else if (this->phase == GamePhase::PLAYER_CREATE)
+
+	switch (this->phase)
 	{
-		if (message == LOGIN_OK)
-			this->gamePhase();
-		else
-			LOG_WARN(LogContext::INTERFACE, std::format("Unexpected message: '{}'", message));
+		case GamePhase::LOGIN:
+			if (message == LOGIN_OK)
+				this->gamePhase();
+			else if (message.find(S_ERR) == 0UL)
+				throw AppException(ErrorCode::UI_USERNAME_NOT_EXISTS);
+			else
+				LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
+			break;
+
+		case GamePhase::PLAYER_CREATE:
+			if (message == LOGIN_OK)
+				this->gamePhase();
+			else if (message.find(S_ERR) == 0UL)
+				throw AppException(ErrorCode::SERVER_ERROR, message);
+			else
+				LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
+			break;
+
+		case GamePhase::GAME:
+			if (message == QUIT_RESPONSE)
+				this->stop();
+			else if ((message.find(S_OK) == 0UL) or (message.find(S_ERR) == 0UL))
+				this->showResponse(message);
+			else if (message.find(S_EVT) == 0UL)
+				this->showEvent(message);
+			else
+				LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
+			break;
+		
+		case GamePhase::ERROR:
+			if (message.find(S_ERR) == 0UL)
+				LOG_ERROR(LogContext::INTERFACE, std::format("Got error: '{}' while handling a previous error", message));
+			else if ((message.find(S_OK) == 0UL) or (message.find(S_EVT) == 0UL))
+				{ /* NB handle data to game window, but first detatch printing stuff in tabs to adding to the state */}
+			else
+				LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
+			break ;
+
+		default:
+			break;
 	}
-	else if (this->phase == GamePhase::GAME)
-	{
-		if (message == QUIT_RESPONSE)
-			this->stop();
-		else if ((message.find(S_OK) == 0UL) or (message.find(S_ERR) == 0UL))
-			this->showResponse(message);
-		else if (message.find(S_EVT) == 0UL)
-			this->showEvent(message);
-		else
-			LOG_WARN(LogContext::INTERFACE, std::format("Unexpected message: '{}'", message));
-	}
-	else
-		LOG_WARN(LogContext::INTERFACE, std::format("Unexpected message: '{}'", message));
+}
+
+void UI::doHandshake(void) noexcept
+{
+	this->handShakeDone = true;
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Handshake performed: {}", INITIAL_GREETING));
 }
 
 void UI::loginPhase(void)
@@ -133,10 +142,8 @@ void UI::loginPhase(void)
 void UI::newPlayerPhase(void)
 {
 	if (this->handShakeDone == false)
-	{
-		this->handleError("Handshake must be performed before moving to character creation");
-		return;
-	}
+		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE, "Can't create new character");
+
 	LOG_DEBUG(LogContext::INTERFACE, "Creating new player");
 	this->phase = GamePhase::PLAYER_CREATE;
 }
@@ -144,16 +151,14 @@ void UI::newPlayerPhase(void)
 void UI::gamePhase(void)
 {
 	if (this->handShakeDone == false)
-	{
-		this->handleError("Handshake must be performed before moving to game session");
-		return;
-	}
+		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE, "Can't login");
+
 	LOG_DEBUG(LogContext::INTERFACE, "Login successful, retrieving game session");
 	this->phase = GamePhase::GAME;
 }
 
-void UI::handleError(std::string const& errMsg) noexcept
+void UI::handleError(ErrorCode const& code, std::string const& errorInfo)
 {
-	LOG_ERROR(LogContext::INTERFACE, errMsg);
+	LOG_ERROR(LogContext::INTERFACE, mapError(code, errorInfo));
 	this->phase = GamePhase::ERROR;
 }
