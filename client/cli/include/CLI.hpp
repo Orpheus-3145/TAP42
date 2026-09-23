@@ -266,11 +266,9 @@ class CLI : public UI
 		void start(void) override;
 		void stop(void) noexcept override { this->keepAlive = false; }
 
-		void getTerminalSize(int32_t& height, int32_t& width) const noexcept;
-
 	private:
 		void handleResize(void);
-		void handlePollError(void) noexcept;
+		void handlePollError(void);
 		void handleGameCommand(void);
 		void handleChatCommand(void);
 
@@ -278,7 +276,7 @@ class CLI : public UI
 		void gamePhase(void) override;
 		void newPlayerPhase(void) override;
 
-		void handleError(std::string const& errMsg) noexcept override;
+		void handleError(ErrorCode const& code, std::string const& errorInfo) override;
 		void handleServerDisconnect(void) noexcept override {}
 
 		void showResponse(std::string const& response) noexcept override;

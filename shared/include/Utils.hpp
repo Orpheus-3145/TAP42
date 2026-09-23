@@ -35,7 +35,7 @@ ssize_t writeNonBlock(int32_t fd, const char* buffer, size_t size);
 
 ssize_t pipe(int32_t sourceFd, int32_t destFd);
 
-int32_t createSignalRedirectFd(int32_t signal);
+int32_t createSignalRedirectFd(int32_t signal, bool nonBlocking = true);
 
 struct SocketPair
 {

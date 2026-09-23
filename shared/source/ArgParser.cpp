@@ -25,12 +25,12 @@ static void setPort( Flags& input, std::string const& port ) {
 	try {
 		input.port = std::stoul(port);
 	} catch (std::invalid_argument const&) {
-		throw ParsingException(std::format("Wrong number input: {}", port));
+		throw AppException(ErrorCode::BAD_FORMAT_ARGS, std::format("Wrong number input: {}", port));
 	} catch (std::out_of_range const&) {
-		throw ParsingException(std::format("Out of range: {}", port));
+		throw AppException(ErrorCode::BAD_FORMAT_ARGS, std::format("Out of range: {}", port));
 	}
 	if (input.port > 65535)
-		throw ParsingException(std::format("Port number too big: {}", port));
+		throw AppException(ErrorCode::BAD_FORMAT_ARGS, std::format("Port number too big: {}", port));
 }
 
 static void setHelpMode( Flags& input, std::string const& optValue )
@@ -57,19 +57,19 @@ Flags parseArguments(int32_t argc, char* argv[])
 	std::function<void(Flags&, std::string const&)> action;
 
 	if (argc < 2)
-		throw ParsingException("Not enough argument provided");
+		throw AppException(ErrorCode::BAD_FORMAT_ARGS, "Not enough argument provided");
 
 	for (int32_t i = 1; i < argc; ++i)
 	{
 		flagKey = argv[i];
 		if (flagKey[0] != '-')
-			throw ParsingException(std::format("Flag not well formatted: {}", flagKey));
+			throw AppException(ErrorCode::BAD_FORMAT_ARGS, std::format("Flag not well formatted: {}", flagKey));
 
 		size_t eqPos = flagKey.find('=');
 		if (eqPos != std::string::npos) // if it is --key=value
 		{
 			if (eqPos == flagKey.size() - 1)
-				throw ParsingException(std::format("Invalid argument with value: {}", flagKey));
+				throw AppException(ErrorCode::BAD_FORMAT_ARGS, std::format("Invalid argument with value: {}", flagKey));
 
 			flagValue = flagKey.substr(eqPos + 1);
 			flagKey = flagKey.substr(0, eqPos);
@@ -77,8 +77,8 @@ Flags parseArguments(int32_t argc, char* argv[])
 
 		try {
 			flag = flagsMap.at(flagKey);
-		} catch(const std::out_of_range& e) {
-			throw ParsingException(std::format("Unknown argument: {}", flagKey));
+		} catch (std::out_of_range const& e) {
+			throw AppException(ErrorCode::BAD_FORMAT_ARGS, std::format("Unknown argument: {}", flagKey));
 		}
 		checkFlags = checkFlags | flag;
 
@@ -91,7 +91,7 @@ Flags parseArguments(int32_t argc, char* argv[])
 			else
 			{
 				if ((i + 1 == argc))
-					throw ParsingException(std::format("No argument provided for flag: {}", flagKey));
+					throw AppException(ErrorCode::BAD_FORMAT_ARGS, std::format("No argument provided for flag: {}", flagKey));
 
 				flagValue = argv[++i];
 			}
@@ -99,15 +99,15 @@ Flags parseArguments(int32_t argc, char* argv[])
 
 		try {
 			action = flagActions.at(flag);
-		} catch(const std::out_of_range& e) {
-			throw ParsingException(std::format("No action linked to: {}", flagKey));
+		} catch (std::out_of_range const& e) {
+			throw AppException(ErrorCode::BAD_FORMAT_ARGS, std::format("No action linked to: {}", flagKey));
 		}
 
 		action(arguments, flagValue);
 	}
 
 	if ((checkFlags & MANDATORY_FLAGS) != MANDATORY_FLAGS)
-		throw ParsingException("Missing mandatory flags");
+		throw AppException(ErrorCode::BAD_FORMAT_ARGS, ("Missing mandatory flags"));
 
 	return arguments;
 }

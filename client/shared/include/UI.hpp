@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "Config.hpp"
+#include "Exceptions.hpp"
 
 
 static constexpr const char*	S_OK = "OK";
@@ -48,20 +49,23 @@ class UI
 		void writeInputToServer(void);
 		void readInputFromServer(void);
 		void handleServerData(std::string const& message);
+		void doHandshake(void) noexcept;
+		void splitIntoMessages(void);
 
 		virtual void loginPhase(void);
 		virtual void newPlayerPhase(void);
 		virtual void gamePhase(void);
 
-		virtual void handleError(std::string const& errMsg) noexcept;
+		virtual void handleError(ErrorCode const& code, std::string const& errorInfo);
 		virtual void handleServerDisconnect(void) noexcept = 0;
 
 		virtual void showResponse(std::string const& response) noexcept = 0;
 		virtual void showEvent(std::string const& event) noexcept = 0;
 
-		void splitIntoMessages(void);
-
 		int32_t clientSocket;
+
+		int32_t height{0};
+		int32_t width{0};
 
 		GamePhase	phase{GamePhase::LOGIN};
 		bool		handShakeDone{false};

@@ -59,10 +59,7 @@ void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 		// add the title
 		this->titleWin = ::newwin(3, this->title.size() + 2, y, x + 1);
 		if (this->titleWin == nullptr)
-		{
-			LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
-			throw CliException("Failed to create window");
-		}
+			throw AppException(ErrorCode::UI_INVALID_SIZE);
 
 		if (this->colorPair != -1)
 			::wattron(this->titleWin, COLOR_PAIR(this->colorPair));
@@ -77,6 +74,9 @@ void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 
 		// add a div line between title and ouput
 		this->divLineWin = ::newwin(1, w - 3 - this->title.size() - 2, y + 2, x + 2 + this->title.size() + 2);
+		if (this->divLineWin == nullptr)
+			throw AppException(ErrorCode::UI_INVALID_SIZE);
+
 		if (this->colorPair != -1)
 			::wattron(this->divLineWin, COLOR_PAIR(this->colorPair));
 		if (this->isActive == true)
@@ -97,10 +97,8 @@ void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 
 	this->outputWin = ::newwin(h, w, y, x);
 	if (this->outputWin == nullptr)
-	{
-		LOG_ERROR(LogContext::INTERFACE, "Failed to create window");
-		throw CliException("Failed to create window");
-	}
+		throw AppException(ErrorCode::UI_INVALID_SIZE);
+
 	::keypad(this->outputWin, true);
 	::scrollok(this->outputWin, true);
 	::idlok(this->outputWin, true);

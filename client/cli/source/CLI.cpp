@@ -1,4 +1,5 @@
 #include "CLI.hpp"
+#include "BasicTab.hpp"
 #include "Logger.hpp"
 #include "Exceptions.hpp"
 #include "Utils.hpp"
@@ -24,18 +25,22 @@ CLI::CLI(int32_t clientSocket) :
 	this->pollFds[CLI::CMD].fd = this->commandPipe.out;
 	this->pollFds[CLI::CHAT].fd = this->chatPipe.out;
 
-	int32_t height, width;
-	this->getTerminalSize(height, width);
+	struct winsize termSize;
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
+		throw AppException(ErrorCode::UI_FAILED_GET_TERM_SIZE);
 
-	if ((height < Config::MIN_HEIGHT_CLI) or (width < Config::MIN_WIDTH_CLI))
+	this->height = termSize.ws_row;
+	this->width = termSize.ws_col;
+
+	if ((this->height < Config::MIN_HEIGHT_CLI) or (this->width < Config::MIN_WIDTH_CLI))
 	{
-		if (height < Config::MIN_HEIGHT_CLI)
-			height = Config::MIN_HEIGHT_CLI;
-		if (width < Config::MIN_WIDTH_CLI)
-			width = Config::MIN_WIDTH_CLI;
+		if (this->height < Config::MIN_HEIGHT_CLI)
+			this->height = Config::MIN_HEIGHT_CLI;
+		if (this->width < Config::MIN_WIDTH_CLI)
+			this->width = Config::MIN_WIDTH_CLI;
 
-		std::cout << std::format("\033[8;{};{}t", height, width) << std::endl;
-		LOG_WARN(LogContext::INTERFACE, std::format("Window too small, forced to h: {}, w: {}", height, width));
+		std::cout << std::format("\033[8;{};{}t", this->height, this->width) << std::endl;
+		LOG_WARN(LogContext::INTERFACE, std::format("Window too small, triggering resize to h: {}, w: {}", this->height, this->width));
 	}
 
 	::initscr();		// check if those functions fail
@@ -85,96 +90,91 @@ CLI::~CLI(void) noexcept
 
 void CLI::start(void)
 {
-	// this->handShakeDone = true;
 	this->loginPhase();
+
+	this->pollFds[CLI::STDIN].events = POLLIN;
+	this->pollFds[CLI::RESIZE].events = POLLIN;
+	this->pollFds[CLI::CLIENT].events = POLLIN;
+	this->pollFds[CLI::CMD].events = POLLIN;
+	this->pollFds[CLI::CHAT].events = POLLIN;
 
 	while (this->keepAlive == true)
 	{
-		this->pollFds[CLI::STDIN].events |= POLLIN;
-		this->pollFds[CLI::STDIN].revents = 0;
-		this->pollFds[CLI::RESIZE].events |= POLLIN;
-		this->pollFds[CLI::RESIZE].revents = 0;
-		this->pollFds[CLI::CLIENT].events |= POLLIN;
-		this->pollFds[CLI::CLIENT].revents = 0;
-		this->pollFds[CLI::CMD].events |= POLLIN;
-		this->pollFds[CLI::CMD].revents = 0;
-		this->pollFds[CLI::CHAT].events |= POLLIN;
-		this->pollFds[CLI::CHAT].revents = 0;
-		ioUtils::poll(this->pollFds, POLL_SIZE, -1);
-
-		// user type input
-		if (this->pollFds[STDIN].revents & POLLIN)
-			this->currentWindow->handleUserInput();
-		// resize window
-		if (this->pollFds[RESIZE].revents & POLLIN)
-			this->handleResize();
-		// read and show data from server 
-		if (this->pollFds[CLIENT].revents & POLLIN)
-			this->readInputFromServer();
-		// send data to server
-		if (this->pollFds[CLIENT].revents & POLLOUT)
+		try
 		{
-			this->writeInputToServer();
-			if (this->toServerSize == 0UL)
-				this->pollFds[CLI::CLIENT].events = POLLIN;
+			this->pollFds[CLI::STDIN].revents = 0;
+			this->pollFds[CLI::RESIZE].revents = 0;
+			this->pollFds[CLI::CLIENT].revents = 0;
+			this->pollFds[CLI::CMD].revents = 0;
+			this->pollFds[CLI::CHAT].revents = 0;
+			ioUtils::poll(this->pollFds, POLL_SIZE, -1);
+	
+			// user type input
+			if (this->pollFds[STDIN].revents & POLLIN)
+				this->currentWindow->handleUserInput();
+			// resize window
+			if (this->pollFds[RESIZE].revents & POLLIN)
+				this->handleResize();
+			// read and show data from server 
+			if (this->pollFds[CLIENT].revents & POLLIN)
+				this->readInputFromServer();
+			// send data to server
+			if (this->pollFds[CLIENT].revents & POLLOUT)
+			{
+				this->writeInputToServer();
+				if (this->toServerSize == 0UL)		// NB move this to UI
+					this->pollFds[CLI::CLIENT].events = POLLIN;
+			}
+			// handle error
+			if (this->pollFds[CLIENT].revents & (POLLHUP | POLLERR | POLLNVAL))
+				this->handlePollError();
+			// read command from UI (and forward it to server)
+			if (this->pollFds[CMD].revents & POLLIN)
+				this->handleGameCommand();
+			// read chat msg/command from UI (and forward it to server)
+			if (this->pollFds[CHAT].revents & POLLIN)
+				this->handleChatCommand();
 		}
-		// handle error
-		if (this->pollFds[CLIENT].revents & (POLLHUP | POLLERR | POLLNVAL))
-			this->handlePollError();
-		// read command from UI (and forward it to server)
-		if (this->pollFds[CMD].revents & POLLIN)
-			this->handleGameCommand();
-		// read chat msg/command from UI (and forward it to server)
-		if (this->pollFds[CHAT].revents & POLLIN)
-			this->handleChatCommand();
+		catch (AppException const& e)
+		{
+			this->handleError(e.getCode(), e.what());
+		}
 
 		this->currentWindow->refresh();
 	}
 	LOG_INFO(LogContext::INTERFACE, "CLI stopped");
 }
 
-void CLI::getTerminalSize(int32_t& height, int32_t& width) const noexcept
-{
-	struct winsize termSize;
-	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
-	{
-		LOG_WARN(LogContext::INTERFACE, "Failed to fetch terminal size, using standard dimension");
-		height = Config::MIN_HEIGHT_CLI;
-		width = Config::MIN_WIDTH_CLI;
-	}
-	else
-	{
-		height = termSize.ws_row;
-		width = termSize.ws_col;
-	}
-}
-
 void CLI::handleResize(void)
 {
 	struct signalfd_siginfo si;
-	ioUtils::read(this->pollFds[CLI::RESIZE].fd, &si, sizeof(si));		// I don't care about the data, flush it
+	ioUtils::read(this->pollFds[CLI::RESIZE].fd, &si, sizeof(si));		// just need to trigger the resize, flush any data
 
-	int32_t height, width;
-	this->getTerminalSize(height, width);
+	struct winsize termSize;
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
+	{
+		LOG_WARN(LogContext::INTERFACE, "Couldn't fetch terminal data, resize window failed");
+		return;
+	}
 
-	this->currentWindow->resize(height, width);
+	this->currentWindow->resize(termSize.ws_row, termSize.ws_col);
 }
 
-void CLI::handlePollError(void) noexcept
+void CLI::handlePollError(void)		// NB move to UI
 {
-	if (this->pollFds[CLIENT].revents & POLLHUP)		// HTTP client stopped
-		this->handleError("...");
-	else if (this->pollFds[CLIENT].revents & POLLERR)	// socket is invalid (poll didn't fail)
-		this->handleError("...");
-	else if (this->pollFds[CLIENT].revents & POLLNVAL)	// something actually went wrong with poll
+	if (this->pollFds[CLIENT].revents & POLLHUP)
+		throw AppException(ErrorCode::CLIENT_DISCONNECTED);
+	else if (this->pollFds[CLIENT].revents & POLLNVAL)
+		throw AppException(ErrorCode::IO_POLL_FAILED, "invalid scket (POLLNVAL)");
+	else if (this->pollFds[CLIENT].revents & POLLERR)	// something actually went wrong with poll
 	{
 		int32_t sockErr = 0;
 		socklen_t len = sizeof(sockErr);
 	
-		if (ioUtils::getsockopt(this->clientSocket, SOL_SOCKET, SO_ERROR, &sockErr, &len) < 0)	// getsockopt could also fail (check strerror(errno))
-			this->handleError("...");
-		else if (sockErr != 0)		// log, show error tab and close win (check strerror(sockErr))
-			this->handleError("...");
+		if (ioUtils::getsockopt(this->clientSocket, SOL_SOCKET, SO_ERROR, &sockErr, &len) < 0)
+			throw AppException(ErrorCode::IO_POLL_FAILED, std::format("getsockopt failed during POLLERR: {}", ::strerror(errno)));
+		else if (sockErr != 0)
+			throw AppException(ErrorCode::IO_POLL_FAILED, ::strerror(sockErr));
 	}
 }
 
@@ -182,112 +182,128 @@ void CLI::handleGameCommand(void)
 {
 	char buffer[Config::BUFF_SIZE];
 
-	try
-	{
-		ssize_t n = ioUtils::read(this->commandPipe.out, buffer, Config::BUFF_SIZE);
+	ssize_t n = ioUtils::read(this->commandPipe.out, buffer, Config::BUFF_SIZE);
 
-		if ((this->phase == GamePhase::LOGIN) or (this->phase == GamePhase::PLAYER_CREATE))
-		{
-			// move to the right to insert CMD_CONNECT and a space at the beginning of the command
-			::memmove(buffer + ::strlen(CMD_CONNECT) + 1, buffer, n);
-			::memcpy(buffer + ::strlen(CMD_CONNECT), &COMMAND_SP, 1);
-			::memcpy(buffer, CMD_CONNECT, ::strlen(CMD_CONNECT));
-			n += ::strlen(CMD_CONNECT) + 1;
-		}
-
-		::memcpy(buffer + n, &COMMAND_TERM, 1);
-		n++;
-		// store formatted command, ready to be sento to client
-		::memcpy(this->toServerBuffer + this->toServerSize, buffer, n);
-		this->toServerSize += n;
-		this->pollFds[CLI::CLIENT].events |= POLLOUT;
-	}
-	catch(const IOException& e)
+	if ((this->phase == GamePhase::LOGIN) or (this->phase == GamePhase::PLAYER_CREATE))
 	{
-		this->handleError(std::format("I/O error failed to write to client: '{}'", e.what()));
+		// move to the right to insert CMD_CONNECT and a space at the beginning of the command
+		::memmove(buffer + ::strlen(CMD_CONNECT) + 1, buffer, n);
+		::memcpy(buffer + ::strlen(CMD_CONNECT), &COMMAND_SP, 1);
+		::memcpy(buffer, CMD_CONNECT, ::strlen(CMD_CONNECT));
+		n += ::strlen(CMD_CONNECT) + 1;
 	}
+
+	::memcpy(buffer + n, &COMMAND_TERM, 1);
+	n++;
+	// store formatted command, ready to be sento to client
+	::memcpy(this->toServerBuffer + this->toServerSize, buffer, n);
+	this->toServerSize += n;
+	this->pollFds[CLI::CLIENT].events |= POLLOUT;
 }
 
 void CLI::handleChatCommand(void)
 {
 	char buffer[Config::BUFF_SIZE];
 
-	try
-	{
-		ssize_t n = ioUtils::read(this->chatPipe.out, buffer, Config::BUFF_SIZE);
+	ssize_t n = ioUtils::read(this->chatPipe.out, buffer, Config::BUFF_SIZE);
 
-		if (this->phase == GamePhase::GAME)
-		{
-			GameWindow* gameWin = dynamic_cast<GameWindow*>(this->currentWindow);
-			assert(gameWin != nullptr and "current window doesn't support handling a response");
-			gameWin->showChatMsg(Config::PROMPT + std::string(buffer, n));
-		}
-
-		::memcpy(buffer + n, &COMMAND_TERM, 1);
-		n++;
-		// store formatted command, ready to be sento to client
-		::memcpy(this->toServerBuffer + this->toServerSize, buffer, n);
-		this->toServerSize += n;
-		this->pollFds[CLI::CLIENT].events |= POLLOUT;
-	}
-	catch(const IOException& e)
-	{
-		this->handleError(std::format("I/O error failed to write to client: '{}'", e.what()));
-	}
+	::memcpy(buffer + n, &COMMAND_TERM, 1);
+	n++;
+	// store formatted command, ready to be sento to client
+	::memcpy(this->toServerBuffer + this->toServerSize, buffer, n);
+	this->toServerSize += n;
+	this->pollFds[CLI::CLIENT].events |= POLLOUT;
 }
 
 void CLI::loginPhase(void)
 {
 	UI::loginPhase();
 
-	int32_t height, width;
-	this->getTerminalSize(height, width);
+	if (this->currentWindow)
+		this->currentWindow->clear();
 
 	this->currentWindow = this->loginWin.get();
-	this->currentWindow->draw(height, width);
+	this->currentWindow->draw(this->height, this->width);
 }
 
 void CLI::newPlayerPhase(void)
 {
 	UI::newPlayerPhase();
 
-	int32_t height, width;
-	this->getTerminalSize(height, width);
-
 	if (this->currentWindow)
 		this->currentWindow->clear();
+
 	this->currentWindow = this->newPlayerWin.get();
-	this->currentWindow->draw(height, width);
+	this->currentWindow->draw(this->height, this->width);
 }
 
 void CLI::gamePhase(void)
 {
 	UI::gamePhase();
 
-	int32_t height, width;
-	this->getTerminalSize(height, width);
-
 	if (this->currentWindow)
 		this->currentWindow->clear();
+
 	this->currentWindow = this->gameWin.get();
-	this->currentWindow->draw(height, width);
+	this->currentWindow->draw(this->height, this->width);
 }
 
-void CLI::handleError(std::string const& errMsg) noexcept
+void CLI::handleError(ErrorCode const& code, std::string const& errorInfo)
 {
-	UI::handleError(errMsg);
+	if (code == ErrorCode::UI_INVALID_SIZE)
+	{
+		// currentWindow::draw() or currentWindow::resize() failed, clean the tabs half-built
+		this->currentWindow->clear();
 
-	int32_t height, width;
-	this->getTerminalSize(height, width);
+		int32_t height = this->height, width = this->width;
+		if (height < Config::MIN_HEIGHT_CLI) height = Config::MIN_HEIGHT_CLI;
+		if (width < Config::MIN_WIDTH_CLI) width = Config::MIN_WIDTH_CLI;
+
+		std::cout << std::format("\033[8;{};{}t", height, width) << std::endl;
+		LOG_WARN(LogContext::INTERFACE, std::format("Window too small, triggering resize to h: {}, w: {}", height, width));
+
+		// NB manually resize here?
+		// if this error happens when a window is created, this trigger
+		// will call the resize on the window without having draw() called (it will show empty tabs)
+		return;
+	}
+
+	GamePhase currentPhase = this->phase;
+	if (currentPhase == GamePhase::ERROR)
+	{
+		LOG_ERROR(LogContext::INTERFACE, std::format("Got error: '{}' while handling a previous error", errorInfo));
+		return;
+	}
+	UI::handleError(code, errorInfo);
+
+	switch (code)
+	{
+		case ErrorCode::UI_USERNAME_NOT_EXISTS:
+			this->errorWin->updateDescription(errorInfo);
+			this->errorWin->setAction1("RETRY", [this] { this->loginPhase(); });
+			this->errorWin->setAction2("CREATE NEW", [this] { this->newPlayerPhase(); });
+			break;
+		
+		case ErrorCode::SERVER_ERROR:
+			this->errorWin->updateDescription(errorInfo);
+			this->errorWin->setAction1("BACK", [this, currentPhase] { 
+				if (currentPhase == GamePhase::LOGIN)				this->loginPhase();
+				else if (currentPhase == GamePhase::PLAYER_CREATE)	this->newPlayerPhase();
+				else if (currentPhase == GamePhase::GAME)			this->gamePhase();
+			});
+			this->errorWin->setAction2("CLOSE", [this] { this->stop(); });
+			break;
+
+		default:
+			this->errorWin->updateDescription(errorInfo);
+			this->errorWin->setAction1("CLOSE", [this] { this->stop(); });
+			break;
+	}
 
 	if (this->currentWindow)
 		this->currentWindow->clear();
-
-	this->errorWin->updateDescription(errMsg);
-	this->errorWin->setAction1("CLOSE", [this] { this->stop(); });
-	// this->errorWin->setAction2("RELOAD", [this] { this->gamePhase(); });
 	this->currentWindow = this->errorWin.get();
-	this->currentWindow->draw(height, width);
+	this->currentWindow->draw(this->height, this->width);
 }
 
 void CLI::showResponse(std::string const& response) noexcept

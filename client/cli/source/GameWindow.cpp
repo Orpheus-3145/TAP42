@@ -13,7 +13,7 @@ GameWindow::GameWindow(int32_t commandFd, int32_t messageFd) :
 	messageFd{messageFd}
 {
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding commands");
-	assert(this->messageFd != -1 and "Invalid fd provided for forwarding chat messages");
+	assert(this->messageFd != -1 and "Invalid fd provided for forwarding chat messages");			// NB remove?
 
 	this->tabs[GameWindow::FRAME] = std::make_unique<BasicTab>(0, BLUE_COLOR, this);
 
@@ -87,19 +87,6 @@ void GameWindow::resize(int32_t height, int32_t width)
 {
 	this->height = (height % 2) == 0 ? height : height - 1;
 	this->width = (width % 2) == 0 ? width : width - 1;
-
-	// force minimum size of the window
-	// if ((this->height < Config::MIN_HEIGHT_CLI) or (this->width < Config::MIN_WIDTH_CLI))
-	// {
-	// 	if (this->height < Config::MIN_HEIGHT_CLI)
-	// 		this->height = Config::MIN_HEIGHT_CLI;
-	// 	if (this->width < Config::MIN_WIDTH_CLI)
-	// 		this->width = Config::MIN_WIDTH_CLI;
-	//
-	// 	std::cout << std::format("\033[8;{};{}t", this->height, this->width) << std::endl;
-	// 	LOG_WARN(LogContext::INTERFACE, std::format("Window too small, forced to h: {}, w: {}", this->height, this->width));
-	// 	return;
-	// }
 	::resizeterm(this->height, this->width);
 
 	this->tabs.at(GameWindow::FRAME)->resize(
