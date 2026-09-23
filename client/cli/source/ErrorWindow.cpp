@@ -146,6 +146,13 @@ void ErrorWindow::clear(void) noexcept
 {
 	CurseWindow::clear();
 
+	this->tabs.erase(ErrorWindow::ACTION1);
+	this->tabs.erase(ErrorWindow::ACTION2);
+
+	OutputTab* descTab = dynamic_cast<OutputTab*>(this->tabs.at(ErrorWindow::INFO).get());
+	assert(descTab != nullptr and "current tab doesn't support appending content");
+	descTab->clearContent();		// clear static content written every time by draw()
+
 	curs_set(1);
 }
 
