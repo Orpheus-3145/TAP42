@@ -17,8 +17,8 @@ GameWindow::GameWindow(int32_t commandFd, int32_t messageFd) :
 
 	this->tabs[GameWindow::FRAME] = std::make_unique<BasicTab>(0, BLUE_COLOR, this);
 
-	this->tabs[GameWindow::CMD] = std::make_unique<InOutTab>(this->commandFd, CMD_HINTS, Config::PROMPT, "User Events", 0, CYAN_COLOR, this);
-	this->tabs[GameWindow::CHAT] = std::make_unique<InOutTab>(this->messageFd, CHAT_CMD_HINTS, Config::PROMPT, "Chat", 0, GREEN_COLOR, this);
+	this->tabs[GameWindow::CMD] = std::make_unique<InOutTab>(this->commandFd, CMD_HINTS, false, Config::PROMPT, "User Events", 0, CYAN_COLOR, this);
+	this->tabs[GameWindow::CHAT] = std::make_unique<InOutTab>(this->messageFd, CHAT_CMD_HINTS, false, Config::PROMPT, "Chat", 0, GREEN_COLOR, this);
 
 	this->tabs[GameWindow::INFO] = std::make_unique<OutputTab>(0, BLUE_COLOR, this);
 	this->tabs[GameWindow::WORLD] = std::make_unique<OutputTab>("World events", 0, YELLOW_COLOR, this);
