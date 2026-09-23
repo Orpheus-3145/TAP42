@@ -14,6 +14,7 @@ class PlayerCreateWindow : public CurseWindow
 
 		void draw(int32_t height, int32_t width) override;
 		void resize(int32_t height, int32_t width) override;
+		void clear(void) noexcept override;
 
 	protected:
 		static constexpr size_t FRAME = 0UL;
