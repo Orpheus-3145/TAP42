@@ -43,6 +43,8 @@ class OutputTab : public virtual BasicTab
 		void printLine(std::pair<std::string,TextAlign> const& content) const noexcept
 			{ this->printLine(content.first, content.second); }
 
+		void clearContent(void) noexcept { this->state.clear(); }
+
 	protected:
 		WINDOW*	titleWin{nullptr};
 		WINDOW*	divLineWin{nullptr};

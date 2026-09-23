@@ -83,3 +83,12 @@ void PlayerCreateWindow::resize(int32_t height, int32_t width)
 
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Resized playerCreate window to h: {}, w: {}", this->height, this->width));
 }
+
+void PlayerCreateWindow::clear(void) noexcept
+{
+	CurseWindow::clear();
+
+	OutputTab* descTab = dynamic_cast<OutputTab*>(this->tabs.at(PlayerCreateWindow::USERNAME).get());
+	assert(descTab != nullptr and "current tab doesn't support appending content");
+	descTab->clearContent();		// clear static content written every time by draw()
+}
