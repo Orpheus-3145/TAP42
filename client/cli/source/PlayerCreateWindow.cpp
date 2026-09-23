@@ -15,7 +15,7 @@ PlayerCreateWindow::PlayerCreateWindow(int32_t commandFd) :
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding username");
 
 	this->tabs[PlayerCreateWindow::FRAME] = std::make_unique<BasicTab>(-1, GREEN_COLOR, this);
-	this->tabs[PlayerCreateWindow::USERNAME] = std::make_unique<InOutTab>(this->commandFd, std::vector<std::string>(), Config::PROMPT, "", 0, GREEN_COLOR, this);
+	this->tabs[PlayerCreateWindow::USERNAME] = std::make_unique<InOutTab>(this->commandFd, std::vector<std::string>(), true, Config::PROMPT, "", 0, GREEN_COLOR, this);
 
 	this->tabsToSkip.insert(PlayerCreateWindow::FRAME);
 	this->switchActiveTab(PlayerCreateWindow::USERNAME);

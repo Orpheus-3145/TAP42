@@ -7,6 +7,7 @@
 InOutTab::InOutTab(
 	int32_t forwardInputFd,
 	std::vector<std::string> const& hints,
+	bool hideInput,
 	std::string const& prompt,
 	std::string const& title,
 	int32_t borderChar,
@@ -15,7 +16,8 @@ InOutTab::InOutTab(
 ) :
 	BasicTab(borderChar, colorPair, parent),
 	InputTab(forwardInputFd, hints, prompt, borderChar, colorPair, parent),
-	OutputTab(title, borderChar, colorPair, parent)
+	OutputTab(title, borderChar, colorPair, parent),
+	hideInput{hideInput}
 {
 }
 
@@ -149,5 +151,6 @@ void InOutTab::terminateInput(void)
 	InputTab::terminateInput();
 
 	// show last input
-	this->appendContent(this->prompt + this->inputHistory.front());
+	if (this->hideInput == false)
+		this->appendContent(this->prompt + this->inputHistory.front());
 }
