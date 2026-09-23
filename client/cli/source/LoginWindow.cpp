@@ -15,7 +15,7 @@ LoginWindow::LoginWindow(int32_t commandFd) :
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding username");
 
 	this->tabs[LoginWindow::FRAME] = std::make_unique<BasicTab>(-1, BLUE_COLOR, this);
-	this->tabs[LoginWindow::USERNAME] = std::make_unique<InOutTab>(this->commandFd, std::vector<std::string>(), Config::PROMPT, "", 0, BLUE_COLOR, this);
+	this->tabs[LoginWindow::USERNAME] = std::make_unique<InOutTab>(this->commandFd, std::vector<std::string>(), true, Config::PROMPT, "", 0, BLUE_COLOR, this);
 
 	this->tabsToSkip.insert(LoginWindow::FRAME);
 	this->switchActiveTab(LoginWindow::USERNAME);

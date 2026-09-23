@@ -15,6 +15,7 @@ class InOutTab : public InputTab, public OutputTab
 		InOutTab(
 			int32_t forwardInputFd,
 			std::vector<std::string> const& hints = std::vector<std::string>(),
+			bool hideInput = false,
 			std::string const& prompt = "<?> ",
 			std::string const& title = "",
 			int32_t borderChar = -1,
@@ -40,4 +41,6 @@ class InOutTab : public InputTab, public OutputTab
 
 	protected:
 		WINDOW*	inputFrame{nullptr};
+
+		bool	hideInput;
 };
