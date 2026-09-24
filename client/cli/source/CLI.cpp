@@ -257,16 +257,15 @@ void CLI::handleError(ErrorCode const& code, std::string const& errorInfo)
 		return;
 	}
 
-	std::string strError = mapError(code, errorInfo);
 	if (isErrorSituation)
 	{
-		LOG_ERROR(LogContext::INTERFACE, std::format("Got error: '{}' while handling a previous error", strError));
+		LOG_ERROR(LogContext::INTERFACE, std::format("Got error: '{}' while handling a previous error", errorInfo));
 		return;
 	}
 	else
-		LOG_ERROR(LogContext::INTERFACE, strError);
+		LOG_ERROR(LogContext::INTERFACE, errorInfo);
 
-	this->errorWin->updateDescription(strError);
+	this->errorWin->updateDescription(errorInfo);
 	switch (code)
 	{
 		case ErrorCode::UI_USERNAME_NOT_EXISTS:
@@ -309,6 +308,9 @@ void CLI::showResponse(std::string const& response) noexcept
 	// 	gameWin->showChatMsg(response);
 	// else
 	gameWin->showResponse(response);
+
+	if (this->phase == GamePhase::GAME)
+		gameWin->updateContentWindow();
 }
 
 void CLI::showEvent(std::string const& event) noexcept
@@ -320,6 +322,8 @@ void CLI::showEvent(std::string const& event) noexcept
 	// 	gameWin->showChatMsg(event);
 	// else
 	gameWin->showEvent(event);
+	if (this->phase == GamePhase::GAME)
+		gameWin->updateContentWindow();
 }
 
 std::unique_ptr<UI> uiFactory(int32_t clientSocket)

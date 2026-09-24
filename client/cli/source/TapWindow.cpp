@@ -14,6 +14,12 @@ void TapWindow::clear(void) noexcept
 		tab->clear();
 }
 
+void TapWindow::updateContentWindow(void) const noexcept
+{
+	for (auto const& [_, tab] : this->tabs)
+		tab->updateContent();
+}
+
 void TapWindow::handleUserInput(void)
 {
 	this->getActiveTab()->handleUserInput();

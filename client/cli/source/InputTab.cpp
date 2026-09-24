@@ -412,7 +412,7 @@ void InputTab::appendInputChar(int32_t input)
 			return;
 
 		waddch(this->inputWin, '-');
-		this->bufferSize++;
+		this->bufferSize++;			// NB is it safe?
 		this->refresh();
 	}
 
