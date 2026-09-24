@@ -3,7 +3,9 @@
 #include <cstdint>
 #include <string>
 #include <cassert>
+#include <vector>
 #include <memory>
+#include <poll.h>
 
 #include "Config.hpp"
 #include "Exceptions.hpp"
@@ -25,16 +27,13 @@ enum class GamePhase : uint32_t
 	LOGIN = 0U,
 	PLAYER_CREATE = 1U,
 	GAME = 2U,
-	ERROR = 3U,
 };
 
 class UI
 {
 	public:
-		UI(int32_t clientSocket) noexcept :
-			clientSocket{clientSocket}
-		{ assert(clientSocket != -1 and "invalid client socket"); }
-	
+		UI(int32_t clientSocket) noexcept;
+
 		UI(UI const& other) = delete;
 		UI& operator=(UI const& other) = delete;
 		UI(UI&& other) = delete;
@@ -46,23 +45,27 @@ class UI
 		virtual void stop(void) noexcept = 0;
 
 	protected:
-		void writeInputToServer(void);
-		void readInputFromServer(void);
+		void writeToServer(void);
+		void readFromServer(void);
 		void handleServerData(std::string const& message);
 		void doHandshake(void) noexcept;
 		void splitIntoMessages(void);
+		void handlePollError(void);
 
 		virtual void loginPhase(void);
 		virtual void newPlayerPhase(void);
 		virtual void gamePhase(void);
 
-		virtual void handleError(ErrorCode const& code, std::string const& errorInfo);
+		virtual void handleError(ErrorCode const& code, std::string const& errorInfo) = 0;
 		virtual void handleServerDisconnect(void) noexcept = 0;
 
 		virtual void showResponse(std::string const& response) noexcept = 0;
 		virtual void showEvent(std::string const& event) noexcept = 0;
 
-		int32_t clientSocket;
+		static constexpr size_t POLL_SIZE = 1UL;
+		static constexpr size_t CLIENT = 0UL;
+
+		std::vector<struct pollfd>	pollFds;
 
 		int32_t height{0};
 		int32_t width{0};
