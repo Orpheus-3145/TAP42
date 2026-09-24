@@ -1,11 +1,11 @@
 #pragma once
 
-#include "CurseWindow.hpp"
+#include "TapWindow.hpp"
 
 #include <cstdint>
 
 
-class PlayerCreateWindow : public CurseWindow
+class PlayerCreateWindow : public TapWindow
 {
 	public:
 		PlayerCreateWindow(int32_t commandFd);

@@ -7,7 +7,7 @@
 #include <cstdint>
 
 #include <BasicTab.hpp>
-#include <CurseWindow.hpp>
+#include <TapWindow.hpp>
 
 
 enum class TextAlign : uint32_t
@@ -22,7 +22,7 @@ class OutputTab : public virtual BasicTab
 	public:
 		using BasicTab::BasicTab;
 
-		OutputTab(std::string const& title = "", int32_t borderChar = -1, int32_t colorPair = -1, CurseWindow* parent = nullptr);
+		OutputTab(std::string const& title = "", int32_t borderChar = -1, int32_t colorPair = -1, TapWindow* parent = nullptr);
 
 		OutputTab(OutputTab&& other) noexcept;
 		OutputTab& operator=(OutputTab&& other) = delete;

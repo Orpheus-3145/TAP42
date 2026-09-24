@@ -7,7 +7,7 @@
 #include <format>
 
 
-BasicTab::BasicTab(int32_t borderChar, int32_t colorPair, CurseWindow* parent) : 
+BasicTab::BasicTab(int32_t borderChar, int32_t colorPair, TapWindow* parent) : 
 	borderChar{borderChar},
 	colorPair{colorPair},
 	parent{parent}
