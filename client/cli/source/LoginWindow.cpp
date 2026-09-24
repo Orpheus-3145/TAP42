@@ -17,6 +17,11 @@ LoginWindow::LoginWindow(int32_t commandFd) :
 	this->tabs[LoginWindow::FRAME] = std::make_unique<BasicTab>(-1, BLUE_COLOR, this);
 	this->tabs[LoginWindow::USERNAME] = std::make_unique<InOutTab>(this->commandFd, std::vector<std::string>(), true, Config::PROMPT, "", 0, BLUE_COLOR, this);
 
+	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(LoginWindow::USERNAME).get());
+	assert(tab != nullptr and "current tab doesn't support appending content");
+	tab->appendContent(" ");
+	tab->appendContent(" Enter username:", TextAlign::MID_ALIGN);
+
 	this->tabsToSkip.insert(LoginWindow::FRAME);
 	this->switchActiveTab(LoginWindow::USERNAME);
 }
@@ -41,11 +46,8 @@ void LoginWindow::draw(int32_t height, int32_t width)
 		(this->height - heightTabs) / 2,
 		(this->width - widthTabs) / 2
 	);
-	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(LoginWindow::USERNAME).get());
-	assert(tab != nullptr and "current tab doesn't support appending content");
-	tab->appendContent(" ");
-	tab->appendContent(" Insert user name:", TextAlign::MID_ALIGN);
 
+	this->updateContentWindow();
 	this->refresh();
 
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing login window, size h: {}, w: {}", this->height, this->width));
@@ -74,19 +76,11 @@ void LoginWindow::resize(int32_t height, int32_t width)
 		(this->width - widthTabs) / 2
 	);
 
+	this->updateContentWindow();
 	this->refresh();
 
 	// because resize is not handled by ncurses there might be some garbage to read, flush it
 	::flushinp();
 
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Resized login window to h: {}, w: {}", this->height, this->width));
-}
-
-void LoginWindow::clear(void) noexcept
-{
-	TapWindow::clear();
-
-	OutputTab* descTab = dynamic_cast<OutputTab*>(this->tabs.at(LoginWindow::USERNAME).get());
-	assert(descTab != nullptr and "current tab doesn't support appending content");
-	descTab->clearContent();		// clear static content written every time by draw()
 }
