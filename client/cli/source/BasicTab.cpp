@@ -70,16 +70,10 @@ void BasicTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 	this->refresh();
 }
 
-void BasicTab::resize(int32_t h, int32_t w, int32_t y, int32_t x)
-{
-	this->clear();
-	this->draw(h, w, y, x);
-}
-
 void BasicTab::clear(void) noexcept
 {
-	::wrefresh(this->borderWin);
 	::wclear(this->borderWin);
+	::wrefresh(this->borderWin);
 	::delwin(this->borderWin);
 	this->borderWin = nullptr;
 }

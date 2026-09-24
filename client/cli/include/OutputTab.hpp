@@ -30,7 +30,6 @@ class OutputTab : public virtual BasicTab
 		void refresh(void) const noexcept override;
 		void draw(int32_t h, int32_t w, int32_t y, int32_t x) override;
 		void clear(void) noexcept override;
-		void resize(int32_t h, int32_t w, int32_t y, int32_t x) override;
 		void updateContent(void) const noexcept override;
 
 		void activate(void) override;

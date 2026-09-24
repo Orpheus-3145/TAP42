@@ -22,7 +22,7 @@ class TapWindow
 		virtual ~TapWindow(void) noexcept;
 
 		virtual void draw(int32_t height, int32_t width) = 0;
-		virtual void resize(int32_t height, int32_t width) = 0;			// NB remove resize
+		virtual void resize(int32_t height, int32_t width);
 		virtual void clear(void) noexcept;
 		virtual void updateContentWindow(void) const noexcept;
 		virtual void handleUserInput(void);

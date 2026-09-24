@@ -86,57 +86,6 @@ void GameWindow::draw(int32_t height, int32_t width)
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing game window size h: {}, w: {}", height, width));
 }
 
-void GameWindow::resize(int32_t height, int32_t width)
-{
-	this->height = (height % 2) == 0 ? height : height - 1;
-	this->width = (width % 2) == 0 ? width : width - 1;
-	::resizeterm(this->height, this->width);
-
-	this->tabs.at(GameWindow::FRAME)->resize(
-		this->height,
-		this->width,
-		0,
-		0
-	);
-
-	int32_t widthTab = (this->width - 2) / 2 - 1;
-	this->tabs.at(GameWindow::INFO)->resize(
-		6,
-		widthTab,
-		1,
-		2
-	);
-	this->tabs.at(GameWindow::CMD)->resize(
-		this->height - 6 - 2,
-		widthTab,
-		7,
-		2
-	);
-
-	int32_t heightTab = (this->height - 2) / 2;
-	this->tabs.at(GameWindow::WORLD)->resize(
-		heightTab,
-		widthTab,
-		1,
-		widthTab + 3
-	);
-	this->tabs.at(GameWindow::CHAT)->resize(
-		heightTab,
-		widthTab,
-		heightTab + 1,
-		widthTab + 3
-	);
-
-	this->updateContentWindow();
-	this->getActiveTab()->refresh();
-	this->refresh();
-
-	// because resize is not handled by ncurses there might be some garbage to read, flush it
-	::flushinp();
-
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Resized game window to h: {}, w: {}", this->height, this->width));
-}
-
 void GameWindow::showResponse(std::string const& response)
 {
 	InOutTab* tab = dynamic_cast<InOutTab*>(this->tabs.at(GameWindow::CMD).get());

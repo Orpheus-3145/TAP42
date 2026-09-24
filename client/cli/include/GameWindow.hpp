@@ -43,7 +43,6 @@ class GameWindow : public TapWindow
 		virtual ~GameWindow(void) noexcept { this->clear(); }
 
 		void draw(int32_t height, int32_t width) override;
-		void resize(int32_t height, int32_t width) override;
 
 		void showResponse(std::string const& response);
 		void showChatMsg(std::string const& response);

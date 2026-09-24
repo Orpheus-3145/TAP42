@@ -78,8 +78,8 @@ void ButtonTab::clear(void) noexcept
 {
 	BasicTab::clear();
 
-	::wrefresh(this->btnWin);
 	::wclear(this->btnWin);
+	::wrefresh(this->btnWin);
 	::delwin(this->btnWin);
 	this->btnWin = nullptr;
 }
