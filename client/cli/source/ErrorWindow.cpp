@@ -9,7 +9,7 @@
 #include <format>
 
 
-ErrorWindow::ErrorWindow(void) : CurseWindow()
+ErrorWindow::ErrorWindow(void) : TapWindow()
 {
 	this->tabs[ErrorWindow::FRAME] = std::make_unique<BasicTab>(-1, RED_COLOR, this);
 	this->tabs[ErrorWindow::INFO] = std::make_unique<OutputTab>("ERROR", 0, RED_COLOR, this);
@@ -144,7 +144,7 @@ void ErrorWindow::resize(int32_t height, int32_t width)
 
 void ErrorWindow::clear(void) noexcept
 {
-	CurseWindow::clear();
+	TapWindow::clear();
 
 	this->tabs.erase(ErrorWindow::ACTION1);
 	this->tabs.erase(ErrorWindow::ACTION2);

@@ -9,17 +9,17 @@
 
 class BasicTab;
 
-class CurseWindow
+class TapWindow
 {
 	public:
-		CurseWindow(void) noexcept = default;
+		TapWindow(void) noexcept = default;
 
-		CurseWindow(CurseWindow const& other) = delete;
-		CurseWindow& operator=(CurseWindow const& other) = delete;
-		CurseWindow(CurseWindow&& other) = delete;
-		CurseWindow& operator=(CurseWindow&& other) = delete;
+		TapWindow(TapWindow const& other) = delete;
+		TapWindow& operator=(TapWindow const& other) = delete;
+		TapWindow(TapWindow&& other) = delete;
+		TapWindow& operator=(TapWindow&& other) = delete;
 
-		virtual ~CurseWindow(void) noexcept;
+		virtual ~TapWindow(void) noexcept;
 
 		virtual void draw(int32_t height, int32_t width) = 0;
 		virtual void resize(int32_t height, int32_t width) = 0;

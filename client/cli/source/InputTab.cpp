@@ -12,7 +12,7 @@ InputTab::InputTab(
 	std::string const& prompt,
 	int32_t borderChar,
 	int32_t colorPair,
-	CurseWindow* parent
+	TapWindow* parent
 ) :
 	BasicTab(borderChar, colorPair, parent),
 forwardInputFd{forwardInputFd},
@@ -446,7 +446,6 @@ void InputTab::terminateInput(void)
 	if (this->bufferSize == 0UL)
 		return;
 
-	int32_t y, x;
 	std::string command = std::string(this->commandBuffer, this->bufferSize);
 	ioUtils::write(this->forwardInputFd, command.data(), command.size());
 
@@ -455,9 +454,6 @@ void InputTab::terminateInput(void)
 	this->bufferSize = 0UL;
 	// in case a command from history has been submitted reset move commandIndex as the most recent command 
 	this->currentCommandIndex = -1L;
-
-	getyx(this->inputWin, y, x);
-	wmove(this->inputWin, y, 0);
 
 	this->clearHints();
 	this->writePromptLine();

@@ -8,7 +8,7 @@
 
 
 GameWindow::GameWindow(int32_t commandFd, int32_t messageFd) :
-	CurseWindow(),
+	TapWindow(),
 	commandFd{commandFd},
 	messageFd{messageFd}
 {

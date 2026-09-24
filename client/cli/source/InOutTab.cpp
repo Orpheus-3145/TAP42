@@ -12,7 +12,7 @@ InOutTab::InOutTab(
 	std::string const& title,
 	int32_t borderChar,
 	int32_t colorPair,
-	CurseWindow* parent
+	TapWindow* parent
 ) :
 	BasicTab(borderChar, colorPair, parent),
 	InputTab(forwardInputFd, hints, prompt, borderChar, colorPair, parent),

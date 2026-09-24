@@ -8,7 +8,7 @@
 #include <format>
 
 
-ButtonTab::ButtonTab(std::string const& content, std::function<void()> action, int32_t colorPair, CurseWindow* parent) :
+ButtonTab::ButtonTab(std::string const& content, std::function<void()> action, int32_t colorPair, TapWindow* parent) :
 	BasicTab(-1, colorPair, parent),
 	content{content},
 	action{action}
