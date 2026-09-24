@@ -1,25 +1,25 @@
-#include "CurseWindow.hpp"
+#include "TapWindow.hpp"
 #include "BasicTab.hpp"
 
 #include <cassert>
 
 
-CurseWindow::~CurseWindow(void) noexcept
+TapWindow::~TapWindow(void) noexcept
 {
 }
 
-void CurseWindow::clear(void) noexcept
+void TapWindow::clear(void) noexcept
 {
 	for (auto const& [_, tab] : this->tabs)
 		tab->clear();
 }
 
-void CurseWindow::handleUserInput(void)
+void TapWindow::handleUserInput(void)
 {
 	this->getActiveTab()->handleUserInput();
 }
 
-void CurseWindow::switchActiveTab(int32_t index)
+void TapWindow::switchActiveTab(int32_t index)
 {
 	if (this->tabs.empty() == true)
 		return;

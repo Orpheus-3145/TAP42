@@ -1,13 +1,13 @@
 #pragma once
 
-#include "CurseWindow.hpp"
+#include "TapWindow.hpp"
 
 #include <cstdint>
 #include <string>
 #include <functional>
 
 
-class ErrorWindow : public CurseWindow
+class ErrorWindow : public TapWindow
 {
 	public:
 		ErrorWindow(void);

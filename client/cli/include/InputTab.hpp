@@ -9,7 +9,7 @@
 
 #include <Config.hpp>
 #include <BasicTab.hpp>
-#include <CurseWindow.hpp>
+#include <TapWindow.hpp>
 
 
 class InputTab : public virtual BasicTab
@@ -23,7 +23,7 @@ class InputTab : public virtual BasicTab
 			std::string const& prompt = "<?> ",
 			int32_t colorPair = -1,
 			int32_t borderChar = -1,
-			CurseWindow* parent = nullptr
+			TapWindow* parent = nullptr
 		);
 
 		InputTab(InputTab&& other) noexcept;

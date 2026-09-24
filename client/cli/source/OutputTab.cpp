@@ -4,7 +4,7 @@
 
 #include <cassert>
 
-OutputTab::OutputTab(std::string const& title, int32_t borderChar, int32_t colorPair, CurseWindow* parent) :
+OutputTab::OutputTab(std::string const& title, int32_t borderChar, int32_t colorPair, TapWindow* parent) :
 	BasicTab(borderChar, colorPair, parent),
 	title{title}
 {
@@ -187,7 +187,7 @@ void OutputTab::appendContent(std::string const& newContent, TextAlign align)
 
 	if (static_cast<int32_t>(this->state.size()) > maxVerticalSpace)
 	{
-		// reached the end of the tab, rotate le lines and drop the oldest one
+		// reached the end of the tab, rotate the lines and drop the oldest one
 		::wscrl(this->outputWin, 1);
 		::wmove(this->outputWin, maxVerticalSpace - 1, 0);
 		::wclrtoeol(this->outputWin);

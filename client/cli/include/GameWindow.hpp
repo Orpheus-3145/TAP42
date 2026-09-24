@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "CurseWindow.hpp"
+#include "TapWindow.hpp"
 
 
 static std::vector<std::string> CMD_HINTS
@@ -33,10 +33,10 @@ static std::vector<std::string> CHAT_CMD_HINTS
 	"CHAT",
 };
 
-class GameWindow : public CurseWindow
+class GameWindow : public TapWindow
 {
 	public:
-		using CurseWindow::CurseWindow;
+		using TapWindow::TapWindow;
 
 		GameWindow(int32_t commandFd, int32_t messageFd);
 

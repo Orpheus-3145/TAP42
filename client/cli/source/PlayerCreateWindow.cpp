@@ -9,7 +9,7 @@
 
 
 PlayerCreateWindow::PlayerCreateWindow(int32_t commandFd) :
-	CurseWindow(),
+	TapWindow(),
 	commandFd{commandFd}
 {
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding username");
@@ -86,7 +86,7 @@ void PlayerCreateWindow::resize(int32_t height, int32_t width)
 
 void PlayerCreateWindow::clear(void) noexcept
 {
-	CurseWindow::clear();
+	TapWindow::clear();
 
 	OutputTab* descTab = dynamic_cast<OutputTab*>(this->tabs.at(PlayerCreateWindow::USERNAME).get());
 	assert(descTab != nullptr and "current tab doesn't support appending content");
