@@ -305,8 +305,8 @@ void InputTab::clear(void) noexcept
 {
 	BasicTab::clear();
 
-	::wrefresh(this->inputWin);
 	::wclear(this->inputWin);
+	::wrefresh(this->inputWin);
 	::delwin(this->inputWin);
 	this->inputWin = nullptr;
 }

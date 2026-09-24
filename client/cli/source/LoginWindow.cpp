@@ -52,35 +52,3 @@ void LoginWindow::draw(int32_t height, int32_t width)
 
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing login window, size h: {}, w: {}", this->height, this->width));
 }
-
-void LoginWindow::resize(int32_t height, int32_t width)
-{
-	this->height = (height % 4) != 0 ? ((height / 4) * 4) : height;		// has to be multiple of 4
-	this->width = (width % 4) != 0 ? ((width / 4) * 4) : width;			// has to be multiple of 4
-
-	::resizeterm(this->height, this->width);
-
-	this->tabs.at(LoginWindow::FRAME)->resize(
-		this->height, 
-		this->width,
-		0,
-		0
-	);
-	int32_t heightTabs = this->height / 4;
-	int32_t widthTabs = this->width / 4;
-
-	this->tabs.at(LoginWindow::USERNAME)->resize(
-		heightTabs,
-		widthTabs,
-		(this->height - heightTabs) / 2,
-		(this->width - widthTabs) / 2
-	);
-
-	this->updateContentWindow();
-	this->refresh();
-
-	// because resize is not handled by ncurses there might be some garbage to read, flush it
-	::flushinp();
-
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Resized login window to h: {}, w: {}", this->height, this->width));
-}

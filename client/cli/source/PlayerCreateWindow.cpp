@@ -53,36 +53,3 @@ void PlayerCreateWindow::draw(int32_t height, int32_t width)
 
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing create player window, size h: {}, w: {}", this->height, this->width));
 }
-
-void PlayerCreateWindow::resize(int32_t height, int32_t width)
-{
-	this->height = (height % 4) != 0 ? ((height / 4) * 4) : height;		// has to be an even number
-	this->width = (width % 4) != 0 ? ((width / 4) * 4) : width;			// has to be an even number
-
-	::resizeterm(this->height, this->width);
-
-	this->tabs.at(PlayerCreateWindow::FRAME)->resize(
-		this->height, 
-		this->width,
-		0,
-		0
-	);
-
-	int32_t heightTabs = this->height / 2;
-	int32_t widthTabs = this->width / 4;
-
-	this->tabs.at(PlayerCreateWindow::USERNAME)->resize(
-		heightTabs,
-		widthTabs,
-		(this->height - heightTabs) / 2,
-		(this->width - widthTabs) / 2
-	);
-
-	this->updateContentWindow();
-	this->refresh();
-
-	// because resize is not handled by ncurses there might be some garbage to read, flush it
-	::flushinp();
-
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Resized playerCreate window to h: {}, w: {}", this->height, this->width));
-}
