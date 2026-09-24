@@ -4,16 +4,27 @@
 
 #include <cstring>
 #include <format>
+#include <cassert>
 
 
-void UI::writeInputToServer(void)
+UI::UI(int32_t clientSocket) noexcept
+{
+	assert(clientSocket != -1 and "invalid client socket");
+
+	this->pollFds.resize(UI::POLL_SIZE);
+	this->pollFds[UI::CLIENT].fd = clientSocket;
+}
+
+void UI::writeToServer(void)
 {
 	if (this->handShakeDone == false)
 		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE);
-		
-	ssize_t n = ioUtils::writeNonBlock(this->clientSocket, this->toServerBuffer, this->toServerSize);
+
+	int32_t clientSocket = this->pollFds[UI::CLIENT].fd;
+	ssize_t n = ioUtils::writeNonBlock(clientSocket, this->toServerBuffer, this->toServerSize);
+
 	if (n < 0L)
-		throw AppException(ErrorCode::CLIENT_DISCONNECTED);	// NB set pollFD to POLLHUP
+		this->pollFds[UI::CLIENT].revents = POLLHUP;
 	else if (n > 0L)	
 	{
 		std::string gameData = escapeNewLine(this->toServerBuffer, n);
@@ -22,18 +33,22 @@ void UI::writeInputToServer(void)
 		if (std::string(this->toServerBuffer, n - 1) == "quit")		// NB only for debugging purpuses 
 			this->stop();
 		this->toServerSize -= n;
-		if (this->toServerSize > 0UL)
+		if (this->toServerSize > 0UL)		// move the remaining data to send at the beginning of the buffer
 			::memmove(this->toServerBuffer, this->toServerBuffer + n, this->toServerSize);
+		else
+			this->pollFds[UI::CLIENT].events = POLLIN;		// stop writing to server
 	}
 	else
 		LOG_WARN(LogContext::INTERFACE, "Client socket buffer is busy, try again later");
 }
 
-void UI::readInputFromServer(void)
+void UI::readFromServer(void)
 {
-	ssize_t n = ioUtils::readNonBlock(this->clientSocket, this->fromServerBuffer + this->fromServerSize, Config::BUFF_SIZE - this->fromServerSize);
+	int32_t clientSocket = this->pollFds[UI::CLIENT].fd;
+	ssize_t n = ioUtils::readNonBlock(clientSocket, this->fromServerBuffer + this->fromServerSize, Config::BUFF_SIZE - this->fromServerSize);
+
 	if (n < 0L)
-		throw AppException(ErrorCode::CLIENT_DISCONNECTED);	// NB set pollFD to POLLHUP
+		this->pollFds[UI::CLIENT].revents = POLLHUP;
 	else if (n > 0L)
 	{
 		std::string serverData = escapeNewLine(this->fromServerBuffer + this->fromServerSize, n);
@@ -42,6 +57,8 @@ void UI::readInputFromServer(void)
 		this->fromServerSize += n;
 		this->splitIntoMessages();
 	}
+	else
+		LOG_WARN(LogContext::INTERFACE, "Client socket buffer is full, send data to UI and empty it");
 }
 
 void UI::splitIntoMessages(void)
@@ -113,15 +130,6 @@ void UI::handleServerData(std::string const& message)
 			else
 				LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
 			break;
-		
-		case GamePhase::ERROR:
-			if (message.find(S_ERR) == 0UL)
-				LOG_ERROR(LogContext::INTERFACE, std::format("Got error: '{}' while handling a previous error", message));
-			else if ((message.find(S_OK) == 0UL) or (message.find(S_EVT) == 0UL))
-				{ /* NB handle data to game window, but first detatch printing stuff in tabs to adding to the state */}
-			else
-				LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
-			break ;
 
 		default:
 			break;
@@ -134,8 +142,28 @@ void UI::doHandshake(void) noexcept
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Handshake performed: {}", INITIAL_GREETING));
 }
 
+void UI::handlePollError(void)
+{
+	if (this->pollFds[CLIENT].revents & POLLHUP)
+		throw AppException(ErrorCode::CLIENT_DISCONNECTED);
+	else if (this->pollFds[CLIENT].revents & POLLNVAL)
+		throw AppException(ErrorCode::IO_POLL_FAILED, "invalid socket (POLLNVAL)");
+	else if (this->pollFds[CLIENT].revents & POLLERR)	// something actually went wrong with poll
+	{
+		int32_t sockErr = 0;
+		socklen_t len = sizeof(sockErr);
+	
+		int32_t clientSocket = this->pollFds[UI::CLIENT].fd;
+		if (ioUtils::getsockopt(clientSocket, SOL_SOCKET, SO_ERROR, &sockErr, &len) < 0)
+			throw AppException(ErrorCode::IO_POLL_FAILED, std::format("getsockopt failed during POLLERR: {}", ::strerror(errno)));
+		else if (sockErr != 0)
+			throw AppException(ErrorCode::IO_POLL_FAILED, ::strerror(sockErr));
+	}
+}
+
 void UI::loginPhase(void)
 {
+	LOG_DEBUG(LogContext::INTERFACE, "Starting login session");
 	this->phase = GamePhase::LOGIN;
 }
 
@@ -155,10 +183,4 @@ void UI::gamePhase(void)
 
 	LOG_DEBUG(LogContext::INTERFACE, "Login successful, retrieving game session");
 	this->phase = GamePhase::GAME;
-}
-
-void UI::handleError(ErrorCode const& code, std::string const& errorInfo)
-{
-	LOG_ERROR(LogContext::INTERFACE, mapError(code, errorInfo));
-	this->phase = GamePhase::ERROR;
 }
