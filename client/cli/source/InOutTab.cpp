@@ -125,8 +125,8 @@ void InOutTab::clear(void) noexcept
 	InputTab::clear();
 	OutputTab::clear();
 
-	::wrefresh(this->inputFrame);
 	::wclear(this->inputFrame);
+	::wrefresh(this->inputFrame);
 	::delwin(this->inputFrame);
 	this->inputFrame = nullptr;
 }

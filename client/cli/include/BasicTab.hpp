@@ -24,7 +24,6 @@ class BasicTab
 
 		virtual void refresh(void) const noexcept;
 		virtual void draw(int32_t h, int32_t w, int32_t y, int32_t x);
-		virtual void resize(int32_t h, int32_t w, int32_t y, int32_t x);
 		virtual void clear(void) noexcept;
 		virtual void handleUserInput(void);
 		virtual void updateContent(void) const noexcept {};

@@ -1,7 +1,9 @@
 #include "TapWindow.hpp"
 #include "BasicTab.hpp"
+#include "Logger.hpp"
 
 #include <cassert>
+#include <format>
 
 
 TapWindow::~TapWindow(void) noexcept
@@ -44,4 +46,15 @@ void TapWindow::switchActiveTab(int32_t index)
 		this->activeTabIndex = (this->activeTabIndex + 1) % this->tabs.size();
 
 	this->getActiveTab()->activate();
+}
+
+void TapWindow::resize(int32_t height, int32_t width)
+{
+	this->clear();
+	this->draw(height, width);
+
+	// because resize is not handled by ncurses there might be some garbage to read, flush it
+	::flushinp();
+
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Window resized to h: {}, w: {}", this->height, this->width));
 }
