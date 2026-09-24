@@ -40,6 +40,7 @@ void ErrorWindow::draw(int32_t height, int32_t width)
 		(this->height - heightTabs) / 2,
 		(this->width - widthTabs) / 2
 	);
+
 	OutputTab* descTab = dynamic_cast<OutputTab*>(this->tabs.at(ErrorWindow::INFO).get());
 	assert(descTab != nullptr and "current tab doesn't support appending content");
 
@@ -76,6 +77,7 @@ void ErrorWindow::draw(int32_t height, int32_t width)
 		);
 	}
 
+	this->updateContentWindow();
 	this->switchActiveTab(ErrorWindow::ACTION1);
 	this->refresh();
 	curs_set(0);
@@ -135,6 +137,7 @@ void ErrorWindow::resize(int32_t height, int32_t width)
 		);
 	}
 
+	this->updateContentWindow();
 	this->refresh();
 	// because resize is not handled by ncurses there might be some garbage to read, flush it
 	::flushinp();
@@ -146,12 +149,13 @@ void ErrorWindow::clear(void) noexcept
 {
 	TapWindow::clear();
 
+	this->description.clear();
 	this->tabs.erase(ErrorWindow::ACTION1);
 	this->tabs.erase(ErrorWindow::ACTION2);
 
 	OutputTab* descTab = dynamic_cast<OutputTab*>(this->tabs.at(ErrorWindow::INFO).get());
-	assert(descTab != nullptr and "current tab doesn't support appending content");
-	descTab->clearContent();		// clear static content written every time by draw()
+	assert(descTab != nullptr and "current tab doesn't support removing content");
+	descTab->clearContent();
 
 	curs_set(1);
 }
@@ -165,4 +169,3 @@ void ErrorWindow::setAction2(std::string const& actionName, std::function<void()
 {
 	this->tabs[ErrorWindow::ACTION2] = std::make_unique<ButtonTab>(actionName, action, -1, this);
 }
- 

@@ -23,6 +23,13 @@ GameWindow::GameWindow(int32_t commandFd, int32_t messageFd) :
 	this->tabs[GameWindow::INFO] = std::make_unique<OutputTab>(0, BLUE_COLOR, this);
 	this->tabs[GameWindow::WORLD] = std::make_unique<OutputTab>("World events", 0, YELLOW_COLOR, this);
 
+	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(GameWindow::INFO).get());
+	assert(tab != nullptr and "current tab doesn't support appending content");
+	tab->appendContent("Player: <NAME>");
+	tab->appendContent("Data: <CLASS | RACE | ...>");
+	tab->appendContent("Currently in: <LOCATION>");
+	tab->appendContent("<IN GROUP | NOT IN GROUP>");
+
 	this->tabsToSkip.insert(GameWindow::FRAME);
 	this->tabsToSkip.insert(GameWindow::INFO);
 	this->switchActiveTab(GameWindow::CMD);
@@ -48,12 +55,6 @@ void GameWindow::draw(int32_t height, int32_t width)
 		1,
 		2
 	);
-	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(GameWindow::INFO).get());
-	assert(tab != nullptr and "current tab doesn't support appending content");
-	tab->appendContent("Player: <NAME>");
-	tab->appendContent("Data: <CLASS | RACE | ...>");
-	tab->appendContent("Currently in: <LOCATION>");
-	tab->appendContent("<IN GROUP | NOT IN GROUP>");
 
 	this->tabs.at(GameWindow::CMD)->draw(
 		this->height - 6 - 2,
@@ -77,6 +78,8 @@ void GameWindow::draw(int32_t height, int32_t width)
 		heightTab + 1,
 		widthTab + 3
 	);
+
+	this->updateContentWindow();
 	this->getActiveTab()->refresh();
 	this->refresh();
 
@@ -123,6 +126,8 @@ void GameWindow::resize(int32_t height, int32_t width)
 		heightTab + 1,
 		widthTab + 3
 	);
+
+	this->updateContentWindow();
 	this->getActiveTab()->refresh();
 	this->refresh();
 

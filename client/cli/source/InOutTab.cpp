@@ -152,5 +152,8 @@ void InOutTab::terminateInput(void)
 
 	// show last input
 	if (this->hideInput == false)
+	{
 		this->appendContent(this->prompt + this->inputHistory.front());
+		this->updateContent();
+	}
 }

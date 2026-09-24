@@ -180,20 +180,15 @@ void OutputTab::deactivate(void)
 void OutputTab::appendContent(std::string const& newContent, TextAlign align)
 {
 	this->state.emplace_back(newContent, align);
+	if (this->outputWin == nullptr)
+		return;
 
 	int32_t maxVerticalSpace, _;
 	(void)_;
 	getmaxyx(this->outputWin, maxVerticalSpace, _);
 
 	if (static_cast<int32_t>(this->state.size()) > maxVerticalSpace)
-	{
-		// reached the end of the tab, rotate the lines and drop the oldest one
-		::wscrl(this->outputWin, 1);
-		::wmove(this->outputWin, maxVerticalSpace - 1, 0);
-		::wclrtoeol(this->outputWin);
 		this->topLineScroll += 1;
-	}
-	this->printLine(newContent, align);
 }
 
 void OutputTab::resize(int32_t h, int32_t w, int32_t y, int32_t x)
@@ -203,33 +198,45 @@ void OutputTab::resize(int32_t h, int32_t w, int32_t y, int32_t x)
 	getmaxyx(this->outputWin, oldMaxheight, _);
 
 	BasicTab::resize(h, w, y, x);
+
+	if (this->topLineScroll != 0UL)
+	{
+		// topLineScroll != 0 -> there are more lines of content than lines available
+		// in the window, therefore a change in height (delta != 0) needs to adjust
+		// the first index of the content line to print
+		getmaxyx(this->outputWin, newMaxheight, _);
+		delta = newMaxheight - oldMaxheight;
+	
+		if (delta > 0)			// vertical size increased
+		{
+			if (static_cast<int32_t>(this->topLineScroll) < delta)
+				this->topLineScroll = 0;
+			else
+				this->topLineScroll -= delta;
+		}
+		else if (delta < 0)		// vertical size reduced
+		{
+			delta *= -1;
+			if ((this->topLineScroll + delta) >= this->state.size())
+				this->topLineScroll = this->state.size() - 1UL;
+			else
+				this->topLineScroll += delta;
+		}
+	}
+	this->updateContent();
+}
+
+void OutputTab::updateContent(void) const noexcept
+{
+	wmove(this->outputWin, 0, 0);
+	int32_t newMaxheight, _;
+	(void)_;
 	getmaxyx(this->outputWin, newMaxheight, _);
 
-	delta = newMaxheight - oldMaxheight;
+	int32_t nLinesToPrint = std::min(newMaxheight, static_cast<int32_t>(this->state.size() - this->topLineScroll));
 
-	// if resize changed the vertical size, adjust the index of the first line shown
-	if (delta > 0)		// vertical size increased
-	{
-		if (static_cast<int32_t>(this->topLineScroll) < delta)
-			this->topLineScroll = 0;
-		else
-			this->topLineScroll -= delta;
-	}
-	else if (delta < 0)		// vertical size reduced
-	{
-		delta *= -1;
-		if ((this->topLineScroll + delta) >= this->state.size())
-			this->topLineScroll = this->state.size() - 1UL;
-		else
-			this->topLineScroll += delta;
-	}
-
-	for (size_t i = this->topLineScroll; i < this->state.size(); i++)
-	{
-		if (static_cast<int32_t>(i - this->topLineScroll) >= newMaxheight)
-			break;
-		this->printLine(this->state[i]);
-	}
+	for (int32_t i = 0; i < nLinesToPrint; i++)
+		this->printLine(this->state[this->topLineScroll + i]);
 }
 
 void OutputTab::printLine(std::string const& newContent, TextAlign align) const noexcept
