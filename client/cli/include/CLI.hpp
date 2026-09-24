@@ -268,7 +268,6 @@ class CLI : public UI
 
 	private:
 		void handleResize(void);
-		void handlePollError(void);
 		void handleGameCommand(void);
 		void handleChatCommand(void);
 
@@ -283,15 +282,12 @@ class CLI : public UI
 		void showEvent(std::string const& event) noexcept override;
 
 		static constexpr size_t POLL_SIZE = 5UL;
-		static constexpr size_t STDIN = 0UL;
 		static constexpr size_t RESIZE = 1UL;
-		static constexpr size_t CLIENT = 2UL;
+		static constexpr size_t STDIN = 2UL;
 		static constexpr size_t CMD = 3UL;
 		static constexpr size_t CHAT = 4UL;
 
 		ioUtils::Pipe commandPipe, chatPipe;
-
-		struct pollfd	pollFds[POLL_SIZE];
 
 		bool keepAlive{true};
 
