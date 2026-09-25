@@ -51,8 +51,8 @@ class GameWindow : public TapWindow
 	protected:
 		static constexpr size_t FRAME = 0UL;
 		static constexpr size_t INFO = 1UL;
-		static constexpr size_t CMD = 2UL;
-		static constexpr size_t WORLD = 3UL;
+		static constexpr size_t WORLD = 2UL;
+		static constexpr size_t CMD = 3UL;
 		static constexpr size_t CHAT = 4UL;
 
 		int32_t commandFd;
