@@ -24,13 +24,13 @@ class TapWindow
 		virtual void draw(int32_t height, int32_t width) = 0;
 		virtual void resize(int32_t height, int32_t width);
 		virtual void clear(void) noexcept;
-		virtual void updateContentWindow(void) const noexcept;
+		virtual void updateContentWindow(void) noexcept;
 		virtual void handleUserInput(void);
 
 		virtual void	switchActiveTab(int32_t index = -1);
 		BasicTab*		getActiveTab(void) { return this->tabs.at(this->activeTabIndex).get(); }
 
-		void refresh(void) noexcept { ::doupdate(); }
+		void refresh(void) const noexcept { ::doupdate(); }
 
 	protected:
 		std::map<size_t,std::unique_ptr<BasicTab>>	tabs{};
