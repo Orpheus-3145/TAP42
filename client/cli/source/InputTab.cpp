@@ -28,7 +28,7 @@ forwardInputFd{forwardInputFd},
 	this->dispatcher[KEY_BACKSPACE] = [this] { this->deleteCharBack(); };
 	this->dispatcher[KEY_UP]        = [this] { this->showPrevious(); };
 	this->dispatcher[KEY_DOWN]      = [this] { this->showNext(); };
-	this->dispatcher['\t']          = [this] { this->suggestHint(); };
+	this->dispatcher[KEY_BTAB]      = [this] { this->suggestHint(); };
 }
 
 InputTab::InputTab(InputTab&& other) noexcept :
@@ -335,13 +335,16 @@ void InputTab::handleUserInput(void)
 void InputTab::updateHints(void) noexcept
 {
 	this->suggestedHintIndexes.clear();
-	for(uint32_t i = 0U; i < this->hints.size(); i++)
+	for (uint32_t i = 0U; i < this->hints.size(); i++)
 	{
-		std::string const& currentHint = this->hints.at(i);
-		if (::strncmp(currentHint.data(), this->commandBuffer, std::min(this->bufferSize, currentHint.size())))
-			continue;
-
-		this->suggestedHintIndexes.push_back(i);
+		size_t j = 0UL, maxCharsToCheck = std::min(this->bufferSize, this->hints[i].size());
+		for (; j < maxCharsToCheck; j++)		// hint suggestion is case-insesitive
+		{
+			if (this->hints[i][j] != std::toupper(this->commandBuffer[j]))
+				break;
+		}
+		if (j == maxCharsToCheck)
+			this->suggestedHintIndexes.push_back(i);
 	}
 	this->autocompleteMode = this->suggestedHintIndexes.empty() == false;
 	this->currentSuggestedIndex = -1L;
