@@ -15,7 +15,7 @@ BasicTab::BasicTab(int32_t borderChar, int32_t colorPair, TapWindow* parent) :
 	if (::has_colors() == false)
 		this->colorPair = -1;
 
-	this->dispatcher[KEY_BTAB] = [this] { if (this->parent) this->parent->switchActiveTab(); };
+	this->dispatcher['\t'] = [this] { if (this->parent) this->parent->switchActiveTab(); };
 }
 
 BasicTab::BasicTab(BasicTab&& other) noexcept :
