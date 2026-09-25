@@ -7,18 +7,16 @@
 #include <cassert>
 
 
-GameWindow::GameWindow(int32_t commandFd, int32_t messageFd) :
+GameWindow::GameWindow(int32_t commandFd) :
 	TapWindow(),
-	commandFd{commandFd},
-	messageFd{messageFd}
+	commandFd{commandFd}
 {
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding commands");
-	assert(this->messageFd != -1 and "Invalid fd provided for forwarding chat messages");			// NB remove?
 
 	this->tabs[GameWindow::FRAME] = std::make_unique<BasicTab>(0, BLUE_COLOR, this);
 
 	this->tabs[GameWindow::CMD] = std::make_unique<InOutTab>(this->commandFd, CMD_HINTS, false, Config::PROMPT, "User Events", 0, CYAN_COLOR, this);
-	this->tabs[GameWindow::CHAT] = std::make_unique<InOutTab>(this->messageFd, CHAT_CMD_HINTS, false, Config::PROMPT, "Chat", 0, GREEN_COLOR, this);
+	this->tabs[GameWindow::CHAT] = std::make_unique<InOutTab>(this->commandFd, CHAT_CMD_HINTS, false, Config::PROMPT, "Chat", 0, GREEN_COLOR, this);
 
 	this->tabs[GameWindow::INFO] = std::make_unique<OutputTab>(0, BLUE_COLOR, this);
 	this->tabs[GameWindow::WORLD] = std::make_unique<OutputTab>("World events", 0, YELLOW_COLOR, this);
@@ -86,7 +84,7 @@ void GameWindow::draw(int32_t height, int32_t width)
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing game window size h: {}, w: {}", height, width));
 }
 
-void GameWindow::showResponse(std::string const& response)
+void GameWindow::appendResponse(std::string const& response)
 {
 	InOutTab* tab = dynamic_cast<InOutTab*>(this->tabs.at(GameWindow::CMD).get());
 	assert(tab != nullptr and "current tab doesn't support mouse scrolling");
@@ -94,7 +92,7 @@ void GameWindow::showResponse(std::string const& response)
 	tab->appendContent(response);
 }
 
-void GameWindow::showChatMsg(std::string const& response)
+void GameWindow::appendChatMsg(std::string const& response)
 {
 	InOutTab* tab = dynamic_cast<InOutTab*>(this->tabs.at(GameWindow::CHAT).get());
 	assert(tab != nullptr and "current tab doesn't support mouse scrolling");
@@ -102,7 +100,7 @@ void GameWindow::showChatMsg(std::string const& response)
 	tab->appendContent(response);
 }
 
-void GameWindow::showEvent(std::string const& event)
+void GameWindow::appendEvent(std::string const& event)
 {
 	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(GameWindow::WORLD).get());
 	assert(tab != nullptr and "current tab doesn't support mouse scrolling");
