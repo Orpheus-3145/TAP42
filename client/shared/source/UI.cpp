@@ -3,8 +3,26 @@
 #include "Logger.hpp"
 
 #include <cstring>
-#include <format>
 #include <cassert>
+#include <format>
+
+
+std::string toString(GamePhase phase)
+{
+	switch (phase)
+	{
+		case GamePhase::LOGIN: 			return "login";
+		case GamePhase::PLAYER_CREATE:	return "character creation";
+		case GamePhase::GAME:			return "game";
+		default:						return "";
+	}
+}
+
+std::ostream& operator<<(std::ostream& out, GamePhase phase)
+{
+	out << toString(phase);
+	return out;
+}
 
 
 UI::UI(int32_t clientSocket) noexcept
@@ -104,7 +122,7 @@ void UI::handleServerData(std::string const& message)
 	{
 		case GamePhase::LOGIN:
 			if (message == LOGIN_OK)
-				this->gamePhase();
+				this->switchWindow(GamePhase::GAME);
 			else if (message.find(S_ERR) == 0UL)
 				throw AppException(ErrorCode::UI_USERNAME_NOT_EXISTS);
 			else
@@ -113,7 +131,7 @@ void UI::handleServerData(std::string const& message)
 
 		case GamePhase::PLAYER_CREATE:
 			if (message == LOGIN_OK)
-				this->gamePhase();
+				this->switchWindow(GamePhase::GAME);
 			else if (message.find(S_ERR) == 0UL)
 				throw AppException(ErrorCode::SERVER_ERROR, message);
 			else
@@ -124,9 +142,9 @@ void UI::handleServerData(std::string const& message)
 			if (message == QUIT_RESPONSE)
 				this->stop();
 			else if ((message.find(S_OK) == 0UL) or (message.find(S_ERR) == 0UL))
-				this->showResponse(message);
+				this->updateResponse(message);
 			else if (message.find(S_EVT) == 0UL)
-				this->showEvent(message);
+				this->updateEvent(message);
 			else
 				LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
 			break;
@@ -161,26 +179,11 @@ void UI::handlePollError(void)
 	}
 }
 
-void UI::loginPhase(void)
+void UI::switchWindow(GamePhase newPhase)
 {
-	LOG_DEBUG(LogContext::INTERFACE, "Starting login session");
-	this->phase = GamePhase::LOGIN;
-}
+	if ((newPhase != GamePhase::LOGIN) and (this->handShakeDone == false))
+		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE, "Can't proceed to new phase without having received the handshake from server");
 
-void UI::newPlayerPhase(void)
-{
-	if (this->handShakeDone == false)
-		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE, "Can't create new character");
-
-	LOG_DEBUG(LogContext::INTERFACE, "Creating new player");
-	this->phase = GamePhase::PLAYER_CREATE;
-}
-
-void UI::gamePhase(void)
-{
-	if (this->handShakeDone == false)
-		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE, "Can't login");
-
-	LOG_DEBUG(LogContext::INTERFACE, "Login successful, retrieving game session");
-	this->phase = GamePhase::GAME;
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Starting {} session", toString(newPhase)));
+	this->phase = newPhase;
 }

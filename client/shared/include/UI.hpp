@@ -5,6 +5,7 @@
 #include <cassert>
 #include <vector>
 #include <memory>
+#include <ostream>
 #include <poll.h>
 
 #include "Config.hpp"
@@ -29,6 +30,10 @@ enum class GamePhase : uint32_t
 	GAME = 2U,
 };
 
+std::string toString(GamePhase phase);
+
+std::ostream& operator<<(std::ostream& out, GamePhase phase);
+
 class UI
 {
 	public:
@@ -41,8 +46,8 @@ class UI
 
 		virtual ~UI(void) noexcept {};
 
-		virtual void start(void) = 0;
-		virtual void stop(void) noexcept = 0;
+		virtual void start(void) { this->keepAlive = true; }
+		virtual void stop(void) noexcept { this->keepAlive = false; }
 
 	protected:
 		void writeToServer(void);
@@ -52,20 +57,21 @@ class UI
 		void splitIntoMessages(void);
 		void handlePollError(void);
 
-		virtual void loginPhase(void);
-		virtual void newPlayerPhase(void);
-		virtual void gamePhase(void);
-
+		virtual void switchWindow(GamePhase newPhase);
+		virtual void handleCommand(void) = 0;
+		virtual void handleResize(void) = 0;
 		virtual void handleError(ErrorCode const& code, std::string const& errorInfo) = 0;
 		virtual void handleServerDisconnect(void) noexcept = 0;
 
-		virtual void showResponse(std::string const& response) noexcept = 0;
-		virtual void showEvent(std::string const& event) noexcept = 0;
+		virtual void updateResponse(std::string const& response) noexcept = 0;
+		virtual void updateEvent(std::string const& event) noexcept = 0;
 
 		static constexpr size_t POLL_SIZE = 1UL;
 		static constexpr size_t CLIENT = 0UL;
 
 		std::vector<struct pollfd>	pollFds;
+
+		bool keepAlive{false};
 
 		int32_t height{0};
 		int32_t width{0};

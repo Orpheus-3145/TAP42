@@ -38,15 +38,15 @@ class GameWindow : public TapWindow
 	public:
 		using TapWindow::TapWindow;
 
-		GameWindow(int32_t commandFd, int32_t messageFd);
+		GameWindow(int32_t commandFd);
 
 		virtual ~GameWindow(void) noexcept { this->clear(); }
 
 		void draw(int32_t height, int32_t width) override;
 
-		void showResponse(std::string const& response);
-		void showChatMsg(std::string const& response);
-		void showEvent(std::string const& event);
+		void appendResponse(std::string const& response);
+		void appendChatMsg(std::string const& response);
+		void appendEvent(std::string const& event);
 
 	protected:
 		static constexpr size_t FRAME = 0UL;
@@ -56,5 +56,4 @@ class GameWindow : public TapWindow
 		static constexpr size_t CHAT = 4UL;
 
 		int32_t commandFd;
-		int32_t messageFd;
 };
