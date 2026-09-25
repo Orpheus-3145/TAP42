@@ -15,8 +15,8 @@ GameWindow::GameWindow(int32_t commandFd) :
 
 	this->tabs[GameWindow::FRAME] = std::make_unique<BasicTab>(0, BLUE_COLOR, this);
 
-	this->tabs[GameWindow::CMD] = std::make_unique<InOutTab>(this->commandFd, CMD_HINTS, false, Config::PROMPT, "User Events", 0, CYAN_COLOR, this);
-	this->tabs[GameWindow::CHAT] = std::make_unique<InOutTab>(this->commandFd, CHAT_CMD_HINTS, false, Config::PROMPT, "Chat", 0, GREEN_COLOR, this);
+	this->tabs[GameWindow::CMD] = std::make_unique<InOutTab>(this->commandFd, CMD_HINTS, Config::PROMPT, "User Events", 0, CYAN_COLOR, this);
+	this->tabs[GameWindow::CHAT] = std::make_unique<InOutTab>(this->commandFd, CHAT_CMD_HINTS, Config::PROMPT, "Chat", 0, GREEN_COLOR, this);
 
 	this->tabs[GameWindow::INFO] = std::make_unique<OutputTab>(0, BLUE_COLOR, this);
 	this->tabs[GameWindow::WORLD] = std::make_unique<OutputTab>("World events", 0, YELLOW_COLOR, this);
@@ -78,8 +78,6 @@ void GameWindow::draw(int32_t height, int32_t width)
 	);
 
 	this->updateContentWindow();
-	this->getActiveTab()->refresh();
-	this->refresh();
 
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing game window size h: {}, w: {}", height, width));
 }

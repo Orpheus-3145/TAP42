@@ -127,8 +127,6 @@ void CLI::start(void)
 		{
 			this->handleError(e.getCode(), e.what());
 		}
-
-		this->currentWindow->refresh();
 	}
 	LOG_INFO(LogContext::INTERFACE, "CLI stopped");
 }
@@ -232,7 +230,7 @@ void CLI::handleError(ErrorCode const& code, std::string const& errorInfo)
 			switch (this->phase)
 			{
 				case GamePhase::LOGIN: 			this->errorWin->setAction2("BACK", [this] { this->switchWindow(GamePhase::LOGIN); }); break;
-				case GamePhase::PLAYER_CREATE:	this->errorWin->setAction2("BACK", [this] { this->switchWindow(GamePhase::PLAYER_CREATE); });	break;
+				case GamePhase::PLAYER_CREATE:	this->errorWin->setAction2("BACK", [this] { this->switchWindow(GamePhase::PLAYER_CREATE); }); break;
 				case GamePhase::GAME:			this->errorWin->setAction2("BACK", [this] { this->switchWindow(GamePhase::GAME); }); break;
 				default: break;
 			}
@@ -260,7 +258,8 @@ void CLI::updateResponse(std::string const& response) noexcept
 	// if (response is chat type)
 	// 	gameWin->showChatMsg(response);
 	// else
-	gameWin->appendResponse(response);
+	std::string padding(::strlen(Config::PROMPT), ' ');
+	gameWin->appendResponse(padding + response);
 
 	if (this->phase == GamePhase::GAME)
 		gameWin->updateContentWindow();

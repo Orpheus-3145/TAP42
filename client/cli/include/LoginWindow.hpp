@@ -16,7 +16,8 @@ class LoginWindow : public TapWindow
 
 	protected:
 		static constexpr size_t FRAME = 0UL;
-		static constexpr size_t USERNAME = 1UL;
+		static constexpr size_t INFO = 1UL;
+		static constexpr size_t USERNAME = 2UL;
 
 		int32_t commandFd;
 };
