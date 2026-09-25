@@ -72,7 +72,6 @@ void ErrorWindow::draw(int32_t height, int32_t width)
 	}
 
 	this->updateContentWindow();
-	this->refresh();
 	curs_set(0);
 
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing error window, size h: {}, w: {}", this->height, this->width));
@@ -89,6 +88,7 @@ void ErrorWindow::clear(void) noexcept
 	assert(descTab != nullptr and "current tab doesn't support removing content");
 	descTab->clearContent();
 
+	this->activeTabIndex = 0;
 	curs_set(1);
 }
 

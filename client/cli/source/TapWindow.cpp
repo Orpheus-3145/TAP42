@@ -14,17 +14,21 @@ void TapWindow::clear(void) noexcept
 {
 	for (auto const& [_, tab] : this->tabs)
 		tab->clear();
+	this->refresh();
 }
 
-void TapWindow::updateContentWindow(void) const noexcept
+void TapWindow::updateContentWindow(void) noexcept
 {
 	for (auto const& [_, tab] : this->tabs)
 		tab->updateContent();
+	this->getActiveTab()->refresh();
+	this->refresh();
 }
 
 void TapWindow::handleUserInput(void)
 {
 	this->getActiveTab()->handleUserInput();
+	this->refresh();
 }
 
 void TapWindow::switchActiveTab(int32_t index)
@@ -35,7 +39,7 @@ void TapWindow::switchActiveTab(int32_t index)
 	this->getActiveTab()->deactivate();
 	if (index > -1)		// switch to a selected tab
 	{
-		assert(index < static_cast<int32_t>(this->tabs.size()) and "index table to switch > number of tabs");
+		assert(index < static_cast<int32_t>(this->tabs.size()) and "index table to switch overflow");
 		this->activeTabIndex = index;
 	}
 	else
