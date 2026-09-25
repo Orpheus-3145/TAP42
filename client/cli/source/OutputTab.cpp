@@ -3,6 +3,10 @@
 #include "Logger.hpp"
 
 #include <cassert>
+#include <ctime>
+#include <chrono>
+#include <iomanip>
+
 
 OutputTab::OutputTab(std::string const& title, int32_t borderChar, int32_t colorPair, TapWindow* parent) :
 	BasicTab(borderChar, colorPair, parent),
@@ -181,9 +185,27 @@ void OutputTab::deactivate(void)
 	this->refresh();
 }
 
-void OutputTab::appendContent(std::string const& newContent, TextAlign align)
+void OutputTab::appendContent(std::string const& newContent, bool addTimestamp, TextAlign align)
 {
-	this->state.emplace_back(newContent, align);
+	std::string content;
+	if (addTimestamp == true)
+	{
+		auto now = std::chrono::system_clock::now();
+		auto nowTimeT = std::chrono::system_clock::to_time_t(now);
+		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+			now.time_since_epoch()) % 1000;
+	
+		std::tm tmBuf;
+		localtime_r(&nowTimeT, &tmBuf); // thread safe
+	
+		std::ostringstream oss;
+		oss << std::put_time(&tmBuf, "%H:%M:%S");
+		content = std::format("[{}]  {}", oss.str(), newContent);
+	}
+	else
+		content = newContent;
+
+	this->state.emplace_back(content, align);
 	if (this->outputWin == nullptr)
 		return;
 

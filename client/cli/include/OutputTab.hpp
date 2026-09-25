@@ -35,7 +35,7 @@ class OutputTab : public virtual BasicTab
 		void activate(void) override;
 		void deactivate(void) override;
 
-		void appendContent(std::string const& newContent, TextAlign align = TextAlign::LEFT_ALIGN);
+		void appendContent(std::string const& newContent, bool addTimestamp = false, TextAlign align = TextAlign::LEFT_ALIGN);
 		void scrollContentUp(void) noexcept;
 		void scrollContentDown(void) noexcept;
 
