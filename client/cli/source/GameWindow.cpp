@@ -54,7 +54,7 @@ void GameWindow::draw(int32_t height, int32_t width)
 		2
 	);
 
-	this->tabs.at(GameWindow::CMD)->draw(
+	this->tabs.at(GameWindow::WORLD)->draw(
 		this->height - 6 - 2,
 		widthTab,
 		7,
@@ -63,7 +63,7 @@ void GameWindow::draw(int32_t height, int32_t width)
 
 	int32_t heightTab = (this->height - 2) / 2;
 
-	this->tabs.at(GameWindow::WORLD)->draw(
+	this->tabs.at(GameWindow::CMD)->draw(
 		heightTab,
 		widthTab,
 		1,
