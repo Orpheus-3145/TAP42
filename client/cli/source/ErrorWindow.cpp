@@ -98,7 +98,7 @@ void ErrorWindow::updateDescription(std::string const& description)
 	assert(descTab != nullptr and "current tab doesn't support appending content");
 
 	descTab->appendContent(" ");
-	descTab->appendContent(description, TextAlign::MID_ALIGN);
+	descTab->appendContent(description, false, TextAlign::MID_ALIGN);
 }
 
 void ErrorWindow::setAction1(std::string const& actionName, std::function<void()> action)

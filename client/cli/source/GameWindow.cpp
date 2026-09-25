@@ -89,7 +89,7 @@ void GameWindow::appendResponse(std::string const& response)
 	InOutTab* tab = dynamic_cast<InOutTab*>(this->tabs.at(GameWindow::CMD).get());
 	assert(tab != nullptr and "current tab doesn't support mouse scrolling");
 
-	tab->appendContent(response);
+	tab->appendContent(response, true);
 }
 
 void GameWindow::appendChatMsg(std::string const& response)
@@ -97,7 +97,7 @@ void GameWindow::appendChatMsg(std::string const& response)
 	InOutTab* tab = dynamic_cast<InOutTab*>(this->tabs.at(GameWindow::CHAT).get());
 	assert(tab != nullptr and "current tab doesn't support mouse scrolling");
 
-	tab->appendContent(response);
+	tab->appendContent(response, true);
 }
 
 void GameWindow::appendEvent(std::string const& event)
@@ -105,5 +105,5 @@ void GameWindow::appendEvent(std::string const& event)
 	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(GameWindow::WORLD).get());
 	assert(tab != nullptr and "current tab doesn't support mouse scrolling");
 
-	tab->appendContent(event);
+	tab->appendContent(event, true);
 }
