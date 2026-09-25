@@ -15,21 +15,29 @@ GUI::GUI(int32_t clientSocket, int32_t height, int32_t width) :
 	this->app = std::make_unique<QApplication>(argc, argv);
 	this->gameWin = std::make_unique<GameWindow>(nullptr, height, width);
 
+	// when user sends a command from the UI
 	QObject::connect(
 		this->gameWin.get(),
 		&GameWindow::commandEntered,
 	    this,
 		[this](const QString &cmd) {
-			this->handleCommand(cmd.toStdString());
+			std::string cmdStr = cmd.toStdString();
+			LOG_DEBUG(LogContext::INTERFACE, std::format("got: '{}'", cmdStr));
+			this->toServerSize = cmdStr.size();
+			::memcpy(this->toServerBuffer, cmdStr.data(), this->toServerSize);
+			this->writeToServer();
 		}
 	);
 
+	// server data: responses, events
 	this->readFromServerNotifier = std::make_unique<QSocketNotifier>(this->clientSocket, QSocketNotifier::Read, nullptr);
 	QObject::connect(
 		this->readFromServerNotifier.get(),
 		&QSocketNotifier::activated,
 	    this,
-		&GUI::handleServerData
+		[this]() {
+			this->readFromServer();
+		}
 	);
 
     this->gameWin->show();
@@ -45,45 +53,14 @@ GUI::~GUI(void) noexcept
 	this->app.reset();
 }
 
-void GUI::handleServerData(void)
-{
-	try
-	{
-		this->readDataFromServer();
-	}
-	catch(const IOException& e)
-	{
-		LOG_ERROR(LogContext::INTERFACE, std::format("I/O error failed to write to client: '{}'", e.what()));
-		// show error tab and close win
-	}
-}
-
-void GUI::handleCommand(std::string const& command)
-{
-	try
-	{
-		this->writeDataToServer(command);
-	}
-	catch(const IOException& e)
-	{
-		LOG_ERROR(LogContext::INTERFACE, std::format("I/O error failed to write to client: '{}'", e.what()));
-		// show error tab and close win
-	}
-}
-
-void GUI::handleResponse(std::string const& response) noexcept
+void GUI::updateResponse(std::string const& response) noexcept
 {
 	this->gameWin->appendResponse(QString::fromStdString(response));
 }
 
-void GUI::handleEvent(std::string const& event) noexcept
+void GUI::updateEvent(std::string const& event) noexcept
 {
 	this->gameWin->appendEvent(QString::fromStdString(event));
-}
-
-void GUI::handleServerDisconnect(void) noexcept
-{
-
 }
 
 std::unique_ptr<UI> uiFactory(int32_t clientSocket)

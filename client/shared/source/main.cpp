@@ -25,10 +25,11 @@ void run(std::string const& host, uint32_t port)
 
 	std::unique_ptr<ClientHTTP> clientHTTP = std::make_unique<ClientHTTP>(host, port, gameClientSockets.first);
 	clientHTTP->startWorker();
-
+	(void) host;
+	(void) port;
 	std::unique_ptr<UI> interface = uiFactory(gameClientSockets.second);
 
-	interface->startUI();		// blocks here
+	interface->start();		// blocks here
 
 	clientHTTP->stopWorker();
 
@@ -47,9 +48,11 @@ int32_t main(int32_t argc, char** argv)
 			std::cout << HOW_TO << std::endl;
 			return (EXIT_SUCCESS);
 		}
-	} catch (ParsingException& err) {
-		std::cout << HOW_TO << std::endl;
-		return (EXIT_FAILURE);
+	} catch (AppException const& err) {
+		if (err.getCode() == ErrorCode::BAD_FORMAT_ARGS)
+			std::cout << HOW_TO << std::endl;
+		else
+			throw err;
 	}
 
 	run(options.host, options.port);

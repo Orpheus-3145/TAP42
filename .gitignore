@@ -74,4 +74,5 @@ Testing/
 
 # specific to the project
 **/build
-tap-client
+tap-client*
+.vscode
