@@ -43,6 +43,11 @@ finisce direttamente nel path del file.
 - Ogni riga è un messaggio completo (nessun messaggio spezzato su più righe)
 - I comandi sono `UPPERCASE`; gli argomenti liberi (nomi giocatore, testo
   chat) mantengono il case originale
+- Subito dopo l'accept, prima ancora che il client mandi qualsiasi cosa, il
+  server invia una riga di saluto non richiesta: `OK hello proto=1`. Non è
+  la risposta a nessun comando, è solo il segnale "il server è vivo e
+  parla questa versione del protocollo" — il client deve aspettarla prima
+  di mandare il primo comando, non deve rispondere ad essa.
 
 ## 2. Tre categorie di messaggio
 
@@ -109,7 +114,7 @@ volta creato, è riservato per sempre.
 ### CONNECT
 ```
 C: CONNECT <name>
-S: OK {"name":"...","race":"...","special_attributes":"...","room":"...","hp":...,"max_hp":...,"inventory":[...]}
+S: OK connected
 S: ERR ERR_ALREADY_CONNECTED ...
 S: ERR ERR_CHARACTER_NOT_FOUND ...
 ```
@@ -119,6 +124,22 @@ il nome non sia già online, carica lo stato salvato da
 progresso dialoghi — tutto com'era all'ultima disconnessione) e lo rimette
 in gioco esattamente da lì. Un nome mai creato con CREATE_CHARACTER dà
 `ERR_CHARACTER_NOT_FOUND`, non crea nulla al posto del client.
+
+La risposta di successo è letteralmente `OK connected`, senza payload:
+RFC42TAP §5.1.1 la specifica esattamente così, quindi qui non c'è spazio per
+infilarci il profilo del personaggio. Per quello vedi PROFILE subito sotto —
+il client lo chiama dopo un CONNECT riuscito (o in qualsiasi altro momento).
+
+### PROFILE — estensione non RFC
+```
+C: PROFILE
+S: OK {"name":"...","race":"...","special_attributes":"...","room":"...","hp":...,"max_hp":...,"inventory":[...]}
+S: ERR ERR_NOT_CONNECTED ...
+```
+Restituisce lo stesso identico blocco JSON che CREATE_CHARACTER dà al
+momento della creazione: nome, campi cosmetici, stanza attuale, HP e
+inventario. Non è legata al momento del login, si può chiamare in
+qualunque punto della sessione, stesso trattamento di STATUS/INVENTORY.
 
 Le quest vengono comunque passate attraverso l'inizializzazione a
 `in_progress` a ogni CONNECT (vedi §7, nessun comando ACCEPT esplicito per

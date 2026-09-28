@@ -135,7 +135,7 @@ void cmd_connect(const std::shared_ptr<Session>& session, const std::vector<std:
             world.players[name] = loaded;
             session->player_id = name;
             session->current_room = loaded.current_room;
-            response = "OK " + character_info_json(loaded);
+            response = "OK connected"; // literal per RFC42TAP §5.1.1, not a JSON blob - see PROFILE for that
             connected_ok = true;
         }
     }
@@ -226,6 +226,24 @@ void cmd_who(const std::shared_ptr<Session>& session) {
     send_line(*session, oss.str());
 }
 
+// Non-RFC extension: CONNECT's own OK line is the literal "OK connected"
+// mandated by RFC42TAP, so it has no room left for the character's data.
+// PROFILE is the dedicated query for that - same shape as STATUS/INVENTORY,
+// callable any time after login, not just right after it.
+void cmd_profile(const std::shared_ptr<Session>& session) {
+    if (session->player_id.empty()) {
+        send_line(*session, "ERR ERR_NOT_CONNECTED CONNECT first");
+        return;
+    }
+    auto& world = World::instance();
+    std::string response;
+    {
+        std::lock_guard<std::mutex> lock(world.mutex);
+        response = "OK " + character_info_json(world.players.at(session->player_id));
+    }
+    send_line(*session, response);
+}
+
 void cmd_chat(const std::shared_ptr<Session>& session, const std::vector<std::string>& args) {
     if (session->player_id.empty()) {
         send_line(*session, "ERR ERR_NOT_CONNECTED CONNECT first");
@@ -297,6 +315,8 @@ void handle_command(std::shared_ptr<Session> session, const std::string& line) {
         cmd_connect(session, args);
     } else if (cmd == "CREATE_CHARACTER") {
         cmd_create_character(session, args);
+    } else if (cmd == "PROFILE") {
+        cmd_profile(session);
     } else if (cmd == "LOOK") {
         cmd_look(session);
     } else if (cmd == "MOVE") {
