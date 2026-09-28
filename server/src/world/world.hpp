@@ -17,10 +17,14 @@ struct Room {
     std::vector<std::string> npc_ids;
 };
 
+enum class ItemEffect { None, Heal, Damage };
+
 struct Item {
     std::string id;
     std::string name;
     std::string description;
+    ItemEffect effect = ItemEffect::None;
+    int effect_amount = 0; // hp healed (Heal) or damage dealt (Damage)
 };
 
 struct Npc {
@@ -28,9 +32,19 @@ struct Npc {
     std::string name;
     std::string description;
     std::vector<std::string> dialogue;
-    size_t dialogue_index = 0; // index of the next dialogue line to show (cyclic TALK)
     int hp = 0;
     int max_hp = 0;
+    // Per-NPC counter-attack range; a world file that doesn't set these gets
+    // the old one-size-fits-all values. min == max gives a fixed hit
+    // (e.g. the bartender's flat 100) instead of a rolled range.
+    int counter_damage_min = 3;
+    int counter_damage_max = 8;
+
+    // Extra lines appended to the TALK cycle once a player has "completed"
+    // status on every quest listed in unlock_quest_ids. Either left empty
+    // for an NPC with nothing to unlock.
+    std::vector<std::string> bonus_dialogue;
+    std::vector<std::string> unlock_quest_ids;
 };
 
 enum class QuestType { Fetch, Defeat };
@@ -40,7 +54,9 @@ struct Quest {
     std::string name;
     std::string description;
     QuestType type = QuestType::Fetch;
-    std::string target_id;      // item id (Fetch) or npc id (Defeat)
+    std::string target_id;           // Fetch: the item to bring back
+    std::vector<std::string> target_ids; // Defeat: every npc that must die; a
+                                          // single-boss quest just lists one
     std::string reward_item_id; // empty = no reward
 };
 
@@ -52,6 +68,11 @@ struct PlayerState {
     int max_hp = 100;
     std::string last_target; // last npc_id attacked, used by STATUS
     std::unordered_map<std::string, std::string> quest_status; // quest_id -> status
+
+    // Per-player dialogue progress: npc_id -> index of the next line to show.
+    // Deliberately NOT on Npc — each player cycles an NPC's dialogue on
+    // their own, independent of what everyone else has heard from it.
+    std::unordered_map<std::string, size_t> npc_dialogue_progress;
 };
 
 // Shared world state. A singleton because there's a single world for the
