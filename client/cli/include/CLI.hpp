@@ -1,15 +1,16 @@
 #pragma once
 
 #include <ncurses.h>
-#include <unordered_map>
-#include <functional>
 #include <memory>
-#include <array>
+#include <string>
+#include <cstdint>
 
-#include "Config.hpp"
-#include "Utils.hpp"
 #include "UI.hpp"
-#include "CurseTab.hpp"
+#include "LoginWindow.hpp"
+#include "PlayerCreateWindow.hpp"
+#include "GameWindow.hpp"
+#include "ErrorWindow.hpp"
+#include "Utils.hpp"
 
 
 // NCURSES:
@@ -129,6 +130,8 @@
 //
 //	werase(win)								<-- cleans the content of the win (i..e fill win buffer with ' '), and does a differential update next frame
 //	wclear(win)								<-- like above but also calls wclearok(win, TRUE) which fprces a full update from scratch instead of differential
+//  mvwin(win, y, x)						<-- moves win to a new pos
+//  wresize(win, h, w)						<-- change size of win
 // ===========================================================================================================================================================================
 // Borders: to separate windows
 //	box(win, vertLineChar, horLineChar)						<-- draws a box around the window, putting vertLineChar
@@ -156,12 +159,24 @@
 //		COLOR_CYAN    6
 //		COLOR_WHITE   7
 //
+//  has_colors()										<-- true/false if the termial supports colors
+//	start_color()										<-- enables colors in Ncurses (should be called if has_colors() = true)
 //	init_pair(idPair, foreColor, backColor)				<-- creates a couple of two colors (later it can be used with attron(COLOR_PAIR(idPair)) )
 //	init_color(COLOR_NAME, r, g, b)						<-- to change an existing color called COLOR_NAME with the new rgb (ranging from 0 to 1000)
 //
 //	can_change_color()						<-- to check wether the terminal allows chaning colors
 //	color_content(COLOR_NAME)				<-- get foreground/background of COLOR_NAME
 //	pair_content(COLOR_NAME)				<-- get rgb of COLOR_NAME
+//  wbkgd(win, COLOR_PAIR)					<-- sets the color for the whole win, not only for the cells with text with that color in it
+//
+// ===========================================================================================================================================================================
+// Others:
+//  hline(charType, width ) #			<-- draw an horizontal line of width chars of type charType
+//  vline(charType, width ) #			<-- draw a vertical line of width chars of type charType
+//	wscrl(win, nScrolls)				<-- scrolls the content of the window by nScrolls lines up (nScrolls > 0) or (nScrolls < 0)
+//											N.B. to do so, scrollok(win, true) has to be called on that window when it's created
+//											N.B. calling also idlok(win, true) makes the scroll more natural to see
+//
 //
 // ===========================================================================================================================================================================
 // Appendix:
@@ -202,78 +217,77 @@
 //		}
 //
 // ASC characters:
-// 		Upper left corner        --> ACS_ULCORNER
-// 		Lower left corner        --> ACS_LLCORNER
-// 		Lower right corner       --> ACS_LRCORNER
-// 		Tee pointing right       --> ACS_LTEE
-// 		Tee pointing left        --> ACS_RTEE
-// 		Tee pointing up          --> ACS_BTEE
-// 		Tee pointing down        --> ACS_TTEE
-// 		Horizontal line          --> ACS_HLINE
-// 		Vertical line            --> ACS_VLINE
-// 		Large Plus or cross over --> ACS_PLUS
-// 		Scan Line 1              --> ACS_S1
-// 		Scan Line 3              --> ACS_S3
-// 		Scan Line 7              --> ACS_S7
-// 		Scan Line 9              --> ACS_S9
-// 		Diamond                  --> ACS_DIAMOND
-// 		Checker board (stipple)  --> ACS_CKBOARD
-// 		Degree Symbol            --> ACS_DEGREE
-// 		Plus/Minus Symbol        --> ACS_PLMINUS
-// 		Bullet                   --> ACS_BULLET
-// 		Arrow Pointing Left      --> ACS_LARROW
-// 		Arrow Pointing Right     --> ACS_RARROW
-// 		Arrow Pointing Down      --> ACS_DARROW
-// 		Arrow Pointing Up        --> ACS_UARROW
-// 		Board of squares         --> ACS_BOARD
-// 		Lantern Symbol           --> ACS_LANTERN
-// 		Solid Square Block       --> ACS_BLOCK
-// 		Less/Equal sign          --> ACS_LEQUAL
-// 		Greater/Equal sign       --> ACS_GEQUAL
-// 		Pi                       --> ACS_PI
-// 		Not equal                --> ACS_NEQUAL
-// 		UK pound sign            --> ACS_STERLING
+// 		ACS_HLINE			─
+// 		ACS_VLINE			│
+// 		ACS_ULCORNER		┌
+// 		ACS_URCORNER		┐
+// 		ACS_LLCORNER		└
+// 		ACS_LRCORNER		┘
+// 		ACS_LTEE			├
+// 		ACS_RTEE			┤
+// 		ACS_TTEE			┬
+// 		ACS_BTEE			┴
+// 		ACS_PLUS			┼
+// 		ACS_LARROW			←
+// 		ACS_RARROW			→
+// 		ACS_UARROW			↑
+// 		ACS_DARROW			↓
+// 		ACS_BLOCK			█
+// 		ACS_CKBOARD			▒
+// 		ACS_BOARD			▓
+// 		ACS_DIAMOND			◆
+// 		ACS_DEGREE			°
+// 		ACS_PLMINUS			±
+// 		ACS_BULLET			·
+// 		ACS_LANTERN			␋
+// 		ACS_LEQUAL			≤
+// 		ACS_GEQUAL			≥
+// 		ACS_NEQUAL			≠
+// 		ACS_PI				π
+// 		ACS_STERLING		£
+//
 // ===========================================================================================================================================================================
 
 
+static constexpr int32_t BLUE_COLOR = 1;
+static constexpr int32_t RED_COLOR = 2;
+static constexpr int32_t GREEN_COLOR = 3;
+static constexpr int32_t YELLOW_COLOR = 4;
+static constexpr int32_t CYAN_COLOR = 5;
+
 class CLI : public UI
 {
-	using InputDispatcher = std::unordered_map<int32_t,std::function<void()>>;
-
 	public:
 		using UI::UI;
 		CLI(int32_t clientSocket);
 
 		virtual ~CLI(void) noexcept override;
 
-		void startUI(void) override;
-		void stopUI(void) noexcept override { this->keepAlive = false; }
-		void resize(int32_t height, int32_t width) override;
+		void start(void) override;
 
 	private:
-		void createWindow(void);
-		void refresh(void) noexcept { ::doupdate(); }
-		void handleResizeEvent(void);
-		void handleUserInput(void);
-		void handleServerData(void);
-		void handleError(void) noexcept;
+		void switchWindow(GamePhase newPhase) override;
+		void handleResize(void) override;
+		void handleCommand(void) override;
+		void handleError(ErrorCode const& code, std::string const& errorInfo) override;
+		void handleServerDisconnect(void) noexcept override {}
 
-		void handleCommand(std::string const& command) override;
-		void handleResponse(std::string const& response) noexcept override;
-		void handleEvent(std::string const& event) noexcept override;
-		void handleServerDisconnect(void) noexcept override;
+		void updateResponse(std::string const& response) noexcept override;
+		void updateEvent(std::string const& event) noexcept override;
 
-		static constexpr size_t POLL_SIZE = 3UL;
-		static constexpr size_t I_STDIN = 0UL;
-		static constexpr size_t I_RESIZE = 1UL;
-		static constexpr size_t I_CLIENT = 2UL;
+		bool isErrorSituation(void) const noexcept { return this->currentWindow == this->errorWin.get(); }
 
-		bool keepAlive{true};
+		static constexpr size_t POLL_SIZE = 4UL;
+		static constexpr size_t RESIZE = 1UL;
+		static constexpr size_t STDIN = 2UL;
+		static constexpr size_t CMD = 3UL;
 
-		std::unique_ptr<OutputTab>	frame;
-		std::unique_ptr<InputTab>	commandTab;
-		std::unique_ptr<OutputTab>	responseTab, eventTab;
+		ioUtils::Pipe commandPipe;
 
-		struct pollfd	pollFds[POLL_SIZE];
-		InputDispatcher	dispatcher;
+		std::unique_ptr<LoginWindow>		loginWin;
+		std::unique_ptr<PlayerCreateWindow>	newPlayerWin;
+		std::unique_ptr<GameWindow>			gameWin;
+		std::unique_ptr<ErrorWindow>		errorWin;
+
+		TapWindow* currentWindow{nullptr};
 };

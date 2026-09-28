@@ -52,7 +52,7 @@ void Logger::setLogFile(const std::string& path)
 	this->fileStream.open(path, std::ios::out | std::ios::app);
 	this->fileEnabled = this->fileStream.is_open();
 	if (!this->fileEnabled)
-		AppException("Couldn't open log file: " + path);
+		throw AppException(ErrorCode::FILE_NOT_FOUND, path);
 }
 
 void Logger::setMinLevel(LogLevel level) noexcept

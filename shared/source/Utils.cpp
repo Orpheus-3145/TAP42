@@ -64,7 +64,7 @@ int32_t	connectToServer(std::string const& host, uint32_t portNo, struct addrinf
 		filter = &defaultTCPfilter;
 
 	if (::getaddrinfo(host.data(), port.data(), filter, &list) != 0)
-		throw HTTPException(std::format("Failed to find addresses for {}:{}", host, port));
+		throw AppException(ErrorCode::SERVER_CONN_FAILED, std::format("Failed to find addresses for {}:{}", host, port));
 
 	for (tmp = list; tmp != nullptr; tmp = tmp->ai_next)
 	{
@@ -79,16 +79,16 @@ int32_t	connectToServer(std::string const& host, uint32_t portNo, struct addrinf
 	if (tmp == nullptr)
 	{
 		::freeaddrinfo(list);
-		throw HTTPException(std::format("No available IP host found for port: {}", port));
+		throw AppException(ErrorCode::SERVER_CONN_FAILED, std::format("No available IP host found for port: {}", port));
 	}
 	std::memcpy(&rawServerAddress, tmp->ai_addr, tmp->ai_addrlen);
 	::freeaddrinfo(list);
 
 	int32_t flags = ::fcntl(socket, F_GETFL, 0);
 	if (flags == -1)
-		throw HTTPException("Failed to load flags for socket");
+		throw AppException(ErrorCode::SERVER_CONN_FAILED, "Couldn't fetch socket data");
 	if (::fcntl(socket, F_SETFL, flags | O_NONBLOCK) == -1)
-		throw HTTPException("Failed to set socket as non-blocking");
+		throw AppException(ErrorCode::SERVER_CONN_FAILED, "Couldn't set socket as non-blocking");
 
 	return socket;
 }
@@ -101,7 +101,7 @@ int32_t poll(pollfd *fds, size_t nfds, int32_t timeout)
 	else if (errno == EINTR)
 		return 0;
 	else
-		throw HTTPException(std::format("Poll failed: {}", strerror(errno)));
+		throw AppException(ErrorCode::IO_POLL_FAILED, strerror(errno));
 }
 
 size_t read(int32_t fd, char* buffer, size_t size)
@@ -116,7 +116,7 @@ size_t read(int32_t fd, char* buffer, size_t size)
 		if (n > 0L)
 			offset += n;
 		if (n < 0L)
-			throw ReadException(std::format("Read failed: {}", strerror(errno)));
+			throw AppException(ErrorCode::IO_READ_FAILED, strerror(errno));
 		else
 			break;
 	}
@@ -135,7 +135,7 @@ size_t write(int32_t fd, const char* buffer, size_t size)
 		if (n > 0L)
 			offset += n;
 		if (n < 0L)
-			throw ReadException(std::format("Write failed: {}", strerror(errno)));
+			throw AppException(ErrorCode::IO_WRITE_FAILED, strerror(errno));
 		else
 			break;
 	}
@@ -167,7 +167,7 @@ ssize_t readNonBlock(int32_t fd, char* buffer, size_t size)
 		if (errno == EINTR)
 			continue;
 
-		throw ReadException(std::format("Read failed: {}", strerror(errno)));
+		throw AppException(ErrorCode::IO_READ_NONB_FAILED, strerror(errno));
 	}
 	return offset;
 }
@@ -180,7 +180,9 @@ ssize_t writeNonBlock(int32_t fd, const char* buffer, size_t size)
 	ssize_t offset = 0L;
 	while (true)
 	{
-		ssize_t n = ::send(fd, buffer + offset, size - offset, 0);
+		// MSG_NOSIGNAL so if socket closes connection send returns -1 (EPIPE)
+		// instead of generating signal SIGPIPE
+		ssize_t n = ::send(fd, buffer + offset, size - offset, MSG_NOSIGNAL);
 		
 		if (n > 0)
 		{
@@ -190,12 +192,14 @@ ssize_t writeNonBlock(int32_t fd, const char* buffer, size_t size)
 			continue;
 		}
 
-		if (errno == EAGAIN || errno == EWOULDBLOCK)	// buffer full, wait for next pollout
+		if (errno == EPIPE)
 			return -1L;
-		if (errno == EINTR)
+		else if (errno == EAGAIN || errno == EWOULDBLOCK)	// buffer full, wait for next pollout
+			break;
+		else if (errno == EINTR)
 			continue;
 
-		throw ReadException(std::format("Send failed: {}", strerror(errno)));
+		throw AppException(ErrorCode::IO_WRITE_NONB_FAILED, strerror(errno));
 	}
 	return offset;
 }
@@ -208,30 +212,36 @@ ssize_t pipe(int32_t sourceFd, int32_t destFd)
 	while (true)
 	{
 		readSize = readNonBlock(sourceFd, inputBuffer, BUFF_SIZE);
-		if (readSize <= 0L)		// if other peer disconnected or there's nothing else to read
+		if (readSize == 0L)		// nothing else to read
 			break;
+		if (readSize == -1L)
+			throw AppException(ErrorCode::IO_PIPE_FAILED, "source not available");
+
 		if (writeNonBlock(destFd, inputBuffer, readSize) == -1L)
-			throw IOException("Couldn't write on destination fd, piping failed");
+			throw AppException(ErrorCode::IO_PIPE_FAILED, "destination not reachable");
 	}
 	return (readSize);
 }
 
-int32_t createSignalRedirectFd(int32_t signal)
+int32_t createSignalRedirectFd(int32_t signal, bool nonBlocking)
 {
 	sigset_t mask;
 	sigemptyset(&mask);
 	sigaddset(&mask, signal);				// create a filter that signal
-	sigprocmask(SIG_BLOCK, &mask, NULL);	// and use it to not block it
+	sigprocmask(SIG_BLOCK, &mask, nullptr);	// and use it to not block it
 	
 	int32_t fd = ::signalfd(-1, &mask, 0);
 	if (fd == -1)
-		throw IOException(std::format("Failed to creare a file descriptor to redirect: {}", signal));
-
-	int32_t flags = fcntl(fd, F_GETFL, 0);
-	if (flags == -1)
-		throw InterfaceException("Failed to load flags for socket");
-	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-		throw InterfaceException("Failed to set socket as non-blocking");
+		throw AppException(ErrorCode::IO_SIG_SOCK_CREATE_FAILED);
+	
+	if (nonBlocking == true)
+	{
+		int32_t flags = fcntl(fd, F_GETFL, 0);
+		if (flags == -1)
+			throw AppException(ErrorCode::IO_SIG_SOCK_CREATE_FAILED, "Couldn't fetch socket data");
+		if (::fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+			throw AppException(ErrorCode::IO_SIG_SOCK_CREATE_FAILED, "Couldn't set socket as non-blocking");
+	}
 
 	return fd;
 }
@@ -241,15 +251,15 @@ SocketPair createSocketPair(void)
 	int sockets[2];
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1)
-		throw InterfaceException(std::format("Failed to create socket: {}", strerror(errno)));
+		throw AppException(ErrorCode::IO_SOCK_CREATE_FAILED, strerror(errno));
 
 	for (int32_t fd : {sockets[0], sockets[1]})
 	{
 		int32_t flags = fcntl(fd, F_GETFL, 0);
 		if (flags == -1)
-			throw InterfaceException("Failed to load flags for socket");
-		if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-			throw InterfaceException("Failed to set socket as non-blocking");
+			throw AppException(ErrorCode::IO_SOCK_CREATE_FAILED, "Couldn't fetch socket data");
+		if (::fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+			throw AppException(ErrorCode::IO_SOCK_CREATE_FAILED, "Couldn't set socket as non-blocking");
 	}
 
 	return SocketPair{sockets[0], sockets[1]};
@@ -274,15 +284,15 @@ Pipe createPipe(void)
 {
 	int32_t _pipe[2] = {-1, -1};		// pipe for pollwakeup of worker
 	if (::pipe(_pipe) == -1)
-		throw InterfaceException(std::format("Failed to create pipe: {}", strerror(errno)));
+		throw AppException(ErrorCode::IO_PIPE_CREATE_FAILED, strerror(errno));
 
 	for (int32_t fd : {_pipe[0], _pipe[1]})
 	{
 		int32_t flags = ::fcntl(fd, F_GETFL, 0);
 		if (flags == -1)
-			throw HTTPException("Failed to load flags for socket");
+			throw AppException(ErrorCode::IO_PIPE_CREATE_FAILED, "Couldn't fetch socket data");
 		if (::fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-			throw HTTPException("Failed to set socket as non-blocking");
+			throw AppException(ErrorCode::IO_PIPE_CREATE_FAILED, "Couldn't set socket as non-blocking");
 	}
 
 	return Pipe{_pipe[1], _pipe[0]};
@@ -325,7 +335,7 @@ std::string createLogPath(const char* logFolder)
 
 	std::filesystem::path logPath = std::filesystem::current_path() / logFolder;
 	if (std::filesystem::is_directory(logPath) == false)
-		throw AppException(std::format("Folder: '{}' doesn't exist", logPath.string()));
+		throw AppException(ErrorCode::FILE_NOT_FOUND, logPath.string());
 
 	return std::format("{}/{}_logfile.log", logPath.string(), oss.str());
 }
