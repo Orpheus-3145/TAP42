@@ -19,42 +19,37 @@ void startLogging(void)
 	Logger::getInstance().removeFilter(LogContext::INPUT_OUTPUT);
 }
 
-void run(std::string const& host, uint32_t port)
-{
-	ioUtils::SocketPair gameClientSockets = ioUtils::createSocketPair();
-
-	std::unique_ptr<ClientHTTP> clientHTTP = std::make_unique<ClientHTTP>(host, port, gameClientSockets.first);
-	clientHTTP->startWorker();
-	(void) host;
-	(void) port;
-	std::unique_ptr<UI> interface = uiFactory(gameClientSockets.second);
-
-	interface->start();		// blocks here
-
-	clientHTTP->stopWorker();
-
-	ioUtils::closePair(gameClientSockets);
-}
-
 int32_t main(int32_t argc, char** argv)
 {
 	startLogging();
-	Flags options;
 
-	try {
-		options = parseArguments(argc, argv);
+	try
+	{
+		Flags options = parseArguments(argc, argv);
+
 		if (options.helpmode == true)
 		{
 			std::cout << HOW_TO << std::endl;
 			return (EXIT_SUCCESS);
 		}
-	} catch (AppException const& err) {
+
+		std::unique_ptr<UI> app = uiFactory();
+		app->connect(options.host, options.port);
+		app->start();
+	}
+	catch (AppException const& err)
+	{
 		if (err.getCode() == ErrorCode::BAD_FORMAT_ARGS)
+		{
 			std::cout << HOW_TO << std::endl;
+			return (EXIT_SUCCESS);
+		}
 		else
-			throw err;
+		{
+			std::cerr << "Got error: " << err.what() << std::endl;
+			return (EXIT_FAILURE);
+		}
 	}
 
-	run(options.host, options.port);
 	return (EXIT_SUCCESS);
 }

@@ -63,7 +63,7 @@ void GUI::updateEvent(std::string const& event) noexcept
 	this->gameWin->appendEvent(QString::fromStdString(event));
 }
 
-std::unique_ptr<UI> uiFactory(int32_t clientSocket)
+std::unique_ptr<UI> uiFactory(void)
 {
-	return std::make_unique<GUI>(clientSocket, Config::HEIGHT_GUI, Config::WIDTH_GUI);
+	return std::make_unique<GUI>(Config::HEIGHT_GUI, Config::WIDTH_GUI);
 }
