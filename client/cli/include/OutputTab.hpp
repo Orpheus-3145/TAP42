@@ -5,16 +5,43 @@
 #include <functional>
 #include <deque>
 #include <cstdint>
+#include <optional>
+#include <chrono>
+// #include <iomanip>
 
-#include <BasicTab.hpp>
-#include <TapWindow.hpp>
+#include "BasicTab.hpp"
+#include "TapWindow.hpp"
 
 
 enum class TextAlign : uint32_t
 {
-	LEFT_ALIGN = 0,
-	MID_ALIGN = 1,
-	RIGHT_ALIGN = 2,
+	LEFT = 0,
+	MID = 1,
+	RIGHT = 2,
+};
+
+struct TabMessage
+{
+	using TimePoint = std::chrono::time_point<std::chrono::system_clock, std::chrono::system_clock::duration>;
+
+	std::string					content;			// NB handle multi-line messages
+	TextAlign					align;
+	uint32_t					attrs;
+	std::optional<TimePoint>	timestamp;
+
+	explicit TabMessage(std::string const content, TextAlign align = TextAlign::LEFT, uint32_t attrs = A_NORMAL, bool saveTimestamp = true) :
+		content{content},
+		align{align},
+		attrs{attrs} { if (saveTimestamp) this->timestamp = std::chrono::system_clock::now(); }
+
+	TabMessage(void) = delete;
+	
+	TabMessage(TabMessage const& other) noexcept = default;
+	TabMessage& operator=(TabMessage const& other) noexcept = default;
+	TabMessage(TabMessage&& other) noexcept = default;
+	TabMessage& operator=(TabMessage&& other) noexcept = default;
+
+	~TabMessage(void) noexcept = default;
 };
 
 class OutputTab : public virtual BasicTab
@@ -35,13 +62,12 @@ class OutputTab : public virtual BasicTab
 		void activate(void) override;
 		void deactivate(void) override;
 
-		void appendContent(std::string const& newContent, bool addTimestamp = false, TextAlign align = TextAlign::LEFT_ALIGN);
+		void appendContent(std::string const& newContent, TextAlign align = TextAlign::LEFT, uint32_t attrs = A_NORMAL, bool saveTimestamp = true);
 		void scrollContentUp(void) noexcept;
 		void scrollContentDown(void) noexcept;
 
-		void printLine(std::string const& newContent, TextAlign align = TextAlign::LEFT_ALIGN) const noexcept;
-		void printLine(std::pair<std::string,TextAlign> const& content) const noexcept
-			{ this->printLine(content.first, content.second); }
+		virtual void	printLine(TabMessage const& content) const noexcept;
+		void			printLine(std::string const& newContent) const noexcept { this->printLine(TabMessage{newContent}); }
 
 		void clearContent(void) noexcept { this->state.clear(); }
 
@@ -52,7 +78,7 @@ class OutputTab : public virtual BasicTab
 
 		std::string const	title;
 
-		std::deque<std::pair<std::string,TextAlign>> state;
+		std::deque<TabMessage> state;
 
 		size_t		topLineScroll{0UL};
 };

@@ -3,9 +3,6 @@
 #include "Logger.hpp"
 
 #include <cassert>
-#include <ctime>
-#include <chrono>
-#include <iomanip>
 
 
 OutputTab::OutputTab(std::string const& title, int32_t borderChar, int32_t colorPair, TapWindow* parent) :
@@ -185,27 +182,9 @@ void OutputTab::deactivate(void)
 	this->refresh();
 }
 
-void OutputTab::appendContent(std::string const& newContent, bool addTimestamp, TextAlign align)
+void OutputTab::appendContent(std::string const& newContent, TextAlign align, uint32_t attrs, bool saveTimestamp)
 {
-	std::string content;
-	if (addTimestamp == true)
-	{
-		auto now = std::chrono::system_clock::now();
-		auto nowTimeT = std::chrono::system_clock::to_time_t(now);
-		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-			now.time_since_epoch()) % 1000;
-	
-		std::tm tmBuf;
-		localtime_r(&nowTimeT, &tmBuf); // thread safe
-	
-		std::ostringstream oss;
-		oss << std::put_time(&tmBuf, "%H:%M:%S");
-		content = std::format("[{}]  {}", oss.str(), newContent);
-	}
-	else
-		content = newContent;
-
-	this->state.emplace_back(content, align);
+	this->state.emplace_back(newContent, align, attrs, saveTimestamp);
 	if (this->outputWin == nullptr)
 		return;
 
@@ -230,31 +209,38 @@ void OutputTab::updateContent(void) const noexcept
 		this->printLine(this->state[this->topLineScroll + i]);
 }
 
-void OutputTab::printLine(std::string const& newContent, TextAlign align) const noexcept
+void OutputTab::printLine(TabMessage const& message) const noexcept
 {
 	int32_t y, _;
 	(void)_;
 	getyx(this->outputWin, y, _);
 
-	if (align != TextAlign::LEFT_ALIGN)
+	if (message.align != TextAlign::LEFT)
 	{
 		int32_t w;
 		getmaxyx(this->outputWin, _, w);
 
-		uint32_t lenWord = newContent.size();
-		if (w > static_cast<int32_t>(lenWord))
+		int32_t lenWord = static_cast<int32_t>(message.content.size());
+		if (w > lenWord)
 		{
-			uint32_t startText = 0U;
-			if (align == TextAlign::MID_ALIGN)			startText = (w - lenWord) / 2U;
-			else if (align == TextAlign::RIGHT_ALIGN)	startText = w - lenWord;
-
-			::wmove(this->outputWin, y, startText);
+			if (message.align == TextAlign::MID)		::wmove(this->outputWin, y, (w - lenWord) / 2U);
+			else if (message.align == TextAlign::RIGHT) ::wmove(this->outputWin, y, w - lenWord);
 		}
 	}
 
-	waddstr(this->outputWin, newContent.data());
-	::wmove(this->outputWin, y + 1, 0);
+	if (message.timestamp.has_value())
+	{
+		// ignore timings < seconds
+		auto timestamp = std::chrono::time_point_cast<std::chrono::seconds>(message.timestamp.value());
+		std::string strTimestamp = std::format("[{:%H:%M:%S}]  ", timestamp);
+		waddstr(this->outputWin, strTimestamp.data());
+	}
 
+	::wattron(this->outputWin, message.attrs);
+	waddstr(this->outputWin, message.content.data());
+	::wattroff(this->outputWin, message.attrs);
+
+	::wmove(this->outputWin, y + 1, 0);
 	this->refresh();
 }
 

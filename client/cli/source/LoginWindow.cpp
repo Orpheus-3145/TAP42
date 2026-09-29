@@ -21,8 +21,8 @@ LoginWindow::LoginWindow(int32_t commandFd) :
 
 	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(LoginWindow::INFO).get());
 	assert(tab != nullptr and "current tab doesn't support appending content");
-	tab->appendContent(" ");
-	tab->appendContent(" Enter username:", false, TextAlign::MID_ALIGN);
+	tab->appendContent(" ", TextAlign::LEFT, A_NORMAL, false);
+	tab->appendContent(" Enter username:", TextAlign::MID, A_BOLD, false);
 
 	this->tabsToSkip.insert(LoginWindow::FRAME);
 	this->tabsToSkip.insert(LoginWindow::INFO);

@@ -149,6 +149,6 @@ void InOutTab::terminateInput(void)
 	InputTab::terminateInput();
 
 	// show last input
-	this->appendContent(this->prompt + this->inputHistory.front(), true);
+	this->appendContent(this->prompt + this->inputHistory.front());
 	this->updateContent();
 }

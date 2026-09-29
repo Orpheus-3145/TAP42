@@ -1,10 +1,10 @@
 #pragma once
 
-#include "TapWindow.hpp"
-
 #include <cstdint>
 #include <string>
 #include <functional>
+
+#include "TapWindow.hpp"
 
 
 class ErrorWindow : public TapWindow
