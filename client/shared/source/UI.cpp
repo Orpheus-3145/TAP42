@@ -25,17 +25,39 @@ std::ostream& operator<<(std::ostream& out, GamePhase phase)
 }
 
 
-UI::UI(int32_t clientSocket) noexcept
+UI::UI(void) noexcept :
+	gameClientSockets{ioUtils::createSocketPair()}
 {
-	assert(clientSocket != -1 and "invalid client socket");
-
 	this->pollFds.resize(UI::POLL_SIZE);
-	this->pollFds[UI::CLIENT].fd = clientSocket;
+	this->pollFds[UI::CLIENT].fd = this->gameClientSockets.first;
+}
+
+UI::~UI(void) noexcept
+{
+	if (this->clientHTTP) this->clientHTTP->stopWorker();
+	ioUtils::closePair(this->gameClientSockets);
+}
+
+void UI::connect(std::string host, uint32_t port)
+{
+	this->clientHTTP = std::make_unique<ClientHTTP>(host, port, this->gameClientSockets.second);
+}
+
+void UI::start(void)
+{
+	this->keepAlive = true;
+	this->clientHTTP->startWorker();
+}
+
+void UI::stop(void) noexcept
+{
+	this->keepAlive = false;
+	this->clientHTTP->stopWorker();
 }
 
 void UI::writeToServer(void)
 {
-	if (this->handShakeDone == false)
+	if (this->handshakeDone == false)
 		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE);
 
 	int32_t clientSocket = this->pollFds[UI::CLIENT].fd;
@@ -115,49 +137,87 @@ void UI::handleServerData(std::string const& message)
 	if (message == INITIAL_GREETING)
 	{
 		this->doHandshake();
-		return;
+
+		if (this->connectionInterrupt == true)
+		{
+			// it means login has been done already and there's an attempt to reconnect to server
+			std::string connectionMsg = std::format("{} {}", CMD_CONNECT, this->username);
+
+			// add an error message to the queue of msg to send to game
+			if ((this->toServerSize + connectionMsg.size()) > Config::BUFF_SIZE)
+			{
+				// if buffer is full, truncate current message to make room for ERR_SERVER_DISC
+				this->toServerSize = Config::BUFF_SIZE - connectionMsg.size() - 2;
+				this->toServerBuffer[this->toServerSize++] = COMMAND_TERM;
+			}
+			::memcpy(this->toServerBuffer + this->toServerSize, connectionMsg.data(), connectionMsg.size());
+			this->toServerSize += connectionMsg.size();
+			this->toServerBuffer[this->toServerSize++] = COMMAND_TERM;
+
+			this->pollFds[UI::CLIENT].events |= POLLOUT;
+		}
 	}
-
-	switch (this->phase)
+	else if (message == ERR_SERVER_DISC)
 	{
-		case GamePhase::LOGIN:
-			if (message == LOGIN_OK)
-				this->switchWindow(GamePhase::GAME);
-			else if (message.find(S_ERR) == 0UL)
-				throw AppException(ErrorCode::UI_USERNAME_NOT_EXISTS);
-			else
-				LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
-			break;
-
-		case GamePhase::PLAYER_CREATE:
-			if (message == LOGIN_OK)
-				this->switchWindow(GamePhase::GAME);
-			else if (message.find(S_ERR) == 0UL)
-				throw AppException(ErrorCode::SERVER_ERROR, message);
-			else
-				LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
-			break;
-
-		case GamePhase::GAME:
-			if (message == QUIT_RESPONSE)
-				this->stop();
-			else if ((message.find(S_OK) == 0UL) or (message.find(S_ERR) == 0UL))
-				this->updateResponse(message);
-			else if (message.find(S_EVT) == 0UL)
-				this->updateEvent(message);
-			else
-				LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
-			break;
-
-		default:
-			break;
+		this->handshakeDone = false;
+		this->pollFds[UI::CLIENT].events = 0;
+		throw AppException(ErrorCode::SERVER_DISCONNECTED);
+	}
+	else if (message == LOGIN_OK)
+	{
+		if (this->connectionInterrupt == true)
+			this->connectionInterrupt = false;
+		this->switchWindow(GamePhase::GAME);
+	}
+	else if (message == QUIT_RESPONSE)
+	{
+		this->stop();
+	}
+	else
+	{
+		switch (this->phase)
+		{
+			case GamePhase::LOGIN:
+				if (message.find(S_ERR) == 0UL)
+					throw AppException(ErrorCode::UI_USERNAME_NOT_EXISTS);
+				else
+					LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
+				break;
+	
+			case GamePhase::PLAYER_CREATE:
+				if (message.find(S_ERR) == 0UL)
+					throw AppException(ErrorCode::SERVER_ERROR, message);
+				else
+					LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
+				break;
+	
+			case GamePhase::GAME:
+				if ((message.find(S_OK) == 0UL) or (message.find(S_ERR) == 0UL))
+					this->updateResponse(message);
+				else if (message.find(S_EVT) == 0UL)
+					this->updateEvent(message);
+				else
+					LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
+				break;
+	
+			default:
+				break;
+		}
 	}
 }
 
 void UI::doHandshake(void) noexcept
 {
-	this->handShakeDone = true;
+	this->handshakeDone = true;
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Handshake performed: {}", INITIAL_GREETING));
+}
+
+void UI::handleError(ErrorCode const& code, std::string const& errorInfo)
+{
+	LOG_ERROR(LogContext::INTERFACE, errorInfo);
+
+	if (code == ErrorCode::SERVER_DISCONNECTED)
+		this->connectionInterrupt = true;
 }
 
 void UI::handlePollError(void)
@@ -171,8 +231,7 @@ void UI::handlePollError(void)
 		int32_t sockErr = 0;
 		socklen_t len = sizeof(sockErr);
 	
-		int32_t clientSocket = this->pollFds[UI::CLIENT].fd;
-		if (ioUtils::getsockopt(clientSocket, SOL_SOCKET, SO_ERROR, &sockErr, &len) < 0)
+		if (ioUtils::getsockopt(this->pollFds[UI::CLIENT].fd, SOL_SOCKET, SO_ERROR, &sockErr, &len) < 0)
 			throw AppException(ErrorCode::IO_POLL_FAILED, std::format("getsockopt failed during POLLERR: {}", ::strerror(errno)));
 		else if (sockErr != 0)
 			throw AppException(ErrorCode::IO_POLL_FAILED, ::strerror(sockErr));
@@ -181,7 +240,7 @@ void UI::handlePollError(void)
 
 void UI::switchWindow(GamePhase newPhase)
 {
-	if ((newPhase != GamePhase::LOGIN) and (this->handShakeDone == false))
+	if ((newPhase != GamePhase::LOGIN) and (this->handshakeDone == false))
 		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE, "Can't proceed to new phase without having received the handshake from server");
 
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Starting {} session", toString(newPhase)));

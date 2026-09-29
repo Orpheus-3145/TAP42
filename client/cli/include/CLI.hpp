@@ -259,7 +259,7 @@ class CLI : public UI
 {
 	public:
 		using UI::UI;
-		CLI(int32_t clientSocket);
+		CLI(void);
 
 		virtual ~CLI(void) noexcept override;
 

@@ -10,6 +10,7 @@
 #include "Utils.hpp"
 
 
+
 class ClientHTTP
 {
 	public:
@@ -17,32 +18,36 @@ class ClientHTTP
 
 		ClientHTTP(ClientHTTP const&) = delete;
 		ClientHTTP& operator=(ClientHTTP const&) = delete;
-		ClientHTTP(ClientHTTP&) = delete;
-		ClientHTTP& operator=(ClientHTTP&) = delete;
+		ClientHTTP(ClientHTTP&&) = delete;
+		ClientHTTP& operator=(ClientHTTP&&) = delete;
 
 		~ClientHTTP(void);
 
 		bool isWorkerRunning(void) const noexcept { return this->keepAlive.load(); }
 		void startWorker(void) noexcept;
 		void stopWorker(void) noexcept;
+		void wakeUpWorker(void) const noexcept;
+		void connectToServer(void);
 
 	private:
-		void wakeUpWorker(void) const noexcept;
 		void flushPipe(void) const noexcept;
 
 		void pollLoop(void);
+		void exitPoll(void) noexcept { this->keepAlive.store(false);}
 		void handleDataFromGame(void);
 		void handleDataToGame(void);
 		void handleDataFromServer(void);
 		void handleDataToServer(void);
-		void handleGameError(void) noexcept;
-		void handleServerError(void) noexcept;
-		void exitPoll(void) noexcept { this->keepAlive.store(false);}
+		void handleGameError(void);
+		void handleServerError(void);
 
 		static constexpr size_t POLL_SIZE = 3UL;
 		static constexpr size_t PIPE = 0UL;
 		static constexpr size_t GAME = 1UL;
 		static constexpr size_t SERVER = 2UL;
+
+		std::string const	host;
+		uint32_t const		port;
 
 		ioUtils::Pipe	wakeupPipe{-1, -1};		// pipe for pollwakeup the worker	
 		struct pollfd	pollFds[POLL_SIZE];

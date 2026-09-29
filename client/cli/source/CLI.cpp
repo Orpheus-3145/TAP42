@@ -2,7 +2,6 @@
 #include "BasicTab.hpp"
 #include "Logger.hpp"
 #include "Exceptions.hpp"
-#include "Utils.hpp"
 
 #include <format>
 #include <cassert>
@@ -12,8 +11,8 @@
 #include <sys/signalfd.h>
 
 
-CLI::CLI(int32_t clientSocket) :
-	UI{clientSocket},
+CLI::CLI(void) :
+	UI(),
 	commandPipe{ioUtils::createPipe()}
 {
 	this->pollFds.resize(CLI::POLL_SIZE);
@@ -54,7 +53,7 @@ CLI::CLI(int32_t clientSocket) :
 		::init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
 		::init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
 	}
-	// // for callback (scrolling tabs) with mouse wheel
+	// for callback (scrolling tabs) with mouse wheel
     // ::mousemask(BUTTON4_PRESSED | BUTTON5_PRESSED | ALL_MOUSE_EVENTS, NULL);
     // ::mouseinterval(0);       // disable delayed click
 
@@ -87,6 +86,9 @@ void CLI::start(void)
 	UI::start();
 
 	this->switchWindow(GamePhase::LOGIN);
+
+	// this->doHandshake();
+	// this->switchWindow(GamePhase::GAME);
 
 	this->pollFds[CLI::CLIENT].events = POLLIN;
 	this->pollFds[CLI::STDIN].events = POLLIN;
@@ -153,6 +155,7 @@ void CLI::handleCommand(void)
 
 	if ((this->phase == GamePhase::LOGIN) or (this->phase == GamePhase::PLAYER_CREATE))
 	{
+		this->username = std::string(buffer, n);
 		// move to the right to insert CMD_CONNECT and a space at the beginning of the command
 		::memmove(buffer + ::strlen(CMD_CONNECT) + 1, buffer, n);
 		::memcpy(buffer + ::strlen(CMD_CONNECT), &COMMAND_SP, 1);
@@ -190,6 +193,8 @@ void CLI::switchWindow(GamePhase newPhase)
 
 void CLI::handleError(ErrorCode const& code, std::string const& errorInfo)
 {
+	UI::handleError(code, errorInfo);
+
 	if (code == ErrorCode::UI_INVALID_SIZE)		// just trigger a resize in case of this error instead of treating it
 	{
 		// currentWindow::draw() or currentWindow::resize() failed, clean the tabs half-built
@@ -209,13 +214,16 @@ void CLI::handleError(ErrorCode const& code, std::string const& errorInfo)
 
 		return;
 	}
-	else if (this->isErrorSituation())
-	{
-		LOG_ERROR(LogContext::INTERFACE, std::format("Got another error: '{}' while an error", errorInfo));
-		return;
-	}
-	else
-		LOG_ERROR(LogContext::INTERFACE, errorInfo);
+	// else if (this->isErrorSituation())
+	// {
+	// 	LOG_ERROR(LogContext::INTERFACE, std::format("Got another error: '{}' while an error", errorInfo));
+	// 	return;
+	// }
+	// else
+	//	LOG_ERROR(LogContext::INTERFACE, errorInfo);
+
+	if (this->currentWindow)
+		this->currentWindow->clear();
 
 	this->errorWin->updateDescription(errorInfo);
 	switch (code)
@@ -229,14 +237,17 @@ void CLI::handleError(ErrorCode const& code, std::string const& errorInfo)
 			this->errorWin->setAction1("CLOSE", [this] { this->stop(); });
 			this->errorWin->setAction2("BACK", [this] { this->switchWindow(this->phase); }); break;
 			break;
+		
+		case ErrorCode::SERVER_DISCONNECTED:
+			this->connectionInterrupt = true;
+			this->errorWin->setAction1("CONNECT", [this] { this->clientHTTP->wakeUpWorker(); });
+			this->errorWin->setAction2("CLOSE", [this] { this->stop(); }); break;
+			break;
 
 		default:
 			this->errorWin->setAction1("CLOSE", [this] { this->stop(); });
 			break;
 	}
-
-	if (this->currentWindow)
-		this->currentWindow->clear();
 	this->currentWindow = this->errorWin.get();
 	this->currentWindow->draw(this->height, this->width);
 
@@ -271,7 +282,7 @@ void CLI::updateEvent(std::string const& event) noexcept
 		gameWin->updateContentWindow();
 }
 
-std::unique_ptr<UI> uiFactory(int32_t clientSocket)
+std::unique_ptr<UI> uiFactory()
 {
-	return std::make_unique<CLI>(clientSocket);
+	return std::make_unique<CLI>();
 }
