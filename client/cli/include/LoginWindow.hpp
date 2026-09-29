@@ -1,8 +1,8 @@
 #pragma once
 
-#include "TapWindow.hpp"
-
 #include <cstdint>
+
+#include "TapWindow.hpp"
 
 
 class LoginWindow : public TapWindow
