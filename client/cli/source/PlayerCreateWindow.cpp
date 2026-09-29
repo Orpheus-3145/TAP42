@@ -21,13 +21,13 @@ PlayerCreateWindow::PlayerCreateWindow(int32_t commandFd) :
 
 	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(PlayerCreateWindow::INFO).get());
 	assert(tab != nullptr and "current tab doesn't support appending content");
-	tab->appendContent(" ");
-	tab->appendContent(" Enter username:", false, TextAlign::MID_ALIGN);
-	tab->appendContent(" ");
-	tab->appendContent(" ");
-	tab->appendContent(" ");
-	tab->appendContent(" ");
-	tab->appendContent("<TBD MORE STUFF TO ADD>", false, TextAlign::MID_ALIGN);
+	tab->appendContent(" ", TextAlign::LEFT, A_NORMAL, false);
+	tab->appendContent(" Enter username:", TextAlign::MID, A_BOLD, false);
+	tab->appendContent(" ", TextAlign::LEFT, A_NORMAL, false);
+	tab->appendContent(" ", TextAlign::LEFT, A_NORMAL, false);
+	tab->appendContent(" ", TextAlign::LEFT, A_NORMAL, false);
+	tab->appendContent(" ", TextAlign::LEFT, A_NORMAL, false);
+	tab->appendContent("<TBD MORE STUFF TO ADD>", TextAlign::MID, A_NORMAL, false);
 
 	this->tabsToSkip.insert(PlayerCreateWindow::FRAME);
 	this->tabsToSkip.insert(PlayerCreateWindow::INFO);

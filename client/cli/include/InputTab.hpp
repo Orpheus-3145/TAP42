@@ -7,9 +7,9 @@
 #include <cstring>
 #include <cstdint>
 
-#include <Config.hpp>
-#include <BasicTab.hpp>
-#include <TapWindow.hpp>
+#include "Config.hpp"
+#include "BasicTab.hpp"
+#include "TapWindow.hpp"
 
 
 class InputTab : public virtual BasicTab

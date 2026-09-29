@@ -211,7 +211,7 @@ void CLI::handleError(ErrorCode const& code, std::string const& errorInfo)
 	}
 	else if (this->isErrorSituation())
 	{
-		LOG_ERROR(LogContext::INTERFACE, std::format("Got error: '{}' while handling a previous error", errorInfo));
+		LOG_ERROR(LogContext::INTERFACE, std::format("Got another error: '{}' while an error", errorInfo));
 		return;
 	}
 	else
@@ -227,13 +227,7 @@ void CLI::handleError(ErrorCode const& code, std::string const& errorInfo)
 		
 		case ErrorCode::SERVER_ERROR:
 			this->errorWin->setAction1("CLOSE", [this] { this->stop(); });
-			switch (this->phase)
-			{
-				case GamePhase::LOGIN: 			this->errorWin->setAction2("BACK", [this] { this->switchWindow(GamePhase::LOGIN); }); break;
-				case GamePhase::PLAYER_CREATE:	this->errorWin->setAction2("BACK", [this] { this->switchWindow(GamePhase::PLAYER_CREATE); }); break;
-				case GamePhase::GAME:			this->errorWin->setAction2("BACK", [this] { this->switchWindow(GamePhase::GAME); }); break;
-				default: break;
-			}
+			this->errorWin->setAction2("BACK", [this] { this->switchWindow(this->phase); }); break;
 			break;
 
 		default:
@@ -258,8 +252,7 @@ void CLI::updateResponse(std::string const& response) noexcept
 	// if (response is chat type)
 	// 	gameWin->showChatMsg(response);
 	// else
-	std::string padding(::strlen(Config::PROMPT), ' ');
-	gameWin->appendResponse(padding + response);
+	gameWin->appendResponse(response);
 
 	if (this->phase == GamePhase::GAME)
 		gameWin->updateContentWindow();
