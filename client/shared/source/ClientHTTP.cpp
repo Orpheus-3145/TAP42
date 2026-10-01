@@ -22,7 +22,9 @@ ClientHTTP::ClientHTTP(std::string const& host, uint32_t port, int32_t gameSocke
 	::memset(this->pollFds, 0, ClientHTTP::POLL_SIZE * sizeof(struct pollfd));
 
 	this->pollFds[ClientHTTP::PIPE].fd = this->wakeupPipe.out;
+	this->pollFds[ClientHTTP::PIPE].events = POLLIN;
 	this->pollFds[ClientHTTP::GAME].fd = gameSocket;
+	this->pollFds[ClientHTTP::GAME].events = POLLIN;
 
 	LOG_DEBUG(LogContext::HTTP_CLIENT, std::format("Listening to game socket: {}", this->pollFds[ClientHTTP::GAME].fd));
 	LOG_DEBUG(LogContext::HTTP_CLIENT, std::format("Listening to server socket: {}", this->pollFds[ClientHTTP::SERVER].fd));
@@ -49,7 +51,7 @@ void ClientHTTP::connectToServer(void)
 
 void ClientHTTP::startWorker(void) noexcept
 {
-	this->worker = std::thread(&ClientHTTP::pollLoop, this);
+	this->worker = std::thread(&ClientHTTP::loop, this);
 	this->keepAlive.store(true);
 
 	LOG_INFO(LogContext::HTTP_CLIENT, "Started client worker");
@@ -57,9 +59,9 @@ void ClientHTTP::startWorker(void) noexcept
 
 void ClientHTTP::stopWorker(void) noexcept
 {
-	this->exitPoll();
-
+	this->exitLoop();
 	this->wakeUpWorker();
+
 	if (this->worker.joinable())
 	{
 		this->worker.join();
@@ -79,15 +81,8 @@ void ClientHTTP::flushPipe(void) const noexcept
 	ioUtils::read(this->wakeupPipe.out, &tmp, sizeof(char));
 }
 
-void ClientHTTP::pollLoop(void)
+void ClientHTTP::loop(void)
 {
-	::memset(this->gameBuffer, 0, Config::BUFF_SIZE);
-	::memset(this->serverBuffer, 0, Config::BUFF_SIZE);
-
-	this->pollFds[ClientHTTP::PIPE].events = POLLIN;
-	this->pollFds[ClientHTTP::GAME].events = POLLIN;
-	this->pollFds[ClientHTTP::SERVER].events = POLLIN;
-
 	// two directions for handling data:
 	// 1. from game to server, i.e. sending a command: GAME POLLIN -> SERVER POLLOUT
 	// 2. from server to game, i.e. receiving a response or event: SERVER POLLIN -> GAME POLLOUT
@@ -105,7 +100,7 @@ void ClientHTTP::pollLoop(void)
 				this->flushPipe();
 				if (pollFds[ClientHTTP::SERVER].events == 0)
 				{
-					LOG_WARN(LogContext::HTTP_CLIENT, "Attempt to reconnect to server... ");
+					LOG_DEBUG(LogContext::HTTP_CLIENT, "Attempt to reconnect to server... ");
 					this->connectToServer();
 				}
 			}
@@ -134,7 +129,7 @@ void ClientHTTP::pollLoop(void)
 			LOG_ERROR(LogContext::HTTP_CLIENT, e.what());
 			
 			if (e.getCode() != ErrorCode::SERVER_CONN_FAILED)
-				this->exitPoll();
+				this->exitLoop();
 		}
 	}
 }

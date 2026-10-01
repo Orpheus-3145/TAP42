@@ -32,8 +32,8 @@ class ClientHTTP
 	private:
 		void flushPipe(void) const noexcept;
 
-		void pollLoop(void);
-		void exitPoll(void) noexcept { this->keepAlive.store(false);}
+		void loop(void);
+		void exitLoop(void) noexcept { this->keepAlive.store(false);}
 		void handleDataFromGame(void);
 		void handleDataToGame(void);
 		void handleDataFromServer(void);

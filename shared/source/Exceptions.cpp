@@ -25,6 +25,7 @@ std::string mapError(ErrorCode code, std::string const& errorData) noexcept
 		case ErrorCode::UI_INVALID_SIZE:			return std::format("UI widget couldn't be drawn (newinw() failed): {}", errorData);
 		case ErrorCode::UI_HANDSHAKE_NOT_DONE:		return std::format("No handshake received before performing action", errorData);
 		case ErrorCode::UI_USERNAME_NOT_EXISTS:		return std::format("Username doesn't exist", errorData);
+		case ErrorCode::UI_USERNAME_IN_USE:			return std::format("Username already in use");
 		case ErrorCode::UI_FAILED_GET_TERM_SIZE:	return std::format("Couldn't get terminal size", errorData);
 		default:									return std::format("No error found for code: {}", errorData);
 	}

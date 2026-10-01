@@ -146,6 +146,8 @@ void InOutTab::deactivate(void)
 
 void InOutTab::terminateInput(void)
 {
+	if (this->bufferSize == 0UL)
+		return;
 	InputTab::terminateInput();
 
 	// show last input
