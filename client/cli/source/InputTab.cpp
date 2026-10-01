@@ -403,7 +403,7 @@ void InputTab::setChar(int32_t input)
 {
 	if (input != COMMAND_TERM)		// append normal char to buffer
 		this->appendInputChar(input);
-	else							// if got end msg and buffer is not empty store current command
+	else							// if got end msg and buffer is not empty store current command NB split in specific handler in dispatch
 		this->terminateInput();
 }
 

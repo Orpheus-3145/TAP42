@@ -26,7 +26,7 @@ inline constexpr const char		COMMAND_TERM = '\n';
 inline constexpr const char		COMMAND_SP = ' ';
 
 
-enum class GamePhase : uint32_t
+enum class GamePhase : uint32_t		// NB make error phase
 {
 	LOGIN = 0U,
 	PLAYER_CREATE = 1U,
@@ -56,17 +56,18 @@ class UI
 	protected:
 		void writeToServer(void);
 		void readFromServer(void);
-		void handleServerData(std::string const& message);
-		void doHandshake(void) noexcept;
 		void splitIntoMessages(void);
+		void handleMessage(std::string const& message);
+		void addMessageToServerQueue(std::string const& msg, bool forseInsert = false) noexcept;
+		void addMessageToGameQueue(std::string const& msg, bool forseInsert = false) noexcept;
 		void handlePollError(void);
-
+		
 		virtual void switchWindow(GamePhase newPhase);
 		virtual void handleCommand(void) = 0;
-		virtual void handleResize(void) = 0;
+		virtual void handleResize(void) = 0;		// NB move to CLI
 		virtual void handleError(ErrorCode const& code, std::string const& errorInfo);
-		virtual void handleServerDisconnect(void) noexcept = 0;
-
+		virtual void doHandshake(void) noexcept;
+		
 		virtual void updateResponse(std::string const& response) noexcept = 0;
 		virtual void updateEvent(std::string const& event) noexcept = 0;
 
@@ -79,19 +80,19 @@ class UI
 
 		std::string username;
 
-		bool keepAlive{false}, connectionInterrupt{false};
+		bool	keepAlive{false};
+		bool	connEstablished{false};
 
 		int32_t height{0};
 		int32_t width{0};
 
 		GamePhase	phase{GamePhase::LOGIN};
-		bool		handshakeDone{false};
 
 		size_t	toServerSize{0UL};
 		char	toServerBuffer[Config::BUFF_SIZE];
 
-		size_t	fromServerSize{0UL};
-		char	fromServerBuffer[Config::BUFF_SIZE];
+		size_t	toGameSize{0UL};
+		char	toGameBuffer[Config::BUFF_SIZE];
 };
 
 std::unique_ptr<UI> uiFactory(void);
