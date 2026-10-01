@@ -79,13 +79,14 @@ class UI
 
 		std::string username;
 
-		bool keepAlive{false}, connectionInterrupt{false};
+		bool	keepAlive{false};
+		bool	handshakeDone{false};
+		bool	connectionInterrupt{false};
 
 		int32_t height{0};
 		int32_t width{0};
 
 		GamePhase	phase{GamePhase::LOGIN};
-		bool		handshakeDone{false};
 
 		size_t	toServerSize{0UL};
 		char	toServerBuffer[Config::BUFF_SIZE];

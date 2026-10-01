@@ -105,7 +105,7 @@ void ClientHTTP::pollLoop(void)
 				this->flushPipe();
 				if (pollFds[ClientHTTP::SERVER].events == 0)
 				{
-					LOG_WARN(LogContext::HTTP_CLIENT, "Attempt to reconnect to server... ");
+					LOG_DEBUG(LogContext::HTTP_CLIENT, "Attempt to reconnect to server... ");
 					this->connectToServer();
 				}
 			}

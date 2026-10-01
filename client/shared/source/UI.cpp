@@ -163,47 +163,39 @@ void UI::handleServerData(std::string const& message)
 		this->pollFds[UI::CLIENT].events = 0;
 		throw AppException(ErrorCode::SERVER_DISCONNECTED);
 	}
-	else if (message == LOGIN_OK)
-	{
-		if (this->connectionInterrupt == true)
-			this->connectionInterrupt = false;
-		this->switchWindow(GamePhase::GAME);
-	}
+	// else if (message == LOGIN_OK)
+	// {
+	// 	if (this->connectionInterrupt == true)
+	// 		this->connectionInterrupt = false;
+	// 	this->switchWindow(GamePhase::GAME);
+	// }
 	else if (message == QUIT_RESPONSE)
 	{
 		this->stop();
 	}
-	else
+	else if (message.find(S_OK) == 0UL)
 	{
-		switch (this->phase)
-		{
-			case GamePhase::LOGIN:
-				if (message.find(S_ERR) == 0UL)
-					throw AppException(ErrorCode::UI_USERNAME_NOT_EXISTS);
-				else
-					LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
-				break;
-	
-			case GamePhase::PLAYER_CREATE:
-				if (message.find(S_ERR) == 0UL)
-					throw AppException(ErrorCode::SERVER_ERROR, message);
-				else
-					LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
-				break;
-	
-			case GamePhase::GAME:
-				if ((message.find(S_OK) == 0UL) or (message.find(S_ERR) == 0UL))
-					this->updateResponse(message);
-				else if (message.find(S_EVT) == 0UL)
-					this->updateEvent(message);
-				else
-					LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
-				break;
-	
-			default:
-				break;
-		}
+		if ((this->phase == GamePhase::LOGIN) or (this->phase == GamePhase::PLAYER_CREATE))
+			this->switchWindow(GamePhase::GAME);
+		else
+			this->updateResponse(message);
 	}
+	else if (message.find(S_EVT) == 0UL)
+	{
+		if (this->phase == GamePhase::GAME)
+			this->updateEvent(message);
+	}
+	else if (message.find(S_ERR) == 0UL)
+	{
+		if (this->phase == GamePhase::LOGIN)
+			throw AppException(ErrorCode::UI_USERNAME_NOT_EXISTS);
+		else if (this->phase == GamePhase::PLAYER_CREATE)
+			throw AppException(ErrorCode::SERVER_ERROR, message);
+		else
+			this->updateResponse(message);
+	}
+	else
+		LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
 }
 
 void UI::doHandshake(void) noexcept
