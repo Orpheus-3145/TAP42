@@ -271,6 +271,7 @@ class CLI : public UI
 		void handleCommand(void) override;
 		void handleError(ErrorCode const& code, std::string const& errorInfo) override;
 		void handleServerDisconnect(void) noexcept override {}
+		void doHandshake(void) noexcept override;
 
 		void updateResponse(std::string const& response) noexcept override;
 		void updateEvent(std::string const& event) noexcept override;

@@ -30,6 +30,9 @@ UI::UI(void) noexcept :
 {
 	this->pollFds.resize(UI::POLL_SIZE);
 	this->pollFds[UI::CLIENT].fd = this->gameClientSockets.first;
+	this->pollFds[UI::CLIENT].events = 0;
+
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Listening to client socket: {}", this->pollFds[UI::CLIENT].fd));
 }
 
 UI::~UI(void) noexcept
@@ -47,6 +50,8 @@ void UI::start(void)
 {
 	this->keepAlive = true;
 	this->clientHTTP->startWorker();
+
+	this->pollFds[UI::CLIENT].events = POLLIN;
 }
 
 void UI::stop(void) noexcept
@@ -57,7 +62,7 @@ void UI::stop(void) noexcept
 
 void UI::writeToServer(void)
 {
-	if (this->handshakeDone == false)
+	if (this->connEstablished == false)
 		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE);
 
 	int32_t clientSocket = this->pollFds[UI::CLIENT].fd;
@@ -111,71 +116,49 @@ void UI::splitIntoMessages(void)
 			break;
 
 		ssize_t lenMsg = endMsg - startMsg;
+		std::string message = std::string(startMsg, lenMsg);
+		startMsg += lenMsg + 1UL;
+		this->fromServerSize -= lenMsg + 1UL;
 
 		try
 		{
-			this->handleServerData(std::string(startMsg, lenMsg));
+			this->handleMessage(message);
 		}
 		catch(AppException const& e)
 		{
-			startMsg += lenMsg + 1UL;
-			this->fromServerSize -= lenMsg + 1UL;
 			if (this->fromServerSize > 0UL)
 				::memmove(this->fromServerBuffer, startMsg, this->fromServerSize);
 			throw e;
 		}
-
-		startMsg += lenMsg + 1UL;
-		this->fromServerSize -= lenMsg + 1UL;
 	}
 	if (this->fromServerSize > 0UL)
 		::memmove(this->fromServerBuffer, startMsg, this->fromServerSize);
 }
 
-void UI::handleServerData(std::string const& message)
+void UI::handleMessage(std::string const& message)
 {
 	if (message == INITIAL_GREETING)
 	{
 		this->doHandshake();
 
-		if (this->connectionInterrupt == true)
-		{
-			// it means login has been done already and there's an attempt to reconnect to server
-			std::string connectionMsg = std::format("{} {}", CMD_CONNECT, this->username);
-
-			// add an error message to the queue of msg to send to game
-			if ((this->toServerSize + connectionMsg.size()) > Config::BUFF_SIZE)
-			{
-				// if buffer is full, truncate current message to make room for ERR_SERVER_DISC
-				this->toServerSize = Config::BUFF_SIZE - connectionMsg.size() - 2;
-				this->toServerBuffer[this->toServerSize++] = COMMAND_TERM;
-			}
-			::memcpy(this->toServerBuffer + this->toServerSize, connectionMsg.data(), connectionMsg.size());
-			this->toServerSize += connectionMsg.size();
-			this->toServerBuffer[this->toServerSize++] = COMMAND_TERM;
-
-			this->pollFds[UI::CLIENT].events |= POLLOUT;
-		}
+		// it means login has been done already and there's an attempt to reconnect to server
+		if (this->phase == GamePhase::GAME)
+			this->addMessageToServerQueue(std::format("{} {}", CMD_CONNECT, this->username));
+		else
+			this->switchWindow(this->phase);
 	}
 	else if (message == ERR_SERVER_DISC)
 	{
-		this->handshakeDone = false;
-		this->pollFds[UI::CLIENT].events = 0;
+		this->pollFds[UI::CLIENT].events = 0;				// stop communications
 		throw AppException(ErrorCode::SERVER_DISCONNECTED);
 	}
-	// else if (message == LOGIN_OK)
-	// {
-	// 	if (this->connectionInterrupt == true)
-	// 		this->connectionInterrupt = false;
-	// 	this->switchWindow(GamePhase::GAME);
-	// }
 	else if (message == QUIT_RESPONSE)
 	{
 		this->stop();
 	}
 	else if (message.find(S_OK) == 0UL)
 	{
-		if ((this->phase == GamePhase::LOGIN) or (this->phase == GamePhase::PLAYER_CREATE))
+		if (message == LOGIN_OK)
 			this->switchWindow(GamePhase::GAME);
 		else
 			this->updateResponse(message);
@@ -190,26 +173,56 @@ void UI::handleServerData(std::string const& message)
 		if (this->phase == GamePhase::LOGIN)
 			throw AppException(ErrorCode::UI_USERNAME_NOT_EXISTS);
 		else if (this->phase == GamePhase::PLAYER_CREATE)
-			throw AppException(ErrorCode::SERVER_ERROR, message);
+			throw AppException(ErrorCode::UI_USERNAME_IN_USE);
 		else
 			this->updateResponse(message);
 	}
 	else
+	{
 		LOG_WARN(LogContext::INTERFACE, std::format("Unrecognized message: '{}'", message));
+	}
 }
 
 void UI::doHandshake(void) noexcept
 {
-	this->handshakeDone = true;
+	this->connEstablished = true;
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Handshake performed: {}", INITIAL_GREETING));
 }
 
-void UI::handleError(ErrorCode const& code, std::string const& errorInfo)
+void UI::addMessageToServerQueue(std::string const& msg, bool forceInsert) noexcept
 {
-	LOG_ERROR(LogContext::INTERFACE, errorInfo);
+	// add an error message to the queue of msg to send to game
+	if ((this->toServerSize + msg.size()) > Config::BUFF_SIZE)
+	{
+		if (forceInsert == false)
+			return;
 
-	if (code == ErrorCode::SERVER_DISCONNECTED)
-		this->connectionInterrupt = true;
+		// if buffer is full, truncate current message to make room for ERR_SERVER_DISC
+		this->toServerSize = Config::BUFF_SIZE - msg.size() - 2;
+		this->toServerBuffer[this->toServerSize++] = COMMAND_TERM;
+	}
+	::memcpy(this->toServerBuffer + this->toServerSize, msg.data(), msg.size());
+	this->toServerSize += msg.size();
+	this->toServerBuffer[this->toServerSize++] = COMMAND_TERM;
+
+	this->pollFds[UI::CLIENT].events |= POLLOUT;
+}
+
+void UI::addMessageToGameQueue(std::string const& msg, bool forceInsert) noexcept
+{
+	// add an error message to the queue of msg to send to game
+	if ((this->fromServerSize + msg.size()) > Config::BUFF_SIZE)
+	{
+		if (forceInsert == false)
+			return;
+
+		// if buffer is full, truncate current message to make room for ERR_SERVER_DISC
+		this->fromServerSize = Config::BUFF_SIZE - msg.size() - 2;
+		this->fromServerBuffer[this->fromServerSize++] = COMMAND_TERM;
+	}
+	::memcpy(this->fromServerBuffer + this->fromServerSize, msg.data(), msg.size());
+	this->fromServerSize += msg.size();
+	this->fromServerBuffer[this->fromServerSize++] = COMMAND_TERM;
 }
 
 void UI::handlePollError(void)
@@ -230,9 +243,17 @@ void UI::handlePollError(void)
 	}
 }
 
+void UI::handleError(ErrorCode const& code, std::string const& errorInfo)
+{
+	LOG_ERROR(LogContext::INTERFACE, errorInfo);
+
+	if (code == ErrorCode::SERVER_DISCONNECTED)
+		this->connEstablished = false;
+}
+
 void UI::switchWindow(GamePhase newPhase)
 {
-	if ((newPhase != GamePhase::LOGIN) and (this->handshakeDone == false))
+	if ((newPhase != GamePhase::LOGIN) and (this->connEstablished == false))
 		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE, "Can't proceed to new phase without having received the handshake from server");
 
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Starting {} session", toString(newPhase)));

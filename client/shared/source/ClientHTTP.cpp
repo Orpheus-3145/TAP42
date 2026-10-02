@@ -22,7 +22,9 @@ ClientHTTP::ClientHTTP(std::string const& host, uint32_t port, int32_t gameSocke
 	::memset(this->pollFds, 0, ClientHTTP::POLL_SIZE * sizeof(struct pollfd));
 
 	this->pollFds[ClientHTTP::PIPE].fd = this->wakeupPipe.out;
+	this->pollFds[ClientHTTP::PIPE].events = 0;
 	this->pollFds[ClientHTTP::GAME].fd = gameSocket;
+	this->pollFds[ClientHTTP::GAME].events = 0;
 
 	LOG_DEBUG(LogContext::HTTP_CLIENT, std::format("Listening to game socket: {}", this->pollFds[ClientHTTP::GAME].fd));
 	LOG_DEBUG(LogContext::HTTP_CLIENT, std::format("Listening to server socket: {}", this->pollFds[ClientHTTP::SERVER].fd));

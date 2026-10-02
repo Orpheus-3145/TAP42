@@ -56,17 +56,19 @@ class UI
 	protected:
 		void writeToServer(void);
 		void readFromServer(void);
-		void handleServerData(std::string const& message);
-		void doHandshake(void) noexcept;
 		void splitIntoMessages(void);
+		void handleMessage(std::string const& message);
+		void addMessageToServerQueue(std::string const& msg, bool forseInsert = false) noexcept;
+		void addMessageToGameQueue(std::string const& msg, bool forseInsert = false) noexcept;
 		void handlePollError(void);
-
+		
 		virtual void switchWindow(GamePhase newPhase);
 		virtual void handleCommand(void) = 0;
 		virtual void handleResize(void) = 0;
 		virtual void handleError(ErrorCode const& code, std::string const& errorInfo);
 		virtual void handleServerDisconnect(void) noexcept = 0;
-
+		virtual void doHandshake(void) noexcept;
+		
 		virtual void updateResponse(std::string const& response) noexcept = 0;
 		virtual void updateEvent(std::string const& event) noexcept = 0;
 
@@ -80,8 +82,7 @@ class UI
 		std::string username;
 
 		bool	keepAlive{false};
-		bool	handshakeDone{false};
-		bool	connectionInterrupt{false};
+		bool	connEstablished{false};
 
 		int32_t height{0};
 		int32_t width{0};
