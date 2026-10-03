@@ -36,8 +36,8 @@ PlayerCreateWindow::PlayerCreateWindow(int32_t commandFd) :
 
 void PlayerCreateWindow::draw(int32_t height, int32_t width)
 {
-	this->height = (height % 2) != 0 ? ((height / 2) * 2) : height;		// has to be multiple of 2
-	this->width = (width % 4) != 0 ? ((width / 4) * 4) : width;			// has to be multiple of 4
+	this->height = (height % 2) != 0 ? ((height / 2) * 2) : height;
+	this->width = (width % 4) != 0 ? ((width / 4) * 4) : width;
 
 	this->tabs.at(PlayerCreateWindow::FRAME)->draw(
 		this->height, 

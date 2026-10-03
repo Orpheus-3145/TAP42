@@ -20,9 +20,9 @@ ErrorWindow::ErrorWindow(void) : TapWindow()
 
 void ErrorWindow::draw(int32_t height, int32_t width)
 {
-	assert(this->tabs.find(ACTION1) != this->tabs.end() and "error window needs at least one callback set");
+	assert(this->tabs.find(ErrorWindow::ACTION1) != this->tabs.end() and "missing at least one action");
 
-	this->height = (height % 2) == 0 ? height : height - 1;		// has to be even
+	this->height = (height % 2) == 0 ? height : height - 1;
 	this->width = width;
 
 	this->tabs.at(ErrorWindow::FRAME)->draw(
@@ -92,11 +92,12 @@ void ErrorWindow::clear(void) noexcept
 	curs_set(1);
 }
 
-void ErrorWindow::updateDescription(std::string const& description)
+void ErrorWindow::setErrorInfo(std::string const& description)
 {
 	OutputTab* descTab = dynamic_cast<OutputTab*>(this->tabs.at(ErrorWindow::INFO).get());
 	assert(descTab != nullptr and "current tab doesn't support appending content");
 
+	descTab->clearContent();
 	descTab->appendContent(" ", TextAlign::LEFT, A_NORMAL, false);
 	descTab->appendContent(description, TextAlign::MID, A_NORMAL, false);
 }

@@ -36,7 +36,7 @@ class InOutTab : public InputTab, public OutputTab
 		void activate(void) override;
 		void deactivate(void) override;
 
-		void terminateInput(void) override;
+		void terminateCommand(void) override;
 
 	protected:
 		WINDOW*	inputFrame{nullptr};

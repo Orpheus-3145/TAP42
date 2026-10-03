@@ -266,21 +266,17 @@ class CLI : public UI
 		void start(void) override;
 
 	private:
-		void switchWindow(GamePhase newPhase) override;
-		void handleResize(void) override;
-		void handleCommand(void) override;
-		void handleError(ErrorCode const& code, std::string const& errorInfo) override;
-		void doHandshake(void) noexcept override;
+		void handleResize(void);
 
-		void updateResponse(std::string const& response) noexcept override;
-		void updateEvent(std::string const& event) noexcept override;
+		void shakeHands(void) noexcept override;
+		void switchWindow(GamePhase newPhase) override;
+		void handleError(ErrorData& error) override;
+		void handleResponse(std::string const& response) noexcept override;
+		void handleEvent(std::string const& event) noexcept override;
 
 		static constexpr size_t POLL_SIZE = 4UL;
-		static constexpr size_t RESIZE = 1UL;
-		static constexpr size_t STDIN = 2UL;
-		static constexpr size_t CMD = 3UL;		// NB move in UI
-
-		ioUtils::Pipe commandPipe;
+		static constexpr size_t RESIZE = 2UL;
+		static constexpr size_t STDIN = 3UL;
 
 		std::unique_ptr<LoginWindow>		loginWin;
 		std::unique_ptr<PlayerCreateWindow>	newPlayerWin;

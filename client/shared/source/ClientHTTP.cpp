@@ -128,7 +128,7 @@ void ClientHTTP::loop(void)
 		{
 			LOG_ERROR(LogContext::HTTP_CLIENT, e.what());
 			
-			if (e.getCode() != ErrorCode::SERVER_CONN_FAILED)
+			if (e.getError().code != ErrorCode::SERVER_CONN_FAILED)
 				this->exitLoop();
 		}
 	}

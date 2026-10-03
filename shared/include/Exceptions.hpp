@@ -30,17 +30,29 @@ enum class ErrorCode : uint32_t
 	UI_USERNAME_NOT_EXISTS = 17U,
 	UI_USERNAME_IN_USE = 18U,
 	UI_FAILED_GET_TERM_SIZE = 19U,
+	UI_DOUBLE_ERROR = 20U,
 };
 
+struct ErrorData
+{
+	ErrorCode	code;
+	std::string	info;
+};
 
-std::string mapError(ErrorCode code, std::string const& errorData) noexcept;
+std::string mapError(ErrorData const& error) noexcept;
 
 class AppException : public std::runtime_error {
 	public:
-		explicit AppException(ErrorCode code, std::string const& errorData = "") noexcept;
+		AppException(ErrorData const& error) noexcept :
+			std::runtime_error(mapError(error)),
+			errData{error} {}
+		AppException(ErrorCode	code, std::string const& info = "") noexcept :
+			std::runtime_error(mapError({code, info})),
+			errData{ErrorData{code, info}} {}
 
-		ErrorCode	getCode(void) const noexcept { return this->code; }
+		ErrorData const&	getError(void) const noexcept { return this->errData; }
+		ErrorData&			getError(void) noexcept { return this->errData; }
 
 	private:
-		ErrorCode code;
+		ErrorData errData;
 };

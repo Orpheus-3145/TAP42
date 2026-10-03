@@ -19,6 +19,7 @@ forwardInputFd{forwardInputFd},
 	hints{hints},
 	prompt{prompt}
 {
+	this->dispatcher[COMMAND_TERM]  = [this] { this->terminateCommand(); };
 	this->dispatcher[KEY_LEFT]      = [this] { this->moveCursorLeft(); };
 	this->dispatcher[KEY_RIGHT]     = [this] { this->moveCursorRight(); };
 	this->dispatcher[KEY_HOME]      = [this] { this->moveStartLine(); };
@@ -329,7 +330,7 @@ void InputTab::handleUserInput(void)
 	}
 
 	// Default handling
-	this->setChar(inputChar);
+	this->appendInputChar(inputChar);
 }
 
 void InputTab::updateHints(void) noexcept
@@ -399,14 +400,6 @@ void InputTab::deactivate(void)
 	this->writePromptLine();
 }
 
-void InputTab::setChar(int32_t input)
-{
-	if (input != COMMAND_TERM)		// append normal char to buffer
-		this->appendInputChar(input);
-	else							// if got end msg and buffer is not empty store current command NB split in specific handler in dispatch
-		this->terminateInput();
-}
-
 void InputTab::appendInputChar(int32_t input)
 {
 	if (this->bufferSize >= Config::CMD_BUFFER_SIZE)
@@ -444,7 +437,7 @@ void InputTab::appendInputChar(int32_t input)
 	}
 }
 
-void InputTab::terminateInput(void)
+void InputTab::terminateCommand(void)
 {
 	if (this->bufferSize == 0UL)
 		return;
