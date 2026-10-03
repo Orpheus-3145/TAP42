@@ -55,10 +55,9 @@ class InputTab : public virtual BasicTab
 		void activate(void) override;
 		void deactivate(void) override;
 
-		void setChar(int32_t input);
+		void appendInputChar(int32_t input);
 
-		virtual void appendInputChar(int32_t input);
-		virtual void terminateInput(void);
+		virtual void terminateCommand(void);
 
 	protected:
 		void updateHints(void) noexcept;

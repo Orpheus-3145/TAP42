@@ -39,7 +39,7 @@ int32_t main(int32_t argc, char** argv)
 	}
 	catch (AppException const& err)
 	{
-		if (err.getCode() == ErrorCode::BAD_FORMAT_ARGS)
+		if (err.getError().code == ErrorCode::BAD_FORMAT_ARGS)
 		{
 			std::cout << HOW_TO << std::endl;
 			return (EXIT_SUCCESS);

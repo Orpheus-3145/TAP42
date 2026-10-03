@@ -144,12 +144,12 @@ void InOutTab::deactivate(void)
 	InputTab::deactivate();
 }
 
-void InOutTab::terminateInput(void)
+void InOutTab::terminateCommand(void)
 {
 	if (this->bufferSize == 0UL)
 		return;
-	InputTab::terminateInput();
 
+	InputTab::terminateCommand();
 	// show last input
 	this->appendContent(this->prompt + this->inputHistory.front());
 	this->updateContent();

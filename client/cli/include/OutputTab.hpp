@@ -69,7 +69,7 @@ class OutputTab : public virtual BasicTab
 		virtual void	printLine(TabMessage const& content) const noexcept;
 		void			printLine(std::string const& newContent) const noexcept { this->printLine(TabMessage{newContent}); }
 
-		void clearContent(void) noexcept { this->state.clear(); }
+		void clearContent(void) noexcept { this->state.clear(); this->topLineScroll = 0UL; }
 
 	protected:
 		WINDOW*	titleWin{nullptr};

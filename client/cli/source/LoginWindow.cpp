@@ -31,8 +31,8 @@ LoginWindow::LoginWindow(int32_t commandFd) :
 
 void LoginWindow::draw(int32_t height, int32_t width)
 {
-	this->height = (height % 3) != 0 ? ((height / 3) * 3) : height;		// has to be multiple of 3
-	this->width = (width % 4) != 0 ? ((width / 4) * 4) : width;			// has to be multiple of 4
+	this->height = (height % 3) != 0 ? ((height / 3) * 3) : height;
+	this->width = (width % 4) != 0 ? ((width / 4) * 4) : width;
 
 	this->tabs.at(LoginWindow::FRAME)->draw(
 		this->height, 

@@ -53,12 +53,12 @@ GUI::~GUI(void) noexcept
 	this->app.reset();
 }
 
-void GUI::updateResponse(std::string const& response) noexcept
+void GUI::handleResponse(std::string const& response) noexcept
 {
 	this->gameWin->appendResponse(QString::fromStdString(response));
 }
 
-void GUI::updateEvent(std::string const& event) noexcept
+void GUI::handleEvent(std::string const& event) noexcept
 {
 	this->gameWin->appendEvent(QString::fromStdString(event));
 }

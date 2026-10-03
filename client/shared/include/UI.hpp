@@ -26,11 +26,13 @@ inline constexpr const char		COMMAND_TERM = '\n';
 inline constexpr const char		COMMAND_SP = ' ';
 
 
-enum class GamePhase : uint32_t		// NB make error phase
+enum class GamePhase : uint32_t
 {
-	LOGIN = 0U,
-	PLAYER_CREATE = 1U,
-	GAME = 2U,
+	ND = 0U,
+	LOGIN = 1U,
+	PLAYER_CREATE = 2U,
+	GAME = 3U,
+	ERROR = 4U,
 };
 
 std::string toString(GamePhase phase);
@@ -58,25 +60,24 @@ class UI
 		void readFromServer(void);
 		void splitIntoMessages(void);
 		void handleMessage(std::string const& message);
-		void addMessageToServerQueue(std::string const& msg, bool forseInsert = false) noexcept;
-		void addMessageToGameQueue(std::string const& msg, bool forseInsert = false) noexcept;
 		void handlePollError(void);
 		
+		virtual void shakeHands(void) noexcept;
 		virtual void switchWindow(GamePhase newPhase);
-		virtual void handleCommand(void) = 0;
-		virtual void handleResize(void) = 0;		// NB move to CLI
-		virtual void handleError(ErrorCode const& code, std::string const& errorInfo);
-		virtual void doHandshake(void) noexcept;
-		
-		virtual void updateResponse(std::string const& response) noexcept = 0;
-		virtual void updateEvent(std::string const& event) noexcept = 0;
+		virtual void handleCommand(void);
+		virtual void handleResponse(std::string const& response) noexcept = 0;
+		virtual void handleEvent(std::string const& event) noexcept = 0;
+		virtual void handleError(ErrorData& error);
 
-		static constexpr size_t POLL_SIZE = 1UL;
+		static constexpr size_t POLL_SIZE = 2UL;
 		static constexpr size_t CLIENT = 0UL;
+		static constexpr size_t CMD = 1UL;
 
-		ioUtils::SocketPair			gameClientSockets;
-		std::unique_ptr<ClientHTTP>	clientHTTP;
 		std::vector<struct pollfd>	pollFds;
+		ioUtils::SocketPair			gameClientSockets;
+		ioUtils::Pipe				commandPipe;
+	
+		std::unique_ptr<ClientHTTP>	clientHTTP;
 
 		std::string username;
 

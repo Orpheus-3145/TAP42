@@ -11,17 +11,13 @@
 #include <sys/signalfd.h>
 
 
-CLI::CLI(void) :
-	UI(),
-	commandPipe{ioUtils::createPipe()}
+CLI::CLI(void) : UI()
 {
 	this->pollFds.resize(CLI::POLL_SIZE);
-	this->pollFds[CLI::RESIZE].fd = ioUtils::createSignalRedirectFd(SIGWINCH);
+	this->pollFds[CLI::RESIZE].fd = ioUtils::createSignalRedirectFd(SIGWINCH);	// redirected signal resize to this fd
 	this->pollFds[CLI::RESIZE].events = POLLIN;
 	this->pollFds[CLI::STDIN].fd = STDIN_FILENO;		// to handle any user input
-	this->pollFds[CLI::STDIN].events = POLLIN;
-	this->pollFds[CLI::CMD].fd = this->commandPipe.out;	// to send a full command to client
-	this->pollFds[CLI::CMD].events = POLLIN;
+	this->pollFds[CLI::STDIN].events = 0;
 
 	struct winsize termSize;
 	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
@@ -80,7 +76,6 @@ CLI::~CLI(void) noexcept
 	::endwin();
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Cleaned Ncurses data"));
 
-	ioUtils::closePipe(this->commandPipe);
 	ioUtils::close(this->pollFds[CLI::RESIZE].fd);
 }
 
@@ -107,19 +102,20 @@ void CLI::start(void)
 			// handle error
 			if (this->pollFds[CLI::CLIENT].revents & (POLLHUP | POLLERR | POLLNVAL))
 				this->handlePollError();
-			// user type input
-			if (this->pollFds[CLI::STDIN].revents & POLLIN)
-				this->currentWindow->handleUserInput();
-			// resize window
-			if (this->pollFds[CLI::RESIZE].revents & POLLIN)
-				this->handleResize();
 			// read command from UI (and forward it to server)
 			if (this->pollFds[CLI::CMD].revents & POLLIN)
 				this->handleCommand();
+			// resize window
+			if (this->pollFds[CLI::RESIZE].revents & POLLIN)
+				this->handleResize();
+			// user type input
+			if (this->pollFds[CLI::STDIN].revents & POLLIN)
+				this->currentWindow->handleUserInput();
 		}
 		catch (AppException const& e)
 		{
-			this->handleError(e.getCode(), e.what());
+			ErrorData err = e.getError();
+			this->handleError(err);
 		}
 	}
 	LOG_INFO(LogContext::INTERFACE, "CLI stopped");
@@ -145,33 +141,19 @@ void CLI::handleResize(void)
 		this->currentWindow->resize(this->height, this->width);
 }
 
-void CLI::handleCommand(void)
+void CLI::shakeHands(void) noexcept
 {
-	char buffer[Config::BUFF_SIZE];
-	ssize_t n = ioUtils::read(this->pollFds[CMD].fd, buffer, Config::BUFF_SIZE);
+	UI::shakeHands();
 
-	if ((this->phase == GamePhase::LOGIN) or (this->phase == GamePhase::PLAYER_CREATE))
-	{
-		this->username = std::string(buffer, n);
-		// move to the right to insert CMD_CONNECT and a space at the beginning of the command
-		::memmove(buffer + ::strlen(CMD_CONNECT) + 1, buffer, n);
-		::memcpy(buffer + ::strlen(CMD_CONNECT), &COMMAND_SP, 1);
-		::memcpy(buffer, CMD_CONNECT, ::strlen(CMD_CONNECT));
-		n += ::strlen(CMD_CONNECT) + 1;
-	}
-	buffer[n++] = COMMAND_TERM;
-
-	// store formatted command, ready to be sent to client
-	::memcpy(this->toServerBuffer + this->toServerSize, buffer, n);
-	this->toServerSize += n;
-	this->pollFds[CLI::CLIENT].events |= POLLOUT;
+	::flushinp();		// flush what might have been typed between window creation and handshake
+	this->pollFds[CLI::STDIN].events = POLLIN;
 }
 
 void CLI::switchWindow(GamePhase newPhase)
 {
 	UI::switchWindow(newPhase);
 
-	if (this->currentWindow)
+	if (this->currentWindow and (newPhase != GamePhase::ERROR))
 		this->currentWindow->clear();
 
 	switch (newPhase)
@@ -179,17 +161,15 @@ void CLI::switchWindow(GamePhase newPhase)
 		case GamePhase::LOGIN:			this->currentWindow = this->loginWin.get(); break;
 		case GamePhase::PLAYER_CREATE:	this->currentWindow = this->newPlayerWin.get(); break;
 		case GamePhase::GAME:			this->currentWindow = this->gameWin.get(); break;
+		case GamePhase::ERROR:			this->currentWindow = this->errorWin.get(); break;
 		default:						break;
 	}
 	this->currentWindow->draw(this->height, this->width);
-	
-	if (this->toServerSize > 0UL)
-		this->pollFds[CLI::CLIENT].events |= POLLOUT;
 }
 
-void CLI::handleError(ErrorCode const& code, std::string const& errorInfo)
+void CLI::handleError(ErrorData& error)
 {
-	if (code == ErrorCode::UI_INVALID_SIZE)		// trigger a resize
+	if (error.code == ErrorCode::UI_INVALID_SIZE)		// trigger a resize
 	{
 		// currentWindow::draw() or currentWindow::resize() failed, clean the tabs half-built
 		this->currentWindow->clear();
@@ -202,12 +182,19 @@ void CLI::handleError(ErrorCode const& code, std::string const& errorInfo)
 		LOG_WARN(LogContext::INTERFACE, std::format("Window too small, triggering resize to h: {}, w: {}", height, width));
 		return;
 	}
+	UI::handleError(error);
 
-	if (this->currentWindow)
-		this->currentWindow->clear();
+	if (this->phase == GamePhase::ERROR)
+	{
+		// if there's another error happeing already just print message and
+		// stop session
+		error.info = mapError(error);
+		error.code = ErrorCode::UI_DOUBLE_ERROR;
+	}
 
-	this->errorWin->updateDescription(errorInfo);
-	switch (code)
+	this->errorWin->clear();
+	this->errorWin->setErrorInfo(mapError(error));
+	switch (error.code)
 	{
 		case ErrorCode::UI_USERNAME_NOT_EXISTS:
 			this->errorWin->setAction1("RETRY", [this] { this->switchWindow(GamePhase::LOGIN); });
@@ -218,38 +205,32 @@ void CLI::handleError(ErrorCode const& code, std::string const& errorInfo)
 			break;
 
 		case ErrorCode::UI_USERNAME_IN_USE:
-			this->errorWin->setAction1("RETRY", [this] { this->switchWindow(GamePhase::PLAYER_CREATE); }); break;
+			this->errorWin->setAction1("RETRY", [this] { this->switchWindow(GamePhase::PLAYER_CREATE); });
 			break;
 
 		case ErrorCode::SERVER_ERROR:
 			this->errorWin->setAction1("CLOSE", [this] { this->stop(); });
-			this->errorWin->setAction2("BACK", [this] { this->switchWindow(this->phase); }); break;
+			this->errorWin->setAction2("BACK", [this] {
+				GamePhase previous = this->errorWin->getPreviousPhase();
+				this->switchWindow(previous);
+			});
 			break;
 		
 		case ErrorCode::SERVER_DISCONNECTED:
 			this->errorWin->setAction1("CONNECT", [this] { this->clientHTTP->wakeUpWorker(); });
-			this->errorWin->setAction2("CLOSE", [this] { this->stop(); }); break;
+			this->errorWin->setAction2("CLOSE", [this] { this->stop(); });
 			break;
 
 		default:
 			this->errorWin->setAction1("CLOSE", [this] { this->stop(); });
 			break;
 	}
-	this->currentWindow = this->errorWin.get();
-	this->currentWindow->draw(this->height, this->width);
-
-	UI::handleError(code, errorInfo);
+	this->errorWin->setPreviousPhase(this->phase);
+	LOG_DEBUG(LogContext::INTERFACE, std::format("pushing: {}", mapError(error)));
+	this->switchWindow(GamePhase::ERROR);
 }
 
-void CLI::doHandshake(void) noexcept
-{
-	UI::doHandshake();
-
-	::flushinp();		// flush what might have been typed between window creation and handshake
-	this->pollFds[CLI::STDIN].events = POLLIN;
-}
-
-void CLI::updateResponse(std::string const& response) noexcept
+void CLI::handleResponse(std::string const& response) noexcept
 {
 	GameWindow* gameWin = dynamic_cast<GameWindow*>(this->gameWin.get());
 	assert(gameWin != nullptr and "current window doesn't support handling a response");
@@ -263,7 +244,7 @@ void CLI::updateResponse(std::string const& response) noexcept
 		gameWin->updateContentWindow();
 }
 
-void CLI::updateEvent(std::string const& event) noexcept
+void CLI::handleEvent(std::string const& event) noexcept
 {
 	GameWindow* gameWin = dynamic_cast<GameWindow*>(this->gameWin.get());
 	assert(gameWin != nullptr and "current window doesn't support handling an event");

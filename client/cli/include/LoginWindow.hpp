@@ -18,6 +18,7 @@ class LoginWindow : public TapWindow
 		static constexpr size_t FRAME = 0UL;
 		static constexpr size_t INFO = 1UL;
 		static constexpr size_t USERNAME = 2UL;
+		// NB add 2 btns: create_new | ?
 
 		int32_t commandFd;
 };
