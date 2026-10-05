@@ -22,6 +22,7 @@ static std::vector<std::string> CMD_HINTS
 	"QUEST",
 	"QUESTS",
 	"QUIT"
+	// "USE" custom command
 };
 
 static std::vector<std::string> CHAT_CMD_HINTS
