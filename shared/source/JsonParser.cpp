@@ -4,6 +4,8 @@
 
 #include <cctype>
 #include <cstdlib>
+#include <cassert>
+#include <format>
 
 namespace {
 
@@ -223,4 +225,61 @@ int JsonValue::as_int() const { return type == Type::Number ? static_cast<int>(n
 bool parse_json(const std::string& text, JsonValue& out, std::string& error) {
     Parser parser(text);
     return parser.parse(out, error);
+}
+
+static std::string scalarToString(JsonValue const& json);
+static std::string stringifyJsonObject(JsonValue const& json, std::string const& indent = "");
+static std::string stringifyJsonArray(JsonValue const& json, std::string const& indent = "");
+
+std::string JsonValue::toString() const
+{
+    std::string out;
+    switch (type) {
+        case Type::Object: out = stringifyJsonObject(*this); break;
+        case Type::Array:  out = stringifyJsonArray(*this);  break;
+        case Type::Null:   return "";
+        default:           return scalarToString(*this);
+    }
+    if (!out.empty() && out.back() == '\n')
+        out.pop_back(); // no final new line
+    return out;
+}
+
+std::string scalarToString(JsonValue const& json) {
+    switch (json.type) {
+        case JsonValue::Type::Bool:   return json.bool_value ? "true" : "false";
+        case JsonValue::Type::Number: return std::format("{}", json.number_value);
+        case JsonValue::Type::String: return json.string_value;
+        default:                      return "null";
+    }
+}
+
+std::string stringifyJsonObject(JsonValue const& json, std::string const& indent)
+{
+    assert(json.is_object() and "json is not an object");
+
+    std::string out;
+    for (auto const& [key, value] : json.object_value) {
+        switch (value.type) {
+            case JsonValue::Type::Object: out += std::format("{}{}:\n{}", indent, key, stringifyJsonObject(value, indent + "\t")); break;
+            case JsonValue::Type::Array:  out += std::format("{}{}:\n{}", indent, key, stringifyJsonArray(value, indent + "\t")); break;
+            default:                      out += std::format("{}{}: {}\n", indent, key, scalarToString(value)); break;
+        }
+    }
+    return out;
+}
+
+std::string stringifyJsonArray(JsonValue const& json, std::string const& indent)
+{
+    assert(json.is_array() and "json is not an array");
+
+    std::string out;
+    for (JsonValue const& entry : json.array_value) {
+        switch (entry.type) {
+            case JsonValue::Type::Object: out += std::format("{}-\n{}", indent, stringifyJsonObject(entry, indent + "\t")); break;
+            case JsonValue::Type::Array:  out += std::format("{}-\n{}", indent, stringifyJsonArray(entry, indent + "\t")); break;
+            default:                      out += std::format("{}- {}\n", indent, scalarToString(entry)); break;
+        }
+    }
+    return out;
 }

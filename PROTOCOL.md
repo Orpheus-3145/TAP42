@@ -30,7 +30,7 @@ durante la partita.
 |---|---|---|
 | Client → Server | `<COMANDO> <args...>` | `MOVE north` |
 | Server → Client (risposta sincrona) | `OK ...` / `ERR <code> <msg>` | `OK room=loc.bakery` |
-| Server → Client (evento asincrono) | `EVT <categoria> <sottotipo> <args...>` | `EVT ROOM PRESENCE ENTER alice` |
+| Server → Client (evento asincrono) | `EVT <categoria> <sottotipo> <args...>` | `EVT ROOM PRESENCE_ENTER alice` |
 
 Ogni comando riceve esattamente una risposta OK/ERR. Gli EVT arrivano in
 qualsiasi momento; il client deve distinguerli dalla risposta pendente senza
@@ -85,8 +85,8 @@ S: ERR ERR_NO_EXIT ...
 ```
 Eventi broadcast (vecchia e nuova stanza):
 ```
-EVT ROOM PRESENCE LEAVE <player>
-EVT ROOM PRESENCE ENTER <player>
+EVT ROOM PRESENCE_LEAVE <player>
+EVT ROOM PRESENCE_ENTER <player>
 ```
 
 ### CHAT
@@ -146,10 +146,10 @@ S: ERR ERR_DEAD ...   # il player attaccante è già a 0 HP
 Broadcast:
 ```
 EVT ROOM COMBAT <attacker> <target> <damage> <target_hp_remaining>
-EVT ROOM COMBAT_DEATH <npc_id>              # se l'NPC muore
-EVT ROOM COMBAT_DEATH <player>              # se il player muore
-EVT ROOM PRESENCE LEAVE <player>            # respawn: uscita dalla stanza vecchia
-EVT ROOM PRESENCE ENTER <player>            # respawn: ingresso nella stanza sicura
+EVT ROOM COMBAT_DEATH_NPC <npc_id>          # se l'NPC muore
+EVT ROOM COMBAT_DEATH_PLAYER <player>       # se il player muore
+EVT ROOM PRESENCE_LEAVE <player>            # respawn: uscita dalla stanza vecchia
+EVT ROOM PRESENCE_ENTER <player>            # respawn: ingresso nella stanza sicura
 ```
 
 **Design choice — combattimento**: risolto in modo atomico per ogni comando
@@ -221,7 +221,7 @@ S: ERR ERR_QUEST_NOT_FOUND ...
 ```
 Evento broadcast al solo player interessato quando una quest si completa:
 ```
-EVT QUEST COMPLETE <player> <quest_id>
+EVT ROOM QUEST_COMPLETE <player> <quest_id>
 ```
 **Design choice — progressione**: due tipi di quest, `fetch` (si completa al
 `TAKE` dell'item target, un solo `target_id`) e `defeat` (si completa quando
@@ -277,7 +277,7 @@ rimosso automaticamente dal proprio gruppo (con relativo `EVT GROUP LEAVE`).
 C: QUIT
 S: OK bye
 (connessione chiusa dal server)
-EVT ROOM PRESENCE LEAVE <player>
+EVT ROOM PRESENCE_LEAVE <player>
 EVT GROUP LEAVE <player>   # se il player era in un gruppo
 ```
 

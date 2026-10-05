@@ -7,7 +7,7 @@
 #include <sstream>
 
 #include "logging/logger.hpp"
-#include "world/json.hpp"
+#include "JsonParser.hpp"
 #include "world/world.hpp"
 
 namespace {

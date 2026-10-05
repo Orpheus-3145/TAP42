@@ -27,7 +27,7 @@ bool all_defeat_targets_dead_locked(const Quest& quest) {
 void complete_quest_and_notify(const std::string& player_id, const std::string& quest_id,
                                 const std::string& trigger, const std::string& trigger_ref) {
     auto session = SessionRegistry::instance().get(player_id);
-    if (session) send_line(*session, "EVT QUEST COMPLETE " + player_id + " " + quest_id);
+    if (session) send_line(*session, "EVT ROOM QUEST_COMPLETE " + player_id + " " + quest_id);
     log_info("quest_completed",
              {{"player", player_id}, {"quest", quest_id}, {"trigger", trigger}, {"ref", trigger_ref}});
 }
