@@ -1,10 +1,16 @@
 #include "TapWindow.hpp"
 #include "BasicTab.hpp"
 #include "Logger.hpp"
+#include "UI.hpp"
 
 #include <cassert>
 #include <format>
 
+
+TapWindow::TapWindow(UI* engine) noexcept : engine{engine}
+{
+	assert(engine != nullptr and "Null pointer for engine instance received");
+}
 
 TapWindow::~TapWindow(void) noexcept
 {

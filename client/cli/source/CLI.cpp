@@ -56,10 +56,10 @@ CLI::CLI(void) : UI()
     // ::mousemask(BUTTON4_PRESSED | BUTTON5_PRESSED | ALL_MOUSE_EVENTS, NULL);
     // ::mouseinterval(0);       // disable delayed click
 
-	this->loginWin = std::make_unique<LoginWindow>(this->commandPipe.in);
-	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(this->commandPipe.in);
-	this->gameWin = std::make_unique<GameWindow>(this->commandPipe.in);
-	this->errorWin = std::make_unique<ErrorWindow>();
+	this->loginWin = std::make_unique<LoginWindow>(this->commandPipe.in, this);
+	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(this->commandPipe.in, this);
+	this->gameWin = std::make_unique<GameWindow>(this->commandPipe.in, this);
+	this->errorWin = std::make_unique<ErrorWindow>(this);
 
 	LOG_INFO(LogContext::INTERFACE, "Done setup CLI");
 }
@@ -149,24 +149,6 @@ void CLI::shakeHands(void) noexcept
 	this->pollFds[CLI::STDIN].events = POLLIN;
 }
 
-void CLI::switchWindow(GamePhase newPhase)
-{
-	UI::switchWindow(newPhase);
-
-	if (this->currentWindow and (newPhase != GamePhase::ERROR))
-		this->currentWindow->clear();
-
-	switch (newPhase)
-	{
-		case GamePhase::LOGIN:			this->currentWindow = this->loginWin.get(); break;
-		case GamePhase::PLAYER_CREATE:	this->currentWindow = this->newPlayerWin.get(); break;
-		case GamePhase::GAME:			this->currentWindow = this->gameWin.get(); break;
-		case GamePhase::ERROR:			this->currentWindow = this->errorWin.get(); break;
-		default:						break;
-	}
-	this->currentWindow->draw(this->height, this->width);
-}
-
 void CLI::handleError(ErrorData& error)
 {
 	if (error.code == ErrorCode::UI_INVALID_SIZE)		// trigger a resize
@@ -186,47 +168,14 @@ void CLI::handleError(ErrorData& error)
 
 	if (this->phase == GamePhase::ERROR)
 	{
-		// if there's another error happeing already just print message and
+		// if there's another error happening already just print message and
 		// stop session
 		error.info = mapError(error);
 		error.code = ErrorCode::UI_DOUBLE_ERROR;
 	}
 
-	this->errorWin->clear();
-	this->errorWin->setErrorInfo(mapError(error));
-	switch (error.code)
-	{
-		case ErrorCode::UI_USERNAME_NOT_EXISTS:
-			this->errorWin->setAction1("RETRY", [this] { this->switchWindow(GamePhase::LOGIN); });
-			this->errorWin->setAction2("CREATE NEW", [this] {
-				this->username = "";
-				this->switchWindow(GamePhase::PLAYER_CREATE);
-			});
-			break;
-
-		case ErrorCode::UI_USERNAME_IN_USE:
-			this->errorWin->setAction1("RETRY", [this] { this->switchWindow(GamePhase::PLAYER_CREATE); });
-			break;
-
-		case ErrorCode::SERVER_ERROR:
-			this->errorWin->setAction1("CLOSE", [this] { this->stop(); });
-			this->errorWin->setAction2("BACK", [this] {
-				GamePhase previous = this->errorWin->getPreviousPhase();
-				this->switchWindow(previous);
-			});
-			break;
-		
-		case ErrorCode::SERVER_DISCONNECTED:
-			this->errorWin->setAction1("CONNECT", [this] { this->clientHTTP->wakeUpWorker(); });
-			this->errorWin->setAction2("CLOSE", [this] { this->stop(); });
-			break;
-
-		default:
-			this->errorWin->setAction1("CLOSE", [this] { this->stop(); });
-			break;
-	}
+	this->errorWin->adaptWinToError(error);
 	this->errorWin->setPreviousPhase(this->phase);
-	LOG_DEBUG(LogContext::INTERFACE, std::format("pushing: {}", mapError(error)));
 	this->switchWindow(GamePhase::ERROR);
 }
 
@@ -255,6 +204,24 @@ void CLI::handleEvent(std::string const& event) noexcept
 	gameWin->appendEvent(event);
 	if (this->phase == GamePhase::GAME)
 		gameWin->updateContentWindow();
+}
+
+void CLI::switchWindow(GamePhase newPhase)
+{
+	UI::switchWindow(newPhase);
+
+	if (this->currentWindow and (newPhase != GamePhase::ERROR))
+		this->currentWindow->clear();
+
+	switch (newPhase)
+	{
+		case GamePhase::LOGIN:			this->currentWindow = this->loginWin.get(); break;
+		case GamePhase::PLAYER_CREATE:	this->currentWindow = this->newPlayerWin.get(); break;
+		case GamePhase::GAME:			this->currentWindow = this->gameWin.get(); break;
+		case GamePhase::ERROR:			this->currentWindow = this->errorWin.get(); break;
+		default:						break;
+	}
+	this->currentWindow->draw(this->height, this->width);
 }
 
 std::unique_ptr<UI> uiFactory()

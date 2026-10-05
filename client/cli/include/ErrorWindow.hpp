@@ -11,7 +11,9 @@
 class ErrorWindow : public TapWindow
 {
 	public:
-		ErrorWindow(void);
+		using TapWindow::TapWindow;
+
+		ErrorWindow(UI* engine);
 
 		virtual ~ErrorWindow(void) noexcept { this->clear(); }
 
@@ -21,7 +23,7 @@ class ErrorWindow : public TapWindow
 		void		setPreviousPhase(GamePhase phase) noexcept { this->previousPhase = phase; }
 		GamePhase	getPreviousPhase(void) const noexcept { return this->previousPhase; }
 
-		void setErrorInfo(std::string const& description);
+		void adaptWinToError(ErrorData& error) noexcept;
 		void setAction1(std::string const& actionName, std::function<void()> action);
 		void setAction2(std::string const& actionName, std::function<void()> action);
 

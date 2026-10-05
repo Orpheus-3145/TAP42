@@ -38,7 +38,7 @@ class GameWindow : public TapWindow
 	public:
 		using TapWindow::TapWindow;
 
-		GameWindow(int32_t commandFd);
+		GameWindow(int32_t commandFd, UI* engine);
 
 		virtual ~GameWindow(void) noexcept { this->clear(); }
 

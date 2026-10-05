@@ -8,7 +8,9 @@
 class LoginWindow : public TapWindow
 {
 	public:
-		LoginWindow(int32_t commandFd);
+		using TapWindow::TapWindow;
+
+		LoginWindow(int32_t commandFd, UI* engine);
 
 		virtual ~LoginWindow(void) noexcept { this->clear(); }
 
@@ -18,7 +20,8 @@ class LoginWindow : public TapWindow
 		static constexpr size_t FRAME = 0UL;
 		static constexpr size_t INFO = 1UL;
 		static constexpr size_t USERNAME = 2UL;
-		// NB add 2 btns: create_new | ?
+		static constexpr size_t CREATE_PLAYER = 3UL;
+		static constexpr size_t CLOSE = 4UL;
 
 		int32_t commandFd;
 };

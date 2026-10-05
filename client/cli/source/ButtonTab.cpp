@@ -87,6 +87,7 @@ void ButtonTab::clear(void) noexcept
 void ButtonTab::activate(void)
 {
 	BasicTab::activate();
+	curs_set(0);
 
 	if (this->colorPair != -1)
 		::wattron(this->btnWin, COLOR_PAIR(this->colorPair));
@@ -106,6 +107,7 @@ void ButtonTab::activate(void)
 void ButtonTab::deactivate(void)
 {
 	BasicTab::deactivate();
+	curs_set(1);
 
 	if (this->colorPair != -1)
 		::wattron(this->btnWin, COLOR_PAIR(this->colorPair));
