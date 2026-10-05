@@ -77,6 +77,11 @@ run-cli: cli
 run-gui: gui
 	./$(GUI_TARGET) $(DEFAULT_CONFIG)
 
+test:
+	$(CC) $(CPP_FLAGS) $(DEBUG_FLAGS) ../test/TestMessage.cpp shared/source/Message.cpp \
+		../shared/source/Exceptions.cpp ../shared/source/JsonParser.cpp \
+		-Ishared/include -I../shared/include -o test_message
+
 $(LOG_DIR) $(SHARED_OBJ_DIR) $(SHARED_OBJ_DIR_CLIENT) $(CLI_OBJ_DIR) $(GUI_OBJ_DIR) $(SHARED_DEPS_DIR) $(SHARED_DEPS_DIR_CLIENT) $(CLI_DEPS_DIR) $(GUI_DEPS_DIR):
 	mkdir -p $@
 
