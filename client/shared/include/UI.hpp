@@ -52,8 +52,12 @@ class UI
 		virtual ~UI(void) noexcept;
 
 		void connect(std::string host, uint32_t port);
+		void reconnect(void) const noexcept { this->clientHTTP->wakeUpWorker();}
+
 		virtual void start(void);
 		virtual void stop(void) noexcept;
+		virtual void switchWindow(GamePhase newPhase);
+		std::string const& getUsername(void) const noexcept { return this->username; }
 
 	protected:
 		void writeToServer(void);
@@ -63,7 +67,6 @@ class UI
 		void handlePollError(void);
 		
 		virtual void shakeHands(void) noexcept;
-		virtual void switchWindow(GamePhase newPhase);
 		virtual void handleCommand(void);
 		virtual void handleResponse(std::string const& response) noexcept = 0;
 		virtual void handleEvent(std::string const& event) noexcept = 0;

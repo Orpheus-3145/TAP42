@@ -7,8 +7,8 @@
 #include <cassert>
 
 
-GameWindow::GameWindow(int32_t commandFd) :
-	TapWindow(),
+GameWindow::GameWindow(int32_t commandFd, UI* engine) :
+	TapWindow(engine),
 	commandFd{commandFd}
 {
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding commands");
@@ -20,13 +20,6 @@ GameWindow::GameWindow(int32_t commandFd) :
 
 	this->tabs[GameWindow::INFO] = std::make_unique<OutputTab>(0, BLUE_COLOR, this);
 	this->tabs[GameWindow::WORLD] = std::make_unique<OutputTab>("World events", 0, YELLOW_COLOR, this);
-
-	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(GameWindow::INFO).get());
-	assert(tab != nullptr and "current tab doesn't support appending content");
-	tab->appendContent("Player: <NAME>", TextAlign::LEFT, A_NORMAL, false);
-	tab->appendContent("Data: <CLASS | RACE | ...>", TextAlign::LEFT, A_NORMAL, false);
-	tab->appendContent("Currently in: <LOCATION>", TextAlign::LEFT, A_NORMAL, false);
-	tab->appendContent("<IN GROUP | NOT IN GROUP>", TextAlign::LEFT, A_NORMAL, false);
 
 	this->tabsToSkip.insert(GameWindow::FRAME);
 	this->tabsToSkip.insert(GameWindow::INFO);
@@ -53,6 +46,14 @@ void GameWindow::draw(int32_t height, int32_t width)
 		1,
 		2
 	);
+
+	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(GameWindow::INFO).get());
+	assert(tab != nullptr and "current tab doesn't support appending content");
+	tab->clearContent();
+	tab->appendContent("Player: " + this->engine->getUsername(), TextAlign::LEFT, A_NORMAL, false);
+	tab->appendContent("Data: <CLASS | RACE | ...>", TextAlign::LEFT, A_NORMAL, false);
+	tab->appendContent("Currently in: <LOCATION>", TextAlign::LEFT, A_NORMAL, false);
+	tab->appendContent("<IN GROUP | NOT IN GROUP>", TextAlign::LEFT, A_NORMAL, false);
 
 	this->tabs.at(GameWindow::WORLD)->draw(
 		this->height - 6 - 2,
@@ -88,7 +89,7 @@ void GameWindow::appendResponse(std::string const& response)
 	assert(tab != nullptr and "current tab doesn't support mouse scrolling");
 
 	std::string padding(::strlen(Config::PROMPT), ' ');
-	tab->appendContent(padding + response, TextAlign::LEFT, A_BOLD);
+	tab->appendContent(padding + response, TextAlign::LEFT);
 }
 
 void GameWindow::appendChatMsg(std::string const& response)
@@ -96,7 +97,7 @@ void GameWindow::appendChatMsg(std::string const& response)
 	InOutTab* tab = dynamic_cast<InOutTab*>(this->tabs.at(GameWindow::CHAT).get());
 	assert(tab != nullptr and "current tab doesn't support mouse scrolling");
 
-	tab->appendContent(response, TextAlign::LEFT, A_BOLD);
+	tab->appendContent(response, TextAlign::LEFT);
 }
 
 void GameWindow::appendEvent(std::string const& event)
@@ -104,5 +105,5 @@ void GameWindow::appendEvent(std::string const& event)
 	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(GameWindow::WORLD).get());
 	assert(tab != nullptr and "current tab doesn't support mouse scrolling");
 
-	tab->appendContent(event, TextAlign::LEFT, A_BOLD);
+	tab->appendContent(event, TextAlign::LEFT);
 }

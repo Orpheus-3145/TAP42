@@ -8,7 +8,9 @@
 class PlayerCreateWindow : public TapWindow
 {
 	public:
-		PlayerCreateWindow(int32_t commandFd);
+		using TapWindow::TapWindow;
+
+		PlayerCreateWindow(int32_t commandFd, UI* engine);
 
 		virtual ~PlayerCreateWindow(void) noexcept { this->clear(); }
 
@@ -18,6 +20,8 @@ class PlayerCreateWindow : public TapWindow
 		static constexpr size_t FRAME = 0UL;
 		static constexpr size_t INFO = 1UL;
 		static constexpr size_t USERNAME = 2UL;
+		static constexpr size_t BACK = 3UL;
+		static constexpr size_t CLOSE = 4UL;
 
 		int32_t commandFd;
 };

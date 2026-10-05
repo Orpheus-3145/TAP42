@@ -65,6 +65,22 @@ void UI::stop(void) noexcept
 	this->clientHTTP->stopWorker();
 }
 
+void UI::switchWindow(GamePhase newPhase)
+{
+	if ((this->connEstablished == false) and (newPhase != GamePhase::ERROR))
+		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE, "Can't proceed to new phase without server handshake");
+
+	if (newPhase == GamePhase::ERROR)				// error win: keep listening server data but stop talking
+		this->pollFds[UI::CLIENT].events = POLLIN;
+	else if (this->toServerSize > 0UL)				// if recovering from error and there's data left, start talking
+		this->pollFds[UI::CLIENT].events |= POLLOUT;
+
+	if (newPhase == GamePhase::PLAYER_CREATE)
+		this->username = "";
+
+	this->phase = newPhase;
+}
+
 void UI::writeToServer(void)
 {
 	if (this->connEstablished == false)
@@ -216,19 +232,6 @@ void UI::handleError(ErrorData& error)
 		this->connEstablished = false;
 }
 
-void UI::switchWindow(GamePhase newPhase)
-{
-	if ((this->connEstablished == false) and (newPhase != GamePhase::ERROR))
-		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE, "Can't proceed to new phase without server handshake");
-
-	if (newPhase == GamePhase::ERROR)				// error win: keep listening server data but stop talking
-		this->pollFds[UI::CLIENT].events = POLLIN;
-	else if (this->toServerSize > 0UL)				// if recovering from error and there's data left, start talking
-		this->pollFds[UI::CLIENT].events |= POLLOUT;
-
-	this->phase = newPhase;
-}
-
 void UI::handleCommand(void)
 {
 	char buffer[Config::BUFF_SIZE];
@@ -237,6 +240,7 @@ void UI::handleCommand(void)
 	if ((this->phase == GamePhase::LOGIN) or (this->phase == GamePhase::PLAYER_CREATE))
 	{
 		this->username = std::string(buffer, n);
+		LOG_DEBUG(LogContext::INTERFACE, std::format("username: {}", this->username));
 		// move to the right to insert CMD_CONNECT and a space at the beginning of the command
 		::memmove(buffer + ::strlen(CMD_CONNECT) + 1, buffer, n);
 		::memcpy(buffer + ::strlen(CMD_CONNECT), &COMMAND_SP, 1);

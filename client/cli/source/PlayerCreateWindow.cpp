@@ -1,6 +1,7 @@
 #include "PlayerCreateWindow.hpp"
 #include "OutputTab.hpp"
 #include "InputTab.hpp"
+#include "ButtonTab.hpp"
 #include "CLI.hpp"
 #include "Logger.hpp"
 #include "Exceptions.hpp"
@@ -9,8 +10,8 @@
 #include <format>
 
 
-PlayerCreateWindow::PlayerCreateWindow(int32_t commandFd) :
-	TapWindow(),
+PlayerCreateWindow::PlayerCreateWindow(int32_t commandFd, UI* engine) :
+	TapWindow(engine),
 	commandFd{commandFd}
 {
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding username");
@@ -18,16 +19,16 @@ PlayerCreateWindow::PlayerCreateWindow(int32_t commandFd) :
 	this->tabs[PlayerCreateWindow::FRAME] = std::make_unique<BasicTab>(-1, GREEN_COLOR, this);
 	this->tabs[PlayerCreateWindow::INFO] = std::make_unique<OutputTab>(0, GREEN_COLOR, this);
 	this->tabs[PlayerCreateWindow::USERNAME] = std::make_unique<InputTab>(this->commandFd, std::vector<std::string>(), Config::PROMPT, 0, GREEN_COLOR, this);
-
-	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(PlayerCreateWindow::INFO).get());
-	assert(tab != nullptr and "current tab doesn't support appending content");
-	tab->appendContent(" ", TextAlign::LEFT, A_NORMAL, false);
-	tab->appendContent(" Enter username:", TextAlign::MID, A_BOLD, false);
-	tab->appendContent(" ", TextAlign::LEFT, A_NORMAL, false);
-	tab->appendContent(" ", TextAlign::LEFT, A_NORMAL, false);
-	tab->appendContent(" ", TextAlign::LEFT, A_NORMAL, false);
-	tab->appendContent(" ", TextAlign::LEFT, A_NORMAL, false);
-	tab->appendContent("<TBD MORE STUFF TO ADD>", TextAlign::MID, A_NORMAL, false);
+	this->tabs[PlayerCreateWindow::BACK] = std::make_unique<ButtonTab>(
+		"LOGIN",
+		[this]
+		{
+			this->switchActiveTab(PlayerCreateWindow::USERNAME);
+			this->engine->switchWindow(GamePhase::LOGIN);
+		},
+		BLUE_COLOR,
+		this);
+	this->tabs[PlayerCreateWindow::CLOSE] = std::make_unique<ButtonTab>("CLOSE", [this] { this->engine->stop(); }, RED_COLOR, this);
 
 	this->tabsToSkip.insert(PlayerCreateWindow::FRAME);
 	this->tabsToSkip.insert(PlayerCreateWindow::INFO);
@@ -48,6 +49,11 @@ void PlayerCreateWindow::draw(int32_t height, int32_t width)
 	int32_t heightInfoTab = this->height / 2;
 	int32_t widthTabs = this->width / 4;
 
+	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(PlayerCreateWindow::INFO).get());
+	assert(tab != nullptr and "current tab doesn't support appending content");
+	tab->clearContent();
+	tab->appendContent(" ", TextAlign::LEFT, A_NORMAL, false);
+	tab->appendContent(" Enter username:", TextAlign::MID, A_BOLD, false);
 	this->tabs.at(PlayerCreateWindow::INFO)->draw(
 		heightInfoTab,
 		widthTabs,
@@ -57,9 +63,35 @@ void PlayerCreateWindow::draw(int32_t height, int32_t width)
 
 	this->tabs.at(PlayerCreateWindow::USERNAME)->draw(
 		3,
-		widthTabs - 2,
-		(this->height - heightInfoTab) / 2 + heightInfoTab - 4,
-		(this->width - widthTabs) / 2 + 1
+		widthTabs - 4,
+		(this->height - heightInfoTab) / 2 + heightInfoTab - 4 - 3,
+		(this->width - widthTabs) / 2 + 2
+	);
+
+	int32_t starty, startxAction1, startxAction2;
+	ButtonTab* btnTab = dynamic_cast<ButtonTab*>(this->tabs.at(PlayerCreateWindow::BACK).get());
+	assert(btnTab != nullptr and "current tab doesn't support getWidth()");
+
+	starty = (this->height - heightInfoTab) / 2 + heightInfoTab - 3 - 1;
+	startxAction1 = (this->width - widthTabs) / 2 + 2;
+	startxAction2 = startxAction1 + widthTabs - btnTab->getWidth() - 4;
+
+	this->tabs.at(PlayerCreateWindow::BACK)->draw(
+		1,
+		1,
+		starty,
+		startxAction1
+	);
+
+	btnTab = dynamic_cast<ButtonTab*>(this->tabs.at(PlayerCreateWindow::CLOSE).get());
+	assert(btnTab != nullptr and "current tab doesn't support getWidth()");
+
+	startxAction2 = startxAction1 + widthTabs - btnTab->getWidth() - 4;
+	this->tabs.at(PlayerCreateWindow::CLOSE)->draw(
+		1,
+		1,
+		starty,
+		startxAction2
 	);
 
 	this->updateContentWindow();

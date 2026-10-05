@@ -9,7 +9,7 @@
 #include <format>
 
 
-ErrorWindow::ErrorWindow(void) : TapWindow()
+ErrorWindow::ErrorWindow(UI* engine) : TapWindow(engine)
 {
 	this->tabs[ErrorWindow::FRAME] = std::make_unique<BasicTab>(-1, RED_COLOR, this);
 	this->tabs[ErrorWindow::INFO] = std::make_unique<OutputTab>("ERROR", 0, RED_COLOR, this);
@@ -72,7 +72,6 @@ void ErrorWindow::draw(int32_t height, int32_t width)
 	}
 
 	this->updateContentWindow();
-	curs_set(0);
 
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing error window, size h: {}, w: {}", this->height, this->width));
 }
@@ -89,17 +88,48 @@ void ErrorWindow::clear(void) noexcept
 	descTab->clearContent();
 
 	this->activeTabIndex = 0;
-	curs_set(1);
 }
 
-void ErrorWindow::setErrorInfo(std::string const& description)
+void ErrorWindow::adaptWinToError(ErrorData& error) noexcept
 {
+	this->clear();
+
 	OutputTab* descTab = dynamic_cast<OutputTab*>(this->tabs.at(ErrorWindow::INFO).get());
 	assert(descTab != nullptr and "current tab doesn't support appending content");
 
 	descTab->clearContent();
 	descTab->appendContent(" ", TextAlign::LEFT, A_NORMAL, false);
-	descTab->appendContent(description, TextAlign::MID, A_NORMAL, false);
+	descTab->appendContent(mapError(error), TextAlign::MID, A_NORMAL, false);
+
+	switch (error.code)
+	{
+		case ErrorCode::UI_USERNAME_NOT_EXISTS:
+			this->setAction1("RETRY", [this] { this->engine->switchWindow(GamePhase::LOGIN); });
+			this->setAction2("CREATE NEW", [this] { this->engine->switchWindow(GamePhase::PLAYER_CREATE);	});
+			break;
+
+		case ErrorCode::UI_USERNAME_IN_USE:
+			this->setAction1("RETRY", [this] { this->engine->switchWindow(GamePhase::PLAYER_CREATE); });
+			break;
+
+		case ErrorCode::SERVER_ERROR:
+			this->setAction1("CLOSE", [this] { this->engine->stop(); });
+			this->setAction2("BACK", [this] {
+				GamePhase previous = this->getPreviousPhase();
+				this->engine->switchWindow(previous);
+			});
+			break;
+		
+		case ErrorCode::SERVER_DISCONNECTED:
+			this->setAction1("CONNECT", [this] { this->engine->reconnect(); });
+			this->setAction2("CLOSE", [this] { this->engine->stop(); });
+			break;
+
+		default:
+			this->setAction1("CLOSE", [this] { this->engine->stop(); });
+			break;
+	}
+
 }
 
 void ErrorWindow::setAction1(std::string const& actionName, std::function<void()> action)
