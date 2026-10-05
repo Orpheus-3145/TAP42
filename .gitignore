@@ -76,3 +76,4 @@ Testing/
 **/build
 tap-client*
 .vscode
+test_message
