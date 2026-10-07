@@ -1,4 +1,5 @@
 #include "Logger.hpp"
+#include "Utils.hpp"
 #include "Exceptions.hpp"
 
 #include <iostream>
@@ -90,7 +91,7 @@ void Logger::log(LogContext context, LogLevel level, const std::string& message)
 	line << padField("[" + currentTimestamp() + "]", kTimestampWidth) << ' '
 		<< padField("[" + Logger::to_string(level) + "]", kLevelWidth) << ' '
 		<< padField("[" + Logger::to_string(context) + "]", kContextWidth)
-		<< " - " << message;
+		<< " - " << escapeString(message);
 
 	if (this->consoleOutput)
 	{

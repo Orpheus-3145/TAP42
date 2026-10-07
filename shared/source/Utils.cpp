@@ -340,20 +340,24 @@ std::string createLogPath(const char* logFolder)
 	return std::format("{}/{}_logfile.log", logPath.string(), oss.str());
 }
 
-std::string escapeNewLine(const char* buffer, size_t size) noexcept
+std::string escapeString(std::string const& toEscape) noexcept
 {
-	assert(buffer != nullptr and "null buffer pointer");
 	std::string escaped;
 
-	for (size_t i = 0UL; i < size; i++)
+	for (size_t i = 0UL; i < toEscape.size(); i++)
 	{
-		if (buffer[i] != '\n')
-			escaped.push_back(buffer[i]);
-		else
+		if (toEscape[i] == '\n')
 		{
 			escaped.push_back('\\');
 			escaped.push_back('n');
 		}
+		else if (toEscape[i] == '\t')
+		{
+			escaped.push_back('\\');
+			escaped.push_back('t');
+		}
+		else
+			escaped.push_back(toEscape[i]);
 	}
 	return escaped;
 }

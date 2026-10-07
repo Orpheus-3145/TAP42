@@ -52,9 +52,6 @@ CLI::CLI(void) : UI()
 		::init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
 		::init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
 	}
-	// for callback (scrolling tabs) with mouse wheel
-    // ::mousemask(BUTTON4_PRESSED | BUTTON5_PRESSED | ALL_MOUSE_EVENTS, NULL);
-    // ::mouseinterval(0);       // disable delayed click
 
 	this->loginWin = std::make_unique<LoginWindow>(this->commandPipe.in, this);
 	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(this->commandPipe.in, this);
@@ -115,7 +112,7 @@ void CLI::start(void)
 		catch (AppException const& e)
 		{
 			ErrorData err = e.getError();
-			this->handleError(err);
+			this->handleException(err);
 		}
 	}
 	LOG_INFO(LogContext::INTERFACE, "CLI stopped");
@@ -149,7 +146,7 @@ void CLI::shakeHands(void) noexcept
 	this->pollFds[CLI::STDIN].events = POLLIN;
 }
 
-void CLI::handleError(ErrorData& error)
+void CLI::handleException(ErrorData& error)
 {
 	if (error.code == ErrorCode::UI_INVALID_SIZE)		// trigger a resize
 	{
@@ -164,7 +161,7 @@ void CLI::handleError(ErrorData& error)
 		LOG_WARN(LogContext::INTERFACE, std::format("Window too small, triggering resize to h: {}, w: {}", height, width));
 		return;
 	}
-	UI::handleError(error);
+	UI::handleException(error);
 
 	if (this->phase == GamePhase::ERROR)
 	{
@@ -175,51 +172,53 @@ void CLI::handleError(ErrorData& error)
 	}
 
 	this->errorWin->adaptWinToError(error);
-	this->errorWin->setPreviousPhase(this->phase);
 	this->switchWindow(GamePhase::ERROR);
 }
 
-void CLI::handleResponse(std::string const& response) noexcept
+void CLI::showResponse(Message const& response) noexcept
 {
 	GameWindow* gameWin = dynamic_cast<GameWindow*>(this->gameWin.get());
 	assert(gameWin != nullptr and "current window doesn't support handling a response");
 
-	// if (response is chat type)
-	// 	gameWin->showChatMsg(response);
-	// else
-	gameWin->appendResponse(response);
-
+	gameWin->appendResponse(response, this->commandQueue.front().getCommandType());
 	if (this->phase == GamePhase::GAME)
 		gameWin->updateContentWindow();
 }
 
-void CLI::handleEvent(std::string const& event) noexcept
+void CLI::showEvent(Message const& event) noexcept
 {
 	GameWindow* gameWin = dynamic_cast<GameWindow*>(this->gameWin.get());
 	assert(gameWin != nullptr and "current window doesn't support handling an event");
 
-	// if (event is chat type)
-	// 	gameWin->showChatMsg(event);
-	// else
 	gameWin->appendEvent(event);
 	if (this->phase == GamePhase::GAME)
 		gameWin->updateContentWindow();
 }
 
-void CLI::switchWindow(GamePhase newPhase)
+void CLI::showError(Message const& error) noexcept
+{
+	GameWindow* gameWin = dynamic_cast<GameWindow*>(this->gameWin.get());
+	assert(gameWin != nullptr and "current window doesn't support handling an event");
+
+	gameWin->appendError(error, this->commandQueue.front().getCommandType());
+	if (this->phase == GamePhase::GAME)
+		gameWin->updateContentWindow();
+}
+
+void CLI::switchWindow(std::optional<GamePhase> newPhase)
 {
 	UI::switchWindow(newPhase);
 
-	if (this->currentWindow and (newPhase != GamePhase::ERROR))
+	if (this->currentWindow and (this->phase != GamePhase::ERROR))
 		this->currentWindow->clear();
 
-	switch (newPhase)
+	switch (this->phase)
 	{
 		case GamePhase::LOGIN:			this->currentWindow = this->loginWin.get(); break;
 		case GamePhase::PLAYER_CREATE:	this->currentWindow = this->newPlayerWin.get(); break;
 		case GamePhase::GAME:			this->currentWindow = this->gameWin.get(); break;
 		case GamePhase::ERROR:			this->currentWindow = this->errorWin.get(); break;
-		default:						break;
+		default:						assert(false and "phase not mapped to any window");
 	}
 	this->currentWindow->draw(this->height, this->width);
 }

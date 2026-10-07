@@ -143,7 +143,7 @@ void ClientHTTP::handleDataFromGame(void)
 		this->pollFds[ClientHTTP::GAME].revents = POLLHUP;		// game UI disconnected
 	else if (n > 0L)
 	{
-		std::string gameData = escapeNewLine(this->gameBuffer + this->gameBufferSize, n);
+		std::string gameData(this->gameBuffer + this->gameBufferSize, n);
 		LOG_DEBUG(LogContext::HTTP_CLIENT, std::format("Read from game: '{}'", gameData));
 
 		this->gameBufferSize += n;
@@ -160,7 +160,7 @@ void ClientHTTP::handleDataToGame(void)
 		this->pollFds[ClientHTTP::GAME].revents = POLLHUP;		// game UI disconnected
 	else if (n > 0L)
 	{
-		std::string serverData = escapeNewLine(this->serverBuffer, n);
+		std::string serverData(this->serverBuffer, n);
 		LOG_DEBUG(LogContext::HTTP_CLIENT, std::format("Sent to game: '{}'", serverData));
 		
 		this->serverBufferSize -= n;
@@ -182,7 +182,7 @@ void ClientHTTP::handleDataFromServer(void)
 		this->pollFds[ClientHTTP::SERVER].revents = POLLHUP;		// server disconnected
 	else if (n > 0L)
 	{
-		std::string serverData = escapeNewLine(this->serverBuffer + this->serverBufferSize, n);
+		std::string serverData(this->serverBuffer + this->serverBufferSize, n);
 		LOG_DEBUG(LogContext::HTTP_CLIENT, std::format("Read from server: '{}'", serverData));
 
 		this->serverBufferSize += n;
@@ -199,7 +199,7 @@ void ClientHTTP::handleDataToServer(void)
 		this->pollFds[ClientHTTP::SERVER].revents = POLLHUP;		// server disconnected
 	else if (n > 0L)
 	{
-		std::string gameData = escapeNewLine(this->gameBuffer, n);
+		std::string gameData(this->gameBuffer, n);
 		LOG_DEBUG(LogContext::HTTP_CLIENT, std::format("Sent to server: '{}'", gameData));
 
 		this->gameBufferSize -= n;
@@ -241,11 +241,11 @@ void ClientHTTP::handleServerError(void)
 		{
 			// if buffer is full, truncate current message to make room for ERR_SERVER_DISC
 			this->serverBufferSize = Config::BUFF_SIZE - ::strlen(ERR_SERVER_DISC) - 2;
-			this->serverBuffer[this->serverBufferSize++] = COMMAND_TERM;
+			this->serverBuffer[this->serverBufferSize++] = Config::COMMAND_TERM;
 		}
 		::memcpy(this->serverBuffer + this->serverBufferSize, ERR_SERVER_DISC, ::strlen(ERR_SERVER_DISC));
 		this->serverBufferSize += ::strlen(ERR_SERVER_DISC);
-		this->serverBuffer[this->serverBufferSize++] = COMMAND_TERM;
+		this->serverBuffer[this->serverBufferSize++] = Config::COMMAND_TERM;
 
 		this->pollFds[ClientHTTP::GAME].events |= POLLOUT;
 		LOG_ERROR(LogContext::HTTP_CLIENT, "Server disconnected, messaging game");

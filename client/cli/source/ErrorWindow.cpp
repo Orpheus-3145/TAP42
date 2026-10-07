@@ -114,10 +114,7 @@ void ErrorWindow::adaptWinToError(ErrorData& error) noexcept
 
 		case ErrorCode::SERVER_ERROR:
 			this->setAction1("CLOSE", [this] { this->engine->stop(); });
-			this->setAction2("BACK", [this] {
-				GamePhase previous = this->getPreviousPhase();
-				this->engine->switchWindow(previous);
-			});
+			this->setAction2("BACK", [this] { this->engine->switchWindow(); });
 			break;
 		
 		case ErrorCode::SERVER_DISCONNECTED:

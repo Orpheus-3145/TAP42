@@ -20,9 +20,6 @@ class ErrorWindow : public TapWindow
 		void draw(int32_t height, int32_t width) override;
 		void clear(void) noexcept override;
 
-		void		setPreviousPhase(GamePhase phase) noexcept { this->previousPhase = phase; }
-		GamePhase	getPreviousPhase(void) const noexcept { return this->previousPhase; }
-
 		void adaptWinToError(ErrorData& error) noexcept;
 		void setAction1(std::string const& actionName, std::function<void()> action);
 		void setAction2(std::string const& actionName, std::function<void()> action);

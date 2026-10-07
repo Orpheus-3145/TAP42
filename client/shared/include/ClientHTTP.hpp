@@ -10,6 +10,7 @@
 #include "Utils.hpp"
 
 
+inline constexpr const char*	ERR_SERVER_DISC = "ERR 900 SERVER DISCONNECTED";
 
 class ClientHTTP
 {

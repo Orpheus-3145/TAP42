@@ -13,7 +13,7 @@ ButtonTab::ButtonTab(std::string const& content, std::function<void()> action, i
 	content{content},
 	action{action}
 {
-	this->dispatcher[COMMAND_TERM] = [this] { this->action(); };
+	this->dispatcher['\n'] = [this] { this->action(); };
 }
 
 ButtonTab::ButtonTab(ButtonTab&& other) noexcept :
