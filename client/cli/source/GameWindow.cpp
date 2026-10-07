@@ -83,27 +83,54 @@ void GameWindow::draw(int32_t height, int32_t width)
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing game window size h: {}, w: {}", height, width));
 }
 
-void GameWindow::appendResponse(std::string const& response)
+void GameWindow::appendResponse(Message const& response, CommandType cmdType)
 {
-	InOutTab* tab = dynamic_cast<InOutTab*>(this->tabs.at(GameWindow::CMD).get());
-	assert(tab != nullptr and "current tab doesn't support mouse scrolling");
+	InOutTab*	tab = nullptr;
+	std::string strCommand = toString(cmdType);
+	int32_t		colorText = -1;
 
-	std::string padding(::strlen(Config::PROMPT), ' ');
-	tab->appendContent(padding + response, TextAlign::LEFT);
+	// the tab to be updated is the one that sent the command
+	if (std::find(CMD_HINTS.begin(), CMD_HINTS.end(), strCommand) != CMD_HINTS.end())
+	{
+		tab = dynamic_cast<InOutTab*>(this->tabs.at(GameWindow::CMD).get());
+		colorText = CYAN_COLOR;
+	}
+	else if (std::find(CHAT_CMD_HINTS.begin(), CHAT_CMD_HINTS.end(), strCommand) != CHAT_CMD_HINTS.end())
+	{
+		tab = dynamic_cast<InOutTab*>(this->tabs.at(GameWindow::CHAT).get());
+		colorText = GREEN_COLOR;
+	}
+	else
+		assert(false and "command not found in hints");
+	assert(tab != nullptr and "current tab doesn't support appending content");
+
+	std::string content = response.toStringResponse(cmdType);
+	tab->appendContent(content, TextAlign::LEFT, COLOR_PAIR(colorText) | A_BOLD);
 }
 
-void GameWindow::appendChatMsg(std::string const& response)
-{
-	InOutTab* tab = dynamic_cast<InOutTab*>(this->tabs.at(GameWindow::CHAT).get());
-	assert(tab != nullptr and "current tab doesn't support mouse scrolling");
-
-	tab->appendContent(response, TextAlign::LEFT);
-}
-
-void GameWindow::appendEvent(std::string const& event)
+void GameWindow::appendEvent(Message const& event)
 {
 	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(GameWindow::WORLD).get());
-	assert(tab != nullptr and "current tab doesn't support mouse scrolling");
+	assert(tab != nullptr and "current tab doesn't support appending content");
 
-	tab->appendContent(event, TextAlign::LEFT);
+	std::string content = event.toStringEvent();
+	tab->appendContent(content, TextAlign::LEFT, COLOR_PAIR(YELLOW_COLOR) | A_BOLD);
+}
+
+void GameWindow::appendError(Message const& error, CommandType cmdType)
+{
+	InOutTab* tab = nullptr;
+	std::string strCommand = toString(cmdType);
+
+	// the tab to be updated is the one that sent the command
+	if (std::find(CMD_HINTS.begin(), CMD_HINTS.end(), strCommand) != CMD_HINTS.end())
+		tab = dynamic_cast<InOutTab*>(this->tabs.at(GameWindow::CMD).get());
+	else if (std::find(CHAT_CMD_HINTS.begin(), CHAT_CMD_HINTS.end(), strCommand) != CHAT_CMD_HINTS.end())
+		tab = dynamic_cast<InOutTab*>(this->tabs.at(GameWindow::CHAT).get());
+	else
+		assert(false and "command not found in hints");
+	assert(tab != nullptr and "current tab doesn't support appending content");
+
+	std::string content = error.toStringError();
+	tab->appendContent(content, TextAlign::LEFT, COLOR_PAIR(RED_COLOR) | A_BOLD);
 }

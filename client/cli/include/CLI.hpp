@@ -269,10 +269,12 @@ class CLI : public UI
 		void handleResize(void);
 
 		void shakeHands(void) noexcept override;
-		void switchWindow(GamePhase newPhase) override;
-		void handleError(ErrorData& error) override;
-		void handleResponse(std::string const& response) noexcept override;
-		void handleEvent(std::string const& event) noexcept override;
+		void switchWindow(std::optional<GamePhase> newPhase = std::nullopt) override;
+		void handleException(ErrorData& error) override;
+	
+		void showResponse(Message const& response) noexcept override;
+		void showEvent(Message const& event) noexcept override;
+		void showError(Message const& error) noexcept override;
 
 		static constexpr size_t POLL_SIZE = 4UL;
 		static constexpr size_t RESIZE = 2UL;

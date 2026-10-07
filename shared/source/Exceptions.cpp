@@ -13,6 +13,7 @@ std::string mapError(ErrorData const& error) noexcept
 		case ErrorCode::SERVER_DISCONNECTED:		return std::format("Server disconnected", error.info);
 		case ErrorCode::SERVER_CONN_FAILED:			return std::format("Connection to server failed: {}", error.info);
 		case ErrorCode::SERVER_ERROR:				return std::format("Server error: {}", error.info);
+		case ErrorCode::BAD_MESSAGE:				return std::format("Bad format message: {}", error.info);
 		case ErrorCode::IO_READ_FAILED:				return std::format("Read error: {}", error.info);
 		case ErrorCode::IO_WRITE_FAILED:			return std::format("Write error: {}", error.info);
 		case ErrorCode::IO_READ_NONB_FAILED:		return std::format("Recv error: {}", error.info);

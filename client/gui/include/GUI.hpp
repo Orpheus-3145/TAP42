@@ -30,7 +30,7 @@ class GUI : public QObject, public UI
 		// void resize(int32_t height, int32_t width) { this->gameWin->resize(width, height); }
 		
 	private:
-		void handleError(std::string const& errMsg) noexcept override { (void) errMsg; }
+		void handleException(std::string const& errMsg) noexcept override { (void) errMsg; }
 		void handleServerDisconnect(void) noexcept override {}
 
 		void handleResponse(std::string const& response) noexcept override;

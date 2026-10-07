@@ -11,7 +11,9 @@ struct Config
 	static constexpr const size_t BUFF_SIZE = 1024UL;
 	static constexpr const size_t CMD_BUFFER_SIZE = 128UL;
 
-	static constexpr char const* PROMPT = "-> ";
+	static constexpr const char		COMMAND_TERM = '\n';
+	static constexpr const char		COMMAND_SP = ' ';
+	static constexpr char const*	PROMPT = "-> ";
 
 	static constexpr char const*	LOG_DIR = "logs";
 	static constexpr LogLevel		DEFAULT_LOG_LEVEL = LogLevel::DEBUG;

@@ -102,7 +102,7 @@ void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 
 	this->topLineScroll = 0UL;
 	if (static_cast<int32_t>(this->state.size()) > h)
-		this->topLineScroll = h - this->state.size();
+		this->topLineScroll = this->state.size() - h;
 
 	::keypad(this->outputWin, true);
 	::scrollok(this->outputWin, true);
@@ -204,7 +204,6 @@ void OutputTab::updateContent(void) const noexcept
 	getmaxyx(this->outputWin, newMaxheight, _);
 
 	int32_t nLinesToPrint = std::min(newMaxheight, static_cast<int32_t>(this->state.size() - this->topLineScroll));
-
 	for (int32_t i = 0; i < nLinesToPrint; i++)
 		this->printLine(this->state[this->topLineScroll + i]);
 }
@@ -215,6 +214,7 @@ void OutputTab::printLine(TabMessage const& message) const noexcept
 	(void)_;
 	getyx(this->outputWin, y, _);
 
+	::wclrtoeol(this->outputWin);
 	if (message.align != TextAlign::LEFT)
 	{
 		int32_t w;
@@ -263,9 +263,8 @@ void OutputTab::scrollContentDown(void) noexcept
 	(void)_;
 	getmaxyx(this->outputWin, maxVerticalSpace, _);
 
-	if (maxVerticalSpace >= static_cast<int32_t>(this->state.size()))
-		return;
-	else if (this->topLineScroll + maxVerticalSpace == this->state.size())
+	if ((maxVerticalSpace >= static_cast<int32_t>(this->state.size())) or
+		(this->topLineScroll + maxVerticalSpace == this->state.size()))
 		return;
 
 	::wscrl(this->outputWin, 1);

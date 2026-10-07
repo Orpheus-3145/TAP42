@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "TapWindow.hpp"
+#include "Message.hpp"
 
 
 static std::vector<std::string> CMD_HINTS
@@ -21,8 +22,8 @@ static std::vector<std::string> CMD_HINTS
 	"STATUS",
 	"QUEST",
 	"QUESTS",
-	"QUIT"
-	// "USE" custom command
+	"QUIT",
+	"USE"
 };
 
 static std::vector<std::string> CHAT_CMD_HINTS
@@ -31,7 +32,9 @@ static std::vector<std::string> CHAT_CMD_HINTS
 	"GROUP INVITE",
 	"GROUP JOIN",
 	"GROUP LEAVE",
-	"CHAT",
+	"CHAT GROUP",
+	"CHAT ROOM",
+	"CHAT GLOBAL"
 };
 
 class GameWindow : public TapWindow
@@ -45,9 +48,9 @@ class GameWindow : public TapWindow
 
 		void draw(int32_t height, int32_t width) override;
 
-		void appendResponse(std::string const& response);
-		void appendChatMsg(std::string const& response);
-		void appendEvent(std::string const& event);
+		void appendResponse(Message const& response, CommandType cmdType);
+		void appendEvent(Message const& event);
+		void appendError(Message const& error, CommandType cmdType);
 
 	protected:
 		static constexpr size_t FRAME = 0UL;

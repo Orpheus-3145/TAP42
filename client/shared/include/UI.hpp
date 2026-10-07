@@ -4,35 +4,28 @@
 #include <string>
 #include <cassert>
 #include <vector>
+#include <queue>
+#include <unordered_map>
+#include <functional>
 #include <memory>
 #include <ostream>
+#include <optional>
 #include <poll.h>
 
 #include "Config.hpp"
 #include "ClientHTTP.hpp"
+#include "Message.hpp"
 #include "Exceptions.hpp"
 #include "Utils.hpp"
-
-
-inline constexpr const char*	S_OK = "OK";
-inline constexpr const char*	S_ERR = "ERR";
-inline constexpr const char*	S_EVT = "EVT";
-inline constexpr const char*	QUIT_RESPONSE = "OK bye";
-inline constexpr const char*	LOGIN_OK = "OK connected";
-inline constexpr const char*	INITIAL_GREETING = "OK hello proto=1";
-inline constexpr const char*	CMD_CONNECT = "CONNECT";
-inline constexpr const char*	ERR_SERVER_DISC = "ERR SERVER DISCONNECTED";
-inline constexpr const char		COMMAND_TERM = '\n';
-inline constexpr const char		COMMAND_SP = ' ';
 
 
 enum class GamePhase : uint32_t
 {
 	ND = 0U,
-	LOGIN = 1U,
-	PLAYER_CREATE = 2U,
-	GAME = 3U,
-	ERROR = 4U,
+	LOGIN,
+	PLAYER_CREATE,
+	GAME,
+	ERROR
 };
 
 std::string toString(GamePhase phase);
@@ -41,6 +34,8 @@ std::ostream& operator<<(std::ostream& out, GamePhase phase);
 
 class UI
 {
+	using MessageDispatcher = std::unordered_map<GamePhase,std::function<void(Message const&)>>;
+
 	public:
 		UI(void) noexcept;
 
@@ -56,21 +51,24 @@ class UI
 
 		virtual void start(void);
 		virtual void stop(void) noexcept;
-		virtual void switchWindow(GamePhase newPhase);
+		virtual void switchWindow(std::optional<GamePhase> newPhase = std::nullopt);
 		std::string const& getUsername(void) const noexcept { return this->username; }
 
 	protected:
 		void writeToServer(void);
 		void readFromServer(void);
 		void splitIntoMessages(void);
-		void handleMessage(std::string const& message);
-		void handlePollError(void);
+		void dispatchMessage(Message const& message);
 		
+		void handlePollError(void);
+		void handleCommand(void);
+
 		virtual void shakeHands(void) noexcept;
-		virtual void handleCommand(void);
-		virtual void handleResponse(std::string const& response) noexcept = 0;
-		virtual void handleEvent(std::string const& event) noexcept = 0;
-		virtual void handleError(ErrorData& error);
+		virtual void handleException(ErrorData& error);
+
+		virtual void showResponse(Message const& response) noexcept = 0;
+		virtual void showEvent(Message const& event) noexcept = 0;
+		virtual void showError(Message const& error) noexcept = 0;
 
 		static constexpr size_t POLL_SIZE = 2UL;
 		static constexpr size_t CLIENT = 0UL;
@@ -79,8 +77,14 @@ class UI
 		std::vector<struct pollfd>	pollFds;
 		ioUtils::SocketPair			gameClientSockets;
 		ioUtils::Pipe				commandPipe;
-	
+
 		std::unique_ptr<ClientHTTP>	clientHTTP;
+
+		std::queue<Message> commandQueue;
+
+		MessageDispatcher responseDispatcher;
+		MessageDispatcher eventDispatcher;
+		MessageDispatcher errorDispatcher;
 
 		std::string username;
 
@@ -90,7 +94,7 @@ class UI
 		int32_t height{0};
 		int32_t width{0};
 
-		GamePhase	phase{GamePhase::LOGIN};
+		GamePhase	phase{GamePhase::ND}, lastPhase{GamePhase::ND};
 
 		size_t	toServerSize{0UL};
 		char	toServerBuffer[Config::BUFF_SIZE];
