@@ -32,7 +32,7 @@ GUI::GUI(int32_t height, int32_t width) : UI()
 	);
 
 	// server data: responses, events
-	this->readFromServerNotifier = std::make_unique<QSocketNotifier>(this->pollFds[GUI::CLIENT], QSocketNotifier::Read, nullptr);
+	this->readFromServerNotifier = std::make_unique<QSocketNotifier>(this->pollFds[GUI::CLIENT].fd, QSocketNotifier::Read, nullptr);
 	QObject::connect(
 		this->readFromServerNotifier.get(),
 		&QSocketNotifier::activated,

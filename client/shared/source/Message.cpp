@@ -73,7 +73,7 @@ std::string	Message::toStringEvent(void) const
 		case EventType::GROUP_JOIN:					return std::format("{} has joined {}", this->data["player"].as_string(), this->data["group"].as_string());
 		case EventType::GROUP_LEAVE:				return std::format("{} has left {}", this->data["player"].as_string(), this->data["group"].as_string());
 		case EventType::GROUP_INVITE:				return std::format("{} has been invited to join {}", this->data["player"].as_string(), this->data["group"].as_string());
-		case EventType::STATS:						return std::format("Player count: {}", this->data["count"].as_int());
+		case EventType::STATS:						return std::format("Player count {}", this->data.as_int());
 		case EventType::ROOM_COMBAT:				return std::format("{} attacked {}", this->data["player"].as_string(), this->data["npc"].as_string());
 		case EventType::ROOM_COMBAT_DEATH_NPC:		return std::format("{} slained NPC {}", this->data["player"].as_string(), this->data["npc"].as_string());
 		case EventType::ROOM_COMBAT_DEATH_PLAYER:	return std::format("NPC {} slained {}", this->data["npc"].as_string(), this->data["player"].as_string());
@@ -90,11 +90,7 @@ std::string	Message::toStringError(void) const
 {
 	assert(this->type == MessageType::ERROR and "wrong type to stringify");
 
-	std::string error = this->data["info"].as_string();
-	if (error.empty() == true)
-		error = std::format("error: ", toString(this->subType.errType));
-
-	return error;
+	return this->data["info"].as_string();
 }
 
 CommandType	Message::getCommandType(void) const noexcept
@@ -221,15 +217,17 @@ void Message::parseError(std::string const& error)
 
 	std::istringstream	iss(error);
 	uint16_t			errCode;
-	std::string			err, errName, errInfo;
+	std::string			errName, errInfo;
 
-	if (!(iss >> err >> errCode >> errName))
+	if (!(iss >> errCode >> errName))
 		throw AppException(ErrorCode::BAD_MESSAGE, "Incomplete error: " + error);
 	this->subType.errType = getError(errCode);
 
 	std::getline(iss >> std::ws, errInfo);
-	if (errInfo.empty() == false)
-		this->storeJson(std::format("{{\"info\": \"{}\"}}", errInfo));
+	if (errInfo.empty() == true)
+		throw AppException(ErrorCode::BAD_MESSAGE, "Missing error info: " + error);
+
+	this->storeJson(std::format("\"{}\"", errInfo));
 }
 
 void Message::storeJson(std::string const& jsonStr)

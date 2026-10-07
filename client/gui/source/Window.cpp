@@ -10,16 +10,9 @@ Window::Window(QWidget *parent, int32_t height, int32_t width, UI* engine) :
 	QMainWindow(parent),
 	engine{engine}
 {
+	(void) height;
+	(void) width;
 	assert(this->engine != nullptr and "Null pointer for engine instance received");
-
-	// signal when to app when user presses enter on command input 
-	QObject::connect(
-		this->promptField,
-		&QLineEdit::returnPressed,
-		this,
-		&Window::onPromptSubmitted
-	);
-	this->draw(height, width);
 }
 
 Window::~Window(void) noexcept
