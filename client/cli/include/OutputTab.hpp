@@ -23,7 +23,7 @@ struct TabMessage
 {
 	using TimePoint = std::chrono::time_point<std::chrono::system_clock, std::chrono::system_clock::duration>;
 
-	std::string					content;			// NB handle multi-line messages
+	std::string					content;
 	TextAlign					align;
 	uint32_t					attrs;
 	std::optional<TimePoint>	timestamp;
@@ -33,7 +33,11 @@ struct TabMessage
 		align{align},
 		attrs{attrs} { if (saveTimestamp) this->timestamp = std::chrono::system_clock::now(); }
 
-	TabMessage(void) = delete;
+	TabMessage(void) noexcept:
+		content{""},
+		align{TextAlign::LEFT},
+		attrs{A_NORMAL},
+		timestamp{std::chrono::system_clock::now()} {}
 	
 	TabMessage(TabMessage const& other) noexcept = default;
 	TabMessage& operator=(TabMessage const& other) noexcept = default;
@@ -65,8 +69,8 @@ class OutputTab : public virtual BasicTab
 		void scrollContentUp(void) noexcept;
 		void scrollContentDown(void) noexcept;
 
-		virtual void	printLine(TabMessage const& content) const noexcept;
-		void			printLine(std::string const& newContent) const noexcept { this->printLine(TabMessage{newContent}); }
+		virtual void	printLine(TabMessage const& content) const;
+		void			printLine(std::string const& newContent) const { this->printLine(TabMessage{newContent}); }
 
 		void clearContent(void) noexcept { this->state.clear(); this->topLineScroll = 0UL; }
 
@@ -77,7 +81,8 @@ class OutputTab : public virtual BasicTab
 
 		std::string const	title;
 
-		std::deque<TabMessage> state;
+		std::deque<TabMessage>	state;
+		bool					hasTimeStamp{false};
 
 		size_t		topLineScroll{0UL};
 };

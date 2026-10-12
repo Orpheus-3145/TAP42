@@ -15,7 +15,7 @@ InputTab::InputTab(
 	TapWindow* parent
 ) :
 	BasicTab(borderChar, colorPair, parent),
-forwardInputFd{forwardInputFd},
+	forwardInputFd{forwardInputFd},
 	hints{hints},
 	prompt{prompt}
 {

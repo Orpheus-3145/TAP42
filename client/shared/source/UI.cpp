@@ -201,29 +201,31 @@ void UI::splitIntoMessages(void)
 		if (lenMsg == 0L)
 			continue;
 
-		try
-		{
-			this->dispatchMessage(Message(msg));
-		}
-		catch (AppException const& e)
-		{
-			if (e.getError().code == ErrorCode::BAD_MESSAGE)
-			{
-				LOG_ERROR(LogContext::INTERFACE, std::format("Bad formatted message: '{}' - discarded", msg));
-				continue;
-			}
-			throw e;
-		}
+		this->dispatchMessage(msg);
 	}
 }
 
-void UI::dispatchMessage(Message const& message)
+void UI::dispatchMessage(std::string const& msg)
 {
-	if (message.isResponse())
+	std::unique_ptr<Message> message;
+	try
+	{
+		message = std::make_unique<Message>(msg);
+	}
+	catch (AppException const& e)
+	{
+		if (e.getError().code != ErrorCode::BAD_MESSAGE)
+			throw e;
+
+		LOG_ERROR(LogContext::INTERFACE, mapError(e.getError()));
+		return;
+	}
+
+	if (message->isResponse())
 	{
 		if (this->commandQueue.empty() == false)
 		{
-			this->responseDispatcher.at(this->phase)(message);
+			this->responseDispatcher.at(this->phase)(*message);
 			if (this->commandQueue.front().getCommandType() == CommandType::QUIT)
 				this->stop();
 
@@ -232,17 +234,26 @@ void UI::dispatchMessage(Message const& message)
 				this->pollFds[UI::CLIENT].events |= POLLOUT;
 		}
 		else
-			LOG_ERROR(LogContext::INTERFACE, std::format("Got response without any pending command: '{}' - discarded", message.getRawMessage()));
+			LOG_ERROR(LogContext::INTERFACE, std::format("Got response without any pending command: '{}' - discarded", message->getRawMessage()));
 	}
-	else if (message.isError())
+	else if (message->isError())
 	{
-		if (message.getErrorType() == ErrorType::CONNECTION_FAILED)
+		if (message->getErrorType() == ErrorType::CONNECTION_FAILED)
 			throw AppException(ErrorCode::SERVER_DISCONNECTED);
-		this->errorDispatcher.at(this->phase)(message);
+		else if (this->commandQueue.empty() == false)
+		{
+			this->errorDispatcher.at(this->phase)(*message);
+
+			this->commandQueue.pop();
+			if (this->commandQueue.empty() == false)		// there's another command queued up, send it
+				this->pollFds[UI::CLIENT].events |= POLLOUT;
+		}
+		else
+			LOG_ERROR(LogContext::INTERFACE, std::format("Got error without any pending command: '{}' - discarded", message->getRawMessage()));
 	}
-	else if (message.isEvent())
+	else if (message->isEvent())
 	{
-		this->eventDispatcher.at(this->phase)(message);
+		this->eventDispatcher.at(this->phase)(*message);
 	}
 }
 

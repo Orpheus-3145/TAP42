@@ -58,7 +58,7 @@ class UI
 		void writeToServer(void);
 		void readFromServer(void);
 		void splitIntoMessages(void);
-		void dispatchMessage(Message const& message);
+		void dispatchMessage(std::string const& message);
 		
 		void handlePollError(void);
 		void handleCommand(void);

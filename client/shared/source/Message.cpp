@@ -73,7 +73,7 @@ std::string	Message::toStringEvent(void) const
 		case EventType::GROUP_JOIN:					return std::format("{} has joined {}", this->data["player"].as_string(), this->data["group"].as_string());
 		case EventType::GROUP_LEAVE:				return std::format("{} has left {}", this->data["player"].as_string(), this->data["group"].as_string());
 		case EventType::GROUP_INVITE:				return std::format("{} has been invited to join {}", this->data["player"].as_string(), this->data["group"].as_string());
-		case EventType::STATS:						return std::format("Player count {}", this->data.as_int());
+		case EventType::STATS:						return std::format("Player count: {}", this->data["count"].as_int());
 		case EventType::ROOM_COMBAT:				return std::format("{} attacked {}", this->data["player"].as_string(), this->data["npc"].as_string());
 		case EventType::ROOM_COMBAT_DEATH_NPC:		return std::format("{} slained NPC {}", this->data["player"].as_string(), this->data["npc"].as_string());
 		case EventType::ROOM_COMBAT_DEATH_PLAYER:	return std::format("NPC {} slained {}", this->data["npc"].as_string(), this->data["player"].as_string());
@@ -90,7 +90,11 @@ std::string	Message::toStringError(void) const
 {
 	assert(this->type == MessageType::ERROR and "wrong type to stringify");
 
-	return this->data["info"].as_string();
+	std::string error = this->data["info"].as_string();
+	if (error.empty() == true)
+		error = std::format("error: ", toString(this->subType.errType));
+
+	return error;
 }
 
 CommandType	Message::getCommandType(void) const noexcept
@@ -101,7 +105,7 @@ CommandType	Message::getCommandType(void) const noexcept
 
 EventType Message::getEventType(void) const noexcept
 {
-	assert(this->type == MessageType::	EVENT and ("requested event type but message is not event"));
+	assert(this->type == MessageType::EVENT and ("requested event type but message is not event"));
 	return this->subType.eventType;
 }
 
@@ -119,33 +123,10 @@ void Message::parse(std::string const& message)
 	if (!(iss >> msgType))
 		throw AppException(ErrorCode::BAD_MESSAGE, "Empty message: " + message);
 	
-	if (msgType == S_OK)
-	{
-		this->type = MessageType::RESPONSE;
-		if ((msgType.size() + 1UL) < message.size())
-			this->parseResponse(message);
-	}
-	else if (msgType == S_ERR)
-	{
-		if ((msgType.size() + 1UL) >= message.size())
-			throw AppException(ErrorCode::BAD_MESSAGE, "Invalid error: " + message);
-
-		this->type = MessageType::ERROR;
-		this->parseError(message);
-	}
-	else if (msgType == S_EVT)
-	{
-		if ((msgType.size() + 1UL) >= message.size())
-			throw AppException(ErrorCode::BAD_MESSAGE, "Invalid event: " + message);
-
-		this->type = MessageType::EVENT;
-		this->parseEvent(message);
-	}
-	else
-	{
-		this->type = MessageType::COMMAND;
-		this->parseCommand(message);
-	}
+	if (msgType == S_OK)		this->parseResponse(message);
+	else if (msgType == S_ERR)	this->parseError(message);
+	else if (msgType == S_EVT)	this->parseEvent(message);
+	else						this->parseCommand(message);
 }
 
 void Message::parseCommand(std::string const& command)
@@ -158,7 +139,7 @@ void Message::parseCommand(std::string const& command)
 	if (!(iss >> cmd))
 		throw AppException(ErrorCode::BAD_MESSAGE, "Empty message: " + command);
 
-	if ((cmd == "GROUP") or (cmd == "CHAT") or (cmd == "WAIT"))		// there are command with two words
+	if ((cmd == "GROUP") or (cmd == "CHAT") or (cmd == "WAIT"))		// there are commands with two words
 	{
 		if (!(iss >> secondCmd))
 			throw AppException(ErrorCode::BAD_MESSAGE, "Incomplete command: " + command);
@@ -198,7 +179,6 @@ void Message::parseResponse(std::string const& response)
 	if ((data[0] != '{') and (data[0] != '['))		// in this case data is just a string
 		data = std::format("\"{}\"", data);
 	
-	LOG_DEBUG(LogContext::INTERFACE, std::format("got: |{}|", data));
 	this->storeJson(data);
 }
 
@@ -225,12 +205,13 @@ void Message::parseEvent(std::string const& event)
 		this->subType.eventType = getEvent(eventTypeStr);
 
 		std::getline(iss >> std::ws, data);
-		if (data.empty() == true)
-			throw AppException(ErrorCode::BAD_MESSAGE, "Missing data for event: " + event);
 	}
 
-	if ((data[0] != '{') and (data[0] != '['))		// in this case data is just a string
+	if (data.empty() == true)
+		throw AppException(ErrorCode::BAD_MESSAGE, "Missing data for event: " + event);
+	else if ((data[0] != '{') and (data[0] != '['))		// in this case data is just a string
 		data = std::format("\"{}\"", data);
+
 	this->storeJson(data);
 }
 
@@ -240,17 +221,15 @@ void Message::parseError(std::string const& error)
 
 	std::istringstream	iss(error);
 	uint16_t			errCode;
-	std::string			errName, errInfo;
+	std::string			err, errName, errInfo;
 
-	if (!(iss >> errCode >> errName))
+	if (!(iss >> err >> errCode >> errName))
 		throw AppException(ErrorCode::BAD_MESSAGE, "Incomplete error: " + error);
 	this->subType.errType = getError(errCode);
 
 	std::getline(iss >> std::ws, errInfo);
-	if (errInfo.empty() == true)
-		throw AppException(ErrorCode::BAD_MESSAGE, "Missing error info: " + error);
-
-	this->storeJson(std::format("{{\"info\": \"{}\"}}", errInfo));
+	if (errInfo.empty() == false)
+		this->storeJson(std::format("{{\"info\": \"{}\"}}", errInfo));
 }
 
 void Message::storeJson(std::string const& jsonStr)

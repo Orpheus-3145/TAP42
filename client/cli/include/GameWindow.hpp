@@ -34,7 +34,8 @@ static std::vector<std::string> CHAT_CMD_HINTS
 	"GROUP LEAVE",
 	"CHAT GROUP",
 	"CHAT ROOM",
-	"CHAT GLOBAL"
+	"CHAT GLOBAL",
+	"QUIT"
 };
 
 class GameWindow : public TapWindow

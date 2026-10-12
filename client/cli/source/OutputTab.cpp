@@ -12,14 +12,6 @@ OutputTab::OutputTab(std::string const& title, int32_t borderChar, int32_t color
 {
 	this->dispatcher[KEY_UP]        = [this] { this->scrollContentUp(); };
 	this->dispatcher[KEY_DOWN]      = [this] { this->scrollContentDown(); };
-	// this->dispatcher[KEY_MOUSE]     = [this] {
-	// 	MEVENT event;
-	// 	if (::getmouse(&event) == OK)
-	// 	{
-	// 		if (event.bstate & BUTTON4_PRESSED)			this->scrollContentUp();
-	// 		else if (event.bstate & BUTTON5_PRESSED)	this->scrollContentDown();
-	// 	}
-	// };
 }
 
 OutputTab::OutputTab(OutputTab&& other) noexcept :
@@ -185,15 +177,18 @@ void OutputTab::deactivate(void)
 
 void OutputTab::appendContent(std::string const& newContent, TextAlign align, uint32_t attrs, bool saveTimestamp)
 {
+	if (saveTimestamp)
+		this->hasTimeStamp = true;
+
 	if (newContent.find('\n') != std::string::npos)
 	{
 		std::stringstream ss(newContent);
-		std::string line, padding = saveTimestamp ? "               " : "";
+		std::string line;
 
 		std::getline(ss, line, '\n');
 		this->state.emplace_back(line, align, attrs, saveTimestamp);
 		while (std::getline(ss, line, '\n'))
-			this->state.emplace_back(padding + line, align, attrs, false);	// add padding cause first message might show the timestamp
+			this->state.emplace_back(line, align, attrs, false);
 	}
 	else
 		this->state.emplace_back(newContent, align, attrs, saveTimestamp);
@@ -206,7 +201,7 @@ void OutputTab::appendContent(std::string const& newContent, TextAlign align, ui
 	getmaxyx(this->outputWin, maxVerticalSpace, _);
 
 	if (static_cast<int32_t>(this->state.size()) > maxVerticalSpace)
-		this->topLineScroll += 1;
+		this->topLineScroll += static_cast<int32_t>(this->state.size()) - maxVerticalSpace;
 }
 
 void OutputTab::updateContent(void) const noexcept
@@ -221,32 +216,36 @@ void OutputTab::updateContent(void) const noexcept
 		this->printLine(this->state[this->topLineScroll + i]);
 }
 
-void OutputTab::printLine(TabMessage const& message) const noexcept
+void OutputTab::printLine(TabMessage const& message) const
 {
-	int32_t y, _;
-	(void)_;
-	getyx(this->outputWin, y, _);
+	int32_t y, x;
+	getyx(this->outputWin, y, x);
 
 	::wclrtoeol(this->outputWin);
-	if (message.align != TextAlign::LEFT)
-	{
-		int32_t w;
-		getmaxyx(this->outputWin, _, w);
-
-		int32_t lenWord = static_cast<int32_t>(message.content.size());
-		if (w > lenWord)
-		{
-			if (message.align == TextAlign::MID)		::wmove(this->outputWin, y, (w - lenWord) / 2U);
-			else if (message.align == TextAlign::RIGHT) ::wmove(this->outputWin, y, w - lenWord);
-		}
-	}
-
 	if (message.timestamp.has_value())
 	{
-		// ignore timings < seconds
 		auto timestamp = std::chrono::time_point_cast<std::chrono::seconds>(message.timestamp.value());
 		std::string strTimestamp = std::format("[{:%H:%M:%S}]  ", timestamp);
 		waddstr(this->outputWin, strTimestamp.data());
+	}
+	else if (this->hasTimeStamp)
+		waddstr(this->outputWin, "            ");
+
+	if (message.align != TextAlign::LEFT)
+	{
+		int32_t w, _;
+		getmaxyx(this->outputWin, _, w);
+		getyx(this->outputWin, y, x);
+		w -= x;
+		if (w < 0)
+			throw AppException(ErrorCode::UI_INVALID_SIZE);
+
+		int32_t start = w - static_cast<int32_t>(message.content.size());
+		if (start > 0)
+		{
+			if (message.align == TextAlign::MID)		::wmove(this->outputWin, y, x + start / 2U);
+			else if (message.align == TextAlign::RIGHT) ::wmove(this->outputWin, y, x + start);
+		}
 	}
 
 	::wattron(this->outputWin, message.attrs);

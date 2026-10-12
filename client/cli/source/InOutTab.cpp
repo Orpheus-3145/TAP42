@@ -18,6 +18,8 @@ InOutTab::InOutTab(
 	InputTab(forwardInputFd, hints, prompt, borderChar, colorPair, parent),
 	OutputTab(title, borderChar, colorPair, parent)
 {
+	// because InputTab cst is called after OutputTab cst, callbacks when pressing
+	// up/down arrow will be overwritten (scroll tab content intstead of suggesting a command/showind history)
 }
 
 InOutTab::InOutTab(InOutTab&& other) noexcept :
