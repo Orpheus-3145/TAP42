@@ -29,7 +29,7 @@ std::string	Message::toStringResponse(CommandType command) const
 	switch (command)
 	{
 		case CommandType::LOOK: 			return std::format("Looking around:\n{}", this->data.toString());
-		case CommandType::MOVE: 			return std::format("Moved to room {}", this->data["room"].as_string());
+		case CommandType::MOVE: 			return std::format("Moved to room {}", this->data["room"]["name"].as_string());
 		case CommandType::WHO: 				return std::format("{} players in the room: {}", this->data["server"].as_string(), this->data["room"].toString());
 		case CommandType::TAKE: 			return std::format("Taken item {}", this->data["taken"].as_string());
 		case CommandType::DROP: 			return std::format("Dropped item {}", this->data["dropped"].as_string());
@@ -197,6 +197,8 @@ void Message::parseResponse(std::string const& response)
 
 	if ((data[0] != '{') and (data[0] != '['))		// in this case data is just a string
 		data = std::format("\"{}\"", data);
+	
+	LOG_DEBUG(LogContext::INTERFACE, std::format("got: |{}|", data));
 	this->storeJson(data);
 }
 

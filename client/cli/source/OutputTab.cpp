@@ -1,6 +1,7 @@
 #include "OutputTab.hpp"
 #include "Exceptions.hpp"
 #include "Logger.hpp"
+#include <sstream>
 
 #include <cassert>
 
@@ -184,7 +185,19 @@ void OutputTab::deactivate(void)
 
 void OutputTab::appendContent(std::string const& newContent, TextAlign align, uint32_t attrs, bool saveTimestamp)
 {
-	this->state.emplace_back(newContent, align, attrs, saveTimestamp);
+	if (newContent.find('\n') != std::string::npos)
+	{
+		std::stringstream ss(newContent);
+		std::string line, padding = saveTimestamp ? "               " : "";
+
+		std::getline(ss, line, '\n');
+		this->state.emplace_back(line, align, attrs, saveTimestamp);
+		while (std::getline(ss, line, '\n'))
+			this->state.emplace_back(padding + line, align, attrs, false);	// add padding cause first message might show the timestamp
+	}
+	else
+		this->state.emplace_back(newContent, align, attrs, saveTimestamp);
+
 	if (this->outputWin == nullptr)
 		return;
 
