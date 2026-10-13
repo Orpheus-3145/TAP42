@@ -169,7 +169,7 @@ void cmd_use(const std::shared_ptr<Session>& session, const std::vector<std::str
                                 {"amount", std::to_string(heal_amount)}});
         broadcast_to_room(room_id, session->player_id,
                                 "EVT ROOM ITEM_USE " +
-                                "{\"player\":\"" + session->player_id + "\"," +
+                                std::string("{\"player\":\"") + session->player_id + "\"," +
                                 "\"item\":\"" + used_item_id + "\"}");
     } else if (is_damage) {
         log_info("item_used", {{"player", session->player_id},
@@ -179,7 +179,7 @@ void cmd_use(const std::shared_ptr<Session>& session, const std::vector<std::str
                                 {"damage", std::to_string(damage_dealt)}});
         if (npc_died) {
             broadcast_to_room(room_id, "", "EVT ROOM COMBAT_DEATH_NPC " +
-                                    "{\"player\":\"" + session->player_id + "\"," +
+                                    std::string("{\"player\":\"") + session->player_id + "\"," +
                                     "\"npc\":\"" + npc_id + "\"," +
                                     "\"damage\":\"" + std::to_string(damage_dealt) + "\"," +
                                     "\"health\":\"" + std::to_string(target_hp) + "\"}");
@@ -187,7 +187,7 @@ void cmd_use(const std::shared_ptr<Session>& session, const std::vector<std::str
             on_npc_defeated(session->player_id, npc_id);
         } else {
             broadcast_to_room(room_id, session->player_id, "EVT ROOM COMBAT " +
-                                    "{\"player\":\"" + session->player_id + "\"," +
+                                    std::string("{\"player\":\"") + session->player_id + "\"," +
                                     "\"npc\":\"" + npc_id + "\"," +
                                     "\"damage\":\"" + std::to_string(damage_dealt) + "\"," +
                                     "\"health\":\"" + std::to_string(target_hp) + "\"}");

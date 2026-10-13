@@ -125,14 +125,14 @@ void cmd_attack(const std::shared_ptr<Session>& session, const std::vector<std::
                                     {"target_hp", std::to_string(target_hp)}});
         if (npc_died) {
             broadcast_to_room(room_id, "", "EVT ROOM COMBAT_DEATH_NPC " +
-                                "{\"player\":\"" + session->player_id + "\"," +
+                                std::string("{\"player\":\"") + session->player_id + "\"," +
                                 "\"npc\":\"" + npc_id + "\"}");
             log_info("npc_defeated", {{"player", session->player_id}, {"npc", npc_id}});
             on_npc_defeated(session->player_id, npc_id);
         } else {
             broadcast_to_room(room_id, session->player_id,
                             "EVT ROOM COMBAT " +
-                            "{\"player\":\"" + session->player_id + "\"," +
+                            std::string("{\"player\":\"") + session->player_id + "\"," +
                             "\"npc\":\"" + npc_id + "\"," +
                             "\"damage\":\"" + std::to_string(damage_dealt) + "\"," +
                             "\"health\":\"" + std::to_string(target_hp) + "\"}");
@@ -140,7 +140,7 @@ void cmd_attack(const std::shared_ptr<Session>& session, const std::vector<std::
     }
     if (player_died) {
         broadcast_to_room(old_room, session->player_id, "EVT ROOM COMBAT_DEATH_PLAYER " +
-                                "{\"player\":\"" + session->player_id + "\"," +
+                                std::string("{\"player\":\"") + session->player_id + "\"," +
                                 "\"npc\":\"" + npc_id + "\"}");
         broadcast_to_room(old_room, session->player_id, "EVT ROOM PRESENCE_LEAVE " + session->player_id);
         broadcast_to_room(new_room, session->player_id, "EVT ROOM PRESENCE_ENTER " + session->player_id);

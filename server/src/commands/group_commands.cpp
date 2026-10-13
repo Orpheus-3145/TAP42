@@ -42,7 +42,7 @@ void cmd_group_invite(const std::shared_ptr<Session>& session, const std::vector
     if (!group_id.empty()) {
         auto target_session = SessionRegistry::instance().get(target);
         if (target_session) send_line(*target_session, "EVT GROUP INVITE " +
-                                    "{\"player\":\"" + session->player_id + "\"," +
+                                    std::string("{\"player\":\"") + session->player_id + "\"," +
                                     "\"group\":\"" + group_id + "\"}");
         log_info("group_invite", {{"inviter", session->player_id}, {"invited", target}, {"group", group_id}});
     }
@@ -81,7 +81,7 @@ void cmd_group_accept(const std::shared_ptr<Session>& session, const std::vector
     send_line(*session, response);
     if (!group_id.empty()) {
         broadcast_to_group(group_id, session->player_id, "EVT GROUP JOIN " +
-                                    "{\"player\":\"" + session->player_id + "\"," +
+                                    std::string("{\"player\":\"") + session->player_id + "\"," +
                                     "\"group\":\"" + group_id + "\"}");
         log_info("group_join", {{"player", session->player_id}, {"group", group_id}});
     }
@@ -98,7 +98,7 @@ void cmd_group_leave(const std::shared_ptr<Session>& session) {
     send_line(*session, "OK {\"left\":\"" + group_id + "\"}");
     if (!group_id.empty()) {
         broadcast_to_group(group_id, "", "EVT GROUP LEAVE " +
-                                    "{\"player\":\"" + session->player_id + "\"," +
+                                    std::string("{\"player\":\"") + session->player_id + "\"," +
                                     "\"group\":\"" + group_id + "\"}");
         log_info("group_leave", {{"player", session->player_id}, {"group", group_id}});
     }
