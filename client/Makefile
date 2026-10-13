@@ -6,7 +6,7 @@ DEBUG_FLAGS              := -O0 -g3 -fsanitize=address,undefined -fno-omit-frame
 DEPS_FLAGS               := -MMD -MP -MF
 
 LOG_DIR                  := logs
-CLIENT_DIR               := clients
+CLIENT_DIR               := client
 CLI_DIR                  := cli
 GUI_DIR                  := gui
 BUILD_DIR                := build
@@ -33,7 +33,7 @@ GUI_DEPS_DIR              = $(DEPS_DIR)/$(CLIENT_DIR)/$(GUI_DIR)
 SHARED_SOURCES            = $(shell find $(SHARED_SRC_DIR) -type f -name '*.cpp')
 SHARED_SOURCES_CLIENT     = $(shell find $(SHARED_SRC_DIR_CLIENT) -type f -name '*.cpp')
 CLI_SOURCES               = $(shell find $(CLI_SRC_DIR) -type f -name '*.cpp')
-GUI_SOURCES               = $(shell find $(GUI_SRC_DIR) -type f -name '*.cpp')
+GUI_SOURCES               = $(shell find $(GUI_SRC_DIR) -type f -name '*.cpp' ! -name 'moc_*')
 
 SHARED_OBJECTS            = $(patsubst $(SHARED_SRC_DIR)/%.cpp,$(SHARED_OBJ_DIR)/%.o,$(SHARED_SOURCES))
 SHARED_OBJECTS_CLIENT     = $(patsubst $(SHARED_SRC_DIR_CLIENT)/%.cpp,$(SHARED_OBJ_DIR_CLIENT)/%.o,$(SHARED_SOURCES_CLIENT))
@@ -59,10 +59,12 @@ GUI_LIB_TARGET           := $(GUI_OBJ_DIR)/libTapGUI.a
 
 CLI_TARGET               := tap-client-cli
 GUI_TARGET               := tap-client-gui
-MOC                       = $(shell find /usr -name moc -type f 2>/dev/null)
 
-MOC_SOURCES              := $(GUI_SRC_DIR)/moc_GameWindow.cpp $(GUI_SRC_DIR)/moc_GUI.cpp
-MOC_OBJECTS              := $(OBJ_DIR)/$(CLIENT_DIR)/gui/moc_GameWindow.o $(OBJ_DIR)/$(CLIENT_DIR)/gui/moc_GUI.o
+MOC                      := $(shell find /usr -name moc -type f 2>/dev/null | head -n 1)
+MOC_DIR                  := $(BUILD_DIR)/moc
+MOC_HEADERS               = $(shell grep -l Q_OBJECT $(GUI_DIR)/include/*.hpp)
+MOC_SOURCES               = $(patsubst $(GUI_DIR)/include/%.hpp,$(MOC_DIR)/moc_%.cpp,$(MOC_HEADERS))
+MOC_OBJECTS               = $(patsubst $(MOC_DIR)/%.cpp,$(GUI_OBJ_DIR)/%.o,$(MOC_SOURCES))
 
 
 all: cli
@@ -82,7 +84,7 @@ test:
 		../shared/source/Exceptions.cpp ../shared/source/JsonParser.cpp \
 		-Ishared/include -I../shared/include -o test_message
 
-$(LOG_DIR) $(SHARED_OBJ_DIR) $(SHARED_OBJ_DIR_CLIENT) $(CLI_OBJ_DIR) $(GUI_OBJ_DIR) $(SHARED_DEPS_DIR) $(SHARED_DEPS_DIR_CLIENT) $(CLI_DEPS_DIR) $(GUI_DEPS_DIR):
+$(LOG_DIR) $(MOC_DIR) $(SHARED_OBJ_DIR) $(SHARED_OBJ_DIR_CLIENT) $(CLI_OBJ_DIR) $(GUI_OBJ_DIR) $(SHARED_DEPS_DIR) $(SHARED_DEPS_DIR_CLIENT) $(CLI_DEPS_DIR) $(GUI_DEPS_DIR):
 	mkdir -p $@
 
 # build CLI executable
@@ -105,16 +107,13 @@ $(GUI_TARGET): $(SHARED_OBJECTS) $(SHARED_OBJECTS_CLIENT) $(GUI_LIB_TARGET) | $(
 $(GUI_LIB_TARGET): $(GUI_OBJECTS) $(MOC_OBJECTS)
 	ar -rcs $@ $(GUI_OBJECTS) $(MOC_OBJECTS)
 
-# compile GUI source files
 $(GUI_OBJ_DIR)/%.o: $(GUI_SRC_DIR)/%.cpp | $(GUI_OBJ_DIR) $(GUI_DEPS_DIR)
 	$(CC) $(CPP_FLAGS) $(INCLUDE_GUI) $(GUI_QT_CFLAGS) $(DEPS_FLAGS) $(GUI_DEPS_DIR)/$*.d -c $< -o $@
 
-# build moc_ source files from Qt headers
-$(GUI_SRC_DIR)/moc_%.cpp: $(GUI_DIR)/include/%.hpp
+$(MOC_DIR)/moc_%.cpp: $(GUI_DIR)/include/%.hpp | $(MOC_DIR)
 	$(MOC) $(INCLUDE_GUI) $< -o $@
 
-# compile GUI moc_ files
-$(GUI_OBJ_DIR)/moc_%.o: $(GUI_SRC_DIR)/moc_%.cpp | $(GUI_OBJ_DIR)
+$(GUI_OBJ_DIR)/moc_%.o: $(MOC_DIR)/moc_%.cpp | $(GUI_OBJ_DIR)
 	$(CC) $(CPP_FLAGS) $(INCLUDE_GUI) $(GUI_QT_CFLAGS) -c $< -o $@
 
 # compile (globally) shared source files
@@ -138,3 +137,4 @@ re-cli: clean cli
 re-gui: clean gui
 
 .PHONY: all cli gui run-cli run-gui clean fclean re-cli re-gui
+.SECONDARY: $(MOC_SOURCES)

@@ -13,10 +13,22 @@ GUI::GUI(int32_t height, int32_t width) : UI()
 {
 	this->app = std::make_unique<QApplication>(argc, argv);
 
-	this->loginWin = std::make_unique<LoginWindow>(nullptr, height, width, this);
-	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(nullptr, height, width, this);
-	this->gameWin = std::make_unique<GameWindow>(nullptr, height, width, this);
-	this->errorWin = std::make_unique<ErrorWindow>(nullptr, height, width, this);
+	// server data: responses, events
+	this->readFromServerNotifier = std::make_unique<QSocketNotifier>(this->pollFds[GUI::CLIENT].fd, QSocketNotifier::Read, nullptr);
+	QObject::connect(
+		this->readFromServerNotifier.get(),
+		&QSocketNotifier::activated,
+	    this,
+		[this]() {
+			this->readFromServer();
+		}
+	);
+
+	this->loginWin = std::make_unique<LoginWindow>(nullptr, this);
+	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(nullptr, this);
+	this->gameWin = std::make_unique<GameWindow>(nullptr, this);
+	this->gameWin->draw(height, width);
+	this->errorWin = std::make_unique<ErrorWindow>(nullptr, this);
 
 	// when user sends a command from the UI
 	QObject::connect(
@@ -30,18 +42,6 @@ GUI::GUI(int32_t height, int32_t width) : UI()
 			this->writeToServer();
 		}
 	);
-
-	// server data: responses, events
-	this->readFromServerNotifier = std::make_unique<QSocketNotifier>(this->pollFds[GUI::CLIENT].fd, QSocketNotifier::Read, nullptr);
-	QObject::connect(
-		this->readFromServerNotifier.get(),
-		&QSocketNotifier::activated,
-	    this,
-		[this]() {
-			this->readFromServer();
-		}
-	);
-
     this->gameWin->show();
 	LOG_INFO(LogContext::INTERFACE, "Done setup GUI");
 }

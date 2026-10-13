@@ -15,23 +15,9 @@ class ErrorWindow : public Window
 	public:
 		using Window::Window;
 
-		ErrorWindow(QWidget *parent, int32_t height, int32_t width, UI* engine) :
-			Window(parent, height, width, engine) {}
-
 		~ErrorWindow(void) noexcept {}
-
-	// signals:
-	// 	void commandEntered(const QString &command);
-
-	// private slots:
-	// 	void onPromptSubmitted();
 
 	private:
 		void draw(int32_t height, int32_t width) override;
-
-		// QPlainTextEdit *inputLog;
-		// QLineEdit      *promptField;
-		// QPlainTextEdit *responsesLog;
-		// QPlainTextEdit *eventsLog;
 };
 

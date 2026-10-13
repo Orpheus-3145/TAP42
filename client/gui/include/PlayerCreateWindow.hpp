@@ -12,21 +12,8 @@ class PlayerCreateWindow : public Window
 	public:
 		using Window::Window;
 
-		PlayerCreateWindow(QWidget *parent, int32_t height, int32_t width, UI* engine);
-
 		~PlayerCreateWindow(void) noexcept {}
-
-	// signals:
-	// 	void commandEntered(const QString &command);
-
-	// private slots:
-	// 	void onPromptSubmitted();
 
 	private:
 		void draw(int32_t height, int32_t width) override;
-
-		// QPlainTextEdit *inputLog;
-		// QLineEdit      *promptField;
-		// QPlainTextEdit *responsesLog;
-		// QPlainTextEdit *eventsLog;
 };

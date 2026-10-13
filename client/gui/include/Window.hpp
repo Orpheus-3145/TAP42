@@ -17,7 +17,7 @@ class Window : public QMainWindow
     Q_OBJECT
 
 	public:
-		Window(QWidget *parent, int32_t height, int32_t width, UI* engine);
+		Window(QWidget *parent, UI* engine);
 
 		Window(Window const& other) = delete;
 		Window& operator=(Window const& other) = delete;
@@ -25,12 +25,6 @@ class Window : public QMainWindow
 		Window& operator=(Window&& other) = delete;
 
 		virtual ~Window(void) noexcept;
-
-	// signals:
-	// 	void commandEntered(const QString &command);
-
-	// private slots:
-	// 	void onPromptSubmitted();
 
 		// void		switchActiveTab(int32_t index = -1);
 		// BasicTab*	getActiveTab(void) { return this->tabs.at(this->activeTabIndex).get(); }
@@ -43,7 +37,5 @@ class Window : public QMainWindow
 		// std::map<size_t,std::unique_ptr<BasicTab>>	tabs{};
 		// std::set<size_t>							tabsToSkip{};
 
-		int32_t height{0};
-		int32_t width{0};
 		// int32_t activeTabIndex{0};
 };

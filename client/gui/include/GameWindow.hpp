@@ -63,7 +63,11 @@ class GameWindow : public Window
 	public:
 		using Window::Window;
 
+<<<<<<< HEAD
 		GameWindow(QWidget *parent, int32_t height, int32_t width, UI* engine);
+=======
+		GameWindow(QWidget *parent, UI* engine, int32_t height, int32_t width);
+>>>>>>> fc40008 (GUI - interface is static, added base of classes for windows)
 
 		~GameWindow(void) noexcept {}
 

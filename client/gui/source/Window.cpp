@@ -6,13 +6,11 @@
 #include <format>
 
 
-Window::Window(QWidget *parent, int32_t height, int32_t width, UI* engine) : 
+Window::Window(QWidget *parent, UI* engine) : 
 	QMainWindow(parent),
 	engine{engine}
 {
-	(void) height;
-	(void) width;
-	assert(this->engine != nullptr and "Null pointer for engine instance received");
+	assert(this->engine != nullptr and "null pointer for engine instance received");
 }
 
 Window::~Window(void) noexcept

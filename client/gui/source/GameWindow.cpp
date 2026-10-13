@@ -1,8 +1,8 @@
 #include "GameWindow.hpp"
 
 
-GameWindow::GameWindow(QWidget *parent, int32_t height, int32_t width, UI* engine) :
-	Window(parent, height, width, engine)
+GameWindow::GameWindow(QWidget *parent, UI* engine) :
+	Window(parent, engine)
 {
 	// signal when to app when user presses enter on command input 
 	QObject::connect(
@@ -26,11 +26,11 @@ void GameWindow::onPromptSubmitted()
 
 void GameWindow::draw(int32_t height, int32_t width)
 {
-	setWindowTitle("TAP 42");
-	resize(width, height);
+	this->setWindowTitle("TAP 42");
+	this->resize(width, height);
 
 	QWidget *central = new QWidget(this);
-	setCentralWidget(central);
+	this->setCentralWidget(central);
 
 	QHBoxLayout *rootLayout = new QHBoxLayout(central);
 	rootLayout->setContentsMargins(10, 10, 10, 10);
@@ -71,6 +71,8 @@ void GameWindow::draw(int32_t height, int32_t width)
 
 	rootLayout->addWidget(leftPanel, /*stretch=*/1);
 	rootLayout->addWidget(rightSplitter, /*stretch=*/1);
+
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing game window, size h: {}, w: {}", height, width));
 }
 
 void GameWindow::appendResponse(Message const& response, CommandType cmdType)
