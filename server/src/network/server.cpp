@@ -16,12 +16,20 @@
 
 namespace {
 
+// Sent unprompted right after the TCP connection opens, before the client
+// has sent anything. Purely a "the server is alive and speaking this
+// protocol version" signal - it isn't a response to any command, so it
+// doesn't follow the OK/ERR request-response pairing, but it does reuse
+// the OK-line shape since that's already a recognized message category.
+constexpr const char* INITIAL_GREETING = "OK hello proto=1";
+
 void client_loop(net::socket_t client_fd, std::string peer_ip) {
     auto session = std::make_shared<Session>();
     session->socket_fd = client_fd;
     session->peer_ip = peer_ip;
 
     log_info("client_connected", {{"ip", peer_ip}});
+    send_line(*session, INITIAL_GREETING);
 
     std::string line;
     while (session->connected && read_line(*session, line)) {

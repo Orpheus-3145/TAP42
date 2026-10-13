@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "network/server.hpp"
+#include "world/character_store.hpp"
 #include "world/loader.hpp"
 
 int main(int argc, char** argv) {
@@ -13,6 +14,7 @@ int main(int argc, char** argv) {
         std::cerr << "Failed to load world data\n";
         return 1;
     }
+    character_store::init("data/characters");
 
     return run_server(port);
 }

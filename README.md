@@ -1,6 +1,5 @@
 # TAP42
-TAP, or The Answer Protocol, is an MUD (multi-user dungeon), or a multiplayer text-adventure game, served on a client-server architecture based on TCP protocol, as specifically defined inside the RFC.42TAP document protocol
-
+TAP, or The Answer Protocol, is a MUD (multi-user dungeon), or a multiplayer text-adventure game, served on a client-server architecture based on TCP protocol, as specifically defined inside the RFC.42TAP document protocol
 
 # Client
 
@@ -27,3 +26,27 @@ From the client/ folder:
 5. Press `ENTER` to send an input or to activate a button
 
 Note that the client will expected the TCP handshake from server before forwarding the username.
+
+## Design choices: combat and quest systems
+
+RFC42TAP §6.1 leaves the combat and quest systems intentionally underspecified and requires implementers to document and justify their own design choices here. This section covers what the server actually does and why, matching the RFC's own list of open points one by one.
+
+### Combat system
+
+- **Turn-based mechanics.** There is no turn state waiting on a second command. An `ATTACK` resolves the player's hit and, if the target survives, its counterattack in the same request/response — the player "acts", the server immediately computes both sides of the exchange, and the reply already carries the full outcome. This was chosen over a real turn queue because a shared-mutex, thread-per-connection server has no natural place to park "waiting for the other side's move" state without adding a second round of messages and a timeout for players who never send it; resolving everything inside one command keeps combat trivially thread-safe and easy to test.
+- **Damage calculation.** Player damage is a uniform random roll (10–15). Both sides can also miss: the player hits 85% of the time, an NPC's counter lands 70% of the time, rolled independently — a miss on one side never cancels the other side's own roll. An NPC that survives counters with its own uniform roll, 3–8 by default, but that range is **per NPC**: the world data can override it per NPC, including setting min==max for a fixed hit (the bartender, for instance, always counters for exactly 100). No defense stat, no critical hits: the RFC does not require them and a flat damage range with a miss chance is enough to make fights take more than one exchange without adding a stat system nothing else in the project needs.
+- **Combat states.** There is no explicit "in combat" flag. Combat begins the moment `ATTACK` is sent and ends the moment the target (or the player) reaches 0 HP; `STATUS` derives an `in_combat` reading from whether the player's last attacked NPC is still alive, rather than tracking a separate state machine. A player who dies respawns immediately, in the same command, at a fixed safe room with a fixed HP value — death is never a dead end that needs a separate command to recover from.
+- **Additional commands.** `DEFEND` and `FLEE` are not implemented. The RFC's base command set doesn't require them, and adding either would need a real turn model (see above) to mean anything, which was a deliberate scope cut for this iteration. A non-RFC `USE` command was added instead, for item-based actions (healing potions, offensive items) that don't need a turn model to make sense.
+- **Status effects.** None. Items and combat only ever change HP directly and immediately; there is no duration-tracked state (poison, buffs, debuffs) anywhere in `PlayerState` or `Npc`. Out of scope for the same reason as DEFEND/FLEE: no turn model to tick effects against.
+
+### Quest system
+
+- **Quest progression.** Two quest types: `fetch` (bring back a specific item) and `defeat`, which can name either one NPC or a whole list of them (e.g. "clear every rat in the sewers"). Every quest defined in the world data is seeded as `in_progress` for a player automatically on login — there's no accept step, since the RFC doesn't ask for one and one more round trip wouldn't change how the quest is tracked afterward.
+- **Quest completion.** Fully automatic. `TAKE`-ing a fetch quest's target item flips it to `completed` immediately. A `defeat` quest completes the moment the *last* NPC on its list dies — and at that point it completes for **every player** who still has that quest in progress, not just whoever landed the final kill. Defeat is world state ("the sewers are clear"), not personal credit, so it wouldn't make sense to reward only the one player who happened to get the kill.
+- **Quest rewards.** A quest may optionally name a `reward_item_id`, added straight to the player's inventory the instant the quest completes. Quests that can complete for several players at once deliberately have no reward item: handing the same item id to multiple inventories simultaneously would break instance uniqueness, so those are reward-free by design rather than by oversight.
+- **Quest dependencies.** Not a quest-to-quest prerequisite chain, but a generic NPC dialogue unlock: an NPC can define bonus dialogue lines that only join its conversation cycle once a player has `completed` status on every quest in that NPC's unlock list. Reusable for any NPC/quest combination, not hardcoded to one storyline.
+- **Additional commands.** No `COMPLETE_QUEST` or `ABANDON_QUEST`: since completion is automatic and always forward-only, neither has anything to do yet.
+
+### Persistent characters
+
+Players are no longer pure session state. `CREATE_CHARACTER` makes a named character once (with a couple of cosmetic, gameplay-inert fields — race, special attributes); `CONNECT` is login for a character that already exists, restoring room, HP, inventory, quest progress and dialogue progress exactly as they were. Full protocol details and the persistence design (one JSON file per character, atomic writes) are in `PROTOCOL.md` rather than duplicated here, since this section exists for the RFC's combat/quest justification requirement specifically.

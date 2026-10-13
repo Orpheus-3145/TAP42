@@ -4,8 +4,9 @@ Riferimento condiviso tra server e client (CLI/GUI). Da tenere aggiornato man
 mano che si chiudono i punti aperti in fondo al documento.
 
 Stato implementazione lato server: tutti i comandi sono implementati e
-verificati con test funzionali (item, combattimento, quest, gruppi). Il
-world data è caricato davvero da `server/data/world.json` con validazione
+verificati con test funzionali (item, combattimento, quest, gruppi,
+creazione/login personaggi). Il world data è caricato davvero da
+`server/data/world.json` con validazione
 referenziale completa (exits, item/npc piazzati, target delle quest — vedi
 `server/src/world/loader.cpp`). Il mondo attuale è una locanda con un
 seminterrato che scende nei sotterranei, 13 stanze in totale con un loop
@@ -13,9 +14,28 @@ chiuso nei sotterranei e un ramo morto verso il boss.
 
 ## 0. Persistenza
 
-Nessuna persistenza: tutto lo stato del mondo vive in RAM per la durata del
-processo server e viene perso al restart. Nessun salvataggio su file/DB
-durante la partita.
+Il mondo statico (stanze, item, npc, quest — tutto ciò che viene da
+`world.json`) resta solo in RAM: nessun salvataggio, si perde e si ricarica
+identico a ogni restart.
+
+I personaggi invece sono persistiti su disco, un file JSON per personaggio
+sotto `server/data/characters/<nome>.json` (vedi
+`server/src/world/character_store.cpp`). Scelta deliberata: un file per
+personaggio invece di un unico database, così il salvataggio di un
+giocatore non prende mai un lock che blocchi il salvataggio di un altro —
+solo due salvataggi dello stesso personaggio (es. una quest che si completa
+grazie alla kill di un altro giocatore mentre lui si sta muovendo) si
+serializzano tra loro. Il file viene riscritto dopo ogni comando che cambia
+lo stato del personaggio (MOVE, TAKE/DROP/USE, ATTACK, TALK, completamento
+quest) e di nuovo, per sicurezza, alla disconnessione. Ogni scrittura passa
+prima per un file temporaneo (`<nome>.json.tmp`) e solo alla fine viene
+rinominato sopra il file vero: un crash a metà scrittura lascia il
+personaggio con il salvataggio precedente intatto, mai con un JSON
+troncato/corrotto.
+
+Non esistono credenziali: l'unico identificatore di un personaggio è il suo
+nome, che deve essere alfanumerico (più `_` e `-`, max 32 caratteri) perché
+finisce direttamente nel path del file.
 
 ## 1. Regole di framing
 
@@ -23,6 +43,11 @@ durante la partita.
 - Ogni riga è un messaggio completo (nessun messaggio spezzato su più righe)
 - I comandi sono `UPPERCASE`; gli argomenti liberi (nomi giocatore, testo
   chat) mantengono il case originale
+- Subito dopo l'accept, prima ancora che il client mandi qualsiasi cosa, il
+  server invia una riga di saluto non richiesta: `OK hello proto=1`. Non è
+  la risposta a nessun comando, è solo il segnale "il server è vivo e
+  parla questa versione del protocollo" — il client deve aspettarla prima
+  di mandare il primo comando, non deve rispondere ad essa.
 
 ## 2. Tre categorie di messaggio
 
@@ -39,37 +64,108 @@ bloccarsi.
 ## 3. Formato errori
 
 ```
-ERR <CODE> <messaggio leggibile>
+ERR <code numerico a 3 cifre> <NOME_SIMBOLICO> <dettaglio leggibile>
 ```
 
-| CODE | Significato |
-|---|---|
-| `ERR_UNKNOWN_CMD` | comando non riconosciuto |
-| `ERR_BAD_ARGS` | argomenti mancanti/malformati |
-| `ERR_NOT_CONNECTED` | comando richiede CONNECT prima |
-| `ERR_ALREADY_CONNECTED` | CONNECT già effettuato |
-| `ERR_NAME_TAKEN` | nome già in uso da un altro giocatore connesso |
-| `ERR_NO_EXIT` | direzione non valida da questa stanza |
-| `ERR_ITEM_NOT_FOUND` | item non presente/riferito male |
-| `ERR_NPC_NOT_FOUND` | NPC non presente nella stanza |
-| `ERR_TARGET_NOT_FOUND` | target ATTACK/GROUP INVITE non valido o non connesso |
-| `ERR_DEAD` | azione (ATTACK o USE) non permessa perché il player è a 0 HP |
-| `ERR_QUEST_NOT_FOUND` | id quest non valido |
-| `ERR_NOT_IN_GROUP` | CHAT GROUP inviato senza far parte di un gruppo |
-| `ERR_INTERNAL` | errore server generico |
+Il codice è numerico come richiede la grammatica ABNF della RFC
+(`error-code = 3DIGIT`). Il nome simbolico subito dopo è il primo token del
+messaggio — un client può confrontare quello senza doversi fidare del
+dettaglio testuale che segue, pensato per log/debug umano. Dove possibile
+riusiamo esattamente i codici che la RFC assegna; per le condizioni che la
+RFC non prevede (il nostro CREATE_CHARACTER/PROFILE, il sistema di
+personaggi persistenti, ecc.) estendiamo lo schema restando nello stesso
+stile (2xx identità, 3xx movimento, 4xx risorsa non trovata, stessa logica
+della RFC che riusa 404 per più condizioni con testo diverso).
+
+| Codice | Nome simbolico | Quando |
+|---|---|---|
+| 102 | `NOT_CONNECTED` | comando richiede CONNECT/CREATE_CHARACTER prima |
+| 200 | `BAD_MESSAGE` | comando sconosciuto o argomenti mancanti/malformati |
+| 201 | `NAME_IN_USE` | nome già online, o già esistente su disco (CREATE_CHARACTER) |
+| 301 | `NO_EXIT` | direzione non valida da questa stanza |
+| 401 | `NOT_IN_GROUP` | CHAT GROUP inviato senza far parte di un gruppo |
+| 402 | `ALREADY_IN_GROUP` | GROUP CREATE mandato mentre si è già in un gruppo |
+| 404 | `ITEM_NOT_FOUND` | item non presente nella stanza (TAKE) |
+| 404 | `ITEM_NOT_IN_INVENTORY` | item non in inventario (DROP, USE) |
+| 404 | `NPC_NOT_FOUND` | NPC non presente nella stanza (TALK, ATTACK, USE) |
+| 404 | `PLAYER_NOT_FOUND` | player non connesso (GROUP INVITE) |
+| 404 | `CHARACTER_NOT_FOUND` | CONNECT con un nome che non ha mai fatto CREATE_CHARACTER |
+| 404 | `QUEST_NOT_FOUND` | id quest non valido |
+| 409 | `DEAD` | azione (ATTACK o USE) non permessa perché il player è a 0 HP |
+| 500 | `INTERNAL` | errore server generico |
+
+Stesso codice 404 per più condizioni, testo diverso — esattamente come fa
+la RFC stessa con `ITEM_NOT_FOUND`/`ITEM_NOT_IN_INVENTORY`/`NPC_NOT_FOUND`.
 
 ## 4. Comandi (Client → Server)
+
+### CREATE_CHARACTER — estensione non RFC
+```
+C: CREATE_CHARACTER <name> <race> [special_attributes...]
+S: OK {"name":"...","race":"...","special_attributes":"...","room":"loc.start","hp":100,"max_hp":100,"inventory":[]}
+S: ERR 200 BAD_MESSAGE ...
+S: ERR 201 NAME_IN_USE ...
+S: ERR 201 NAME_IN_USE ...   # sessione già connessa a un altro personaggio
+```
+Crea un personaggio nuovo e ci connette la sessione corrente, in un solo
+passo. `name` e `race` sono un solo token ciascuno; `special_attributes` è
+libero, può contenere spazi, prende tutto il resto della riga. Solo `name`
+è obbligatorio: `race` e `special_attributes` possono mancare entrambi,
+restano semplicemente stringhe vuote finché il client non li raccoglie.
+
+`race` e `special_attributes` sono campi fissi (lo slot esiste sempre) ma a
+valore libero: il giocatore scrive quello che vuole, il server li salva e li
+restituisce tali e quali, senza che influenzino mai una statistica o un tiro
+di dado — sono lì solo perché il client li mostri. Tutti i personaggi
+partono identici: stesse HP (100/100), stesso punto di spawn (`loc.start`),
+indipendentemente da cosa è stato scritto in questi campi. Lo stesso punto
+di spawn viene usato anche per il respawn dopo la morte (§ ATTACK).
+
+**Alias di compatibilità**: `CREATE PLAYER <name>` (due token) è accettato
+come sinonimo esatto di `CREATE_CHARACTER <name>` — è la stringa che il
+client CLI manda oggi. Stesso handler, stessa risposta; documentato qui
+solo perché non è il nome canonico del comando.
+
+`NAME_IN_USE` scatta sia se il nome è già online sia se esiste già un
+file di quel personaggio su disco da una sessione precedente — un nome, una
+volta creato, è riservato per sempre.
 
 ### CONNECT
 ```
 C: CONNECT <name>
 S: OK connected
-S: ERR ERR_ALREADY_CONNECTED ...
-S: ERR ERR_NAME_TAKEN ...
+S: ERR 201 NAME_IN_USE ...
+S: ERR 404 CHARACTER_NOT_FOUND ...
 ```
-All'atto della CONNECT, tutte le quest del mondo vengono inizializzate a
-`in_progress` per il player (vedi §7, nessun comando ACCEPT esplicito per le
-quest — RFC non lo prevede).
+CONNECT è il login di un personaggio che esiste già: il server verifica che
+il nome non sia già online, carica lo stato salvato da
+`data/characters/<name>.json` (stanza, HP, inventario, progresso quest,
+progresso dialoghi — tutto com'era all'ultima disconnessione) e lo rimette
+in gioco esattamente da lì. Un nome mai creato con CREATE_CHARACTER dà
+`404 CHARACTER_NOT_FOUND`, non crea nulla al posto del client.
+
+La risposta di successo è letteralmente `OK connected`, senza payload:
+RFC42TAP §5.1.1 la specifica esattamente così, quindi qui non c'è spazio per
+infilarci il profilo del personaggio. Per quello vedi PROFILE subito sotto —
+il client lo chiama dopo un CONNECT riuscito (o in qualsiasi altro momento).
+
+### PROFILE — estensione non RFC
+```
+C: PROFILE
+S: OK {"name":"...","race":"...","special_attributes":"...","room":"...","hp":...,"max_hp":...,"inventory":[...]}
+S: ERR 102 NOT_CONNECTED ...
+```
+Restituisce lo stesso identico blocco JSON che CREATE_CHARACTER dà al
+momento della creazione: nome, campi cosmetici, stanza attuale, HP e
+inventario. Non è legata al momento del login, si può chiamare in
+qualunque punto della sessione, stesso trattamento di STATUS/INVENTORY.
+
+Le quest vengono comunque passate attraverso l'inizializzazione a
+`in_progress` a ogni CONNECT (vedi §7, nessun comando ACCEPT esplicito per
+le quest — RFC non lo prevede): questo serve solo a coprire il caso in cui
+`world.json` abbia guadagnato una quest nuova da quando il personaggio è
+stato salvato l'ultima volta, così non resta bloccato per sempre su
+`not_started`. Le quest già presenti nel salvataggio non vengono toccate.
 
 ### LOOK
 ```
@@ -81,7 +177,7 @@ S: OK {"room": {"id":"...","name":"...","description":"...","exits":{"north":"lo
 ```
 C: MOVE <direction>
 S: OK room=<new_room_id>
-S: ERR ERR_NO_EXIT ...
+S: ERR 301 NO_EXIT ...
 ```
 Eventi broadcast (vecchia e nuova stanza):
 ```
@@ -93,18 +189,18 @@ EVT ROOM PRESENCE_ENTER <player>
 ```
 C: CHAT <GLOBAL|ROOM|GROUP> <text...>
 S: OK
-S: ERR ERR_NOT_IN_GROUP ...   # solo per scope GROUP
-EVT <SCOPE> CHAT <player> <text...>
+S: ERR 401 NOT_IN_GROUP ...   # solo per scope GROUP
+EVT <SCOPE> CHAT {"player":"...","text":"..."}
 ```
 
 ### TAKE / DROP
 ```
 C: TAKE <item id o nome esatto>
-S: OK taken=<item_id>
-S: ERR ERR_ITEM_NOT_FOUND ...
+S: OK {"taken":"<item_id>"}
+S: ERR 404 ITEM_NOT_FOUND ...
 
 C: DROP <item id o nome esatto>
-S: OK dropped=<item_id>
+S: OK {"dropped":"<item_id>"}
 ```
 Matching per id esatto o display name esatto (case-insensitive, es. `TAKE
 Frothy Ale` o `TAKE item.ale`); multi-word supportato. Nessun match parziale
@@ -121,7 +217,7 @@ S: OK ["item.herbs","item.bread"]
 ```
 C: TALK <npc id o nome esatto>
 S: OK {"npc":"guard","dialogue":"Stay safe, traveler."}
-S: ERR ERR_NPC_NOT_FOUND ...
+S: ERR 404 NPC_NOT_FOUND ...
 ```
 Design choice: dialogo **ciclico** — ogni TALK mostra la riga successiva
 dell'array `dialogue`, tornando alla prima dopo l'ultima. Deterministico e
@@ -140,17 +236,23 @@ particolare.
 ```
 C: ATTACK <target>
 S: OK {"target":"npc.guard","hit":true,"damage_dealt":12,"target_hp":8,"countered":true,"counter_damage":5,"player_hp":95,"respawned":false}
-S: ERR ERR_TARGET_NOT_FOUND ...
-S: ERR ERR_DEAD ...   # il player attaccante è già a 0 HP
+S: ERR 404 NPC_NOT_FOUND ...
+S: ERR 409 DEAD ...   # il player attaccante è già a 0 HP
 ```
 Broadcast:
 ```
-EVT ROOM COMBAT <attacker> <target> <damage> <target_hp_remaining>
-EVT ROOM COMBAT_DEATH_NPC <npc_id>          # se l'NPC muore
-EVT ROOM COMBAT_DEATH_PLAYER <player>       # se il player muore
+EVT ROOM COMBAT {"player":"...","npc":"...","damage":"...","health":"..."}        # solo se il target sopravvive
+EVT ROOM COMBAT_DEATH_NPC {"player":"...","npc":"..."}                            # se l'NPC muore (non insieme a COMBAT)
+EVT ROOM COMBAT_DEATH_PLAYER {"player":"...","npc":"..."}                         # se il player muore
 EVT ROOM PRESENCE_LEAVE <player>            # respawn: uscita dalla stanza vecchia
 EVT ROOM PRESENCE_ENTER <player>            # respawn: ingresso nella stanza sicura
 ```
+`COMBAT_DEATH_NPC`/`COMBAT_DEATH_PLAYER` sono due eventi distinti (non uno
+solo con un id ambiguo) così il client sa subito come interpretare l'id che
+segue, senza dover incrociarlo con altro stato per capire se è morto un NPC
+o un giocatore. Quando il colpo uccide il target, arriva solo l'evento di
+morte (niente anche `COMBAT`): chi lo riceve sa già che l'ultimo scambio è
+stato quello fatale.
 
 **Design choice — combattimento**: risolto in modo atomico per ogni comando
 ATTACK (un colpo del player, poi eventuale contrattacco NPC nella stessa
@@ -179,20 +281,20 @@ fanno parte del set di comandi base dell'RFC.
 ### USE — estensione non RFC
 ```
 C: USE <item>
-S: OK healed=<amount> hp=<new_hp>                                          # item curativo
-S: ERR ERR_ITEM_NOT_FOUND ...
-S: ERR ERR_DEAD ...
+S: OK {"used":"item.potion_1","effect":{"healed":20,"hp":100}}                          # item curativo
+S: ERR 404 ITEM_NOT_IN_INVENTORY ...
+S: ERR 409 DEAD ...
 
 C: USE <item> <target>
-S: OK {"target":"npc.rat_king","damage_dealt":20,"target_hp":0}            # item offensivo
-S: ERR ERR_BAD_ARGS ...            # item offensivo usato senza target
-S: ERR ERR_TARGET_NOT_FOUND ...    # target non nella stanza
+S: OK {"used":"item.grenade_1","effect":{"target":"npc.rat_king","damage_dealt":20,"target_hp":0}}   # item offensivo
+S: ERR 200 BAD_MESSAGE ...            # item offensivo usato senza target
+S: ERR 404 NPC_NOT_FOUND ...          # target non nella stanza
 ```
 Broadcast:
 ```
-EVT ROOM ITEM_USE <player> <item_id>                                # item curativo, agli altri non si dice quanto ha curato
-EVT ROOM COMBAT <player> <target> <damage> <target_hp_remaining>     # item offensivo, stesso evento di ATTACK
-EVT ROOM COMBAT_DEATH <npc_id>                                       # se il target muore
+EVT ROOM ITEM_USE {"player":"...","item":"..."}                                   # item curativo, agli altri non si dice quanto ha curato
+EVT ROOM COMBAT {"player":"...","npc":"...","damage":"...","health":"..."}        # item offensivo, stesso evento di ATTACK — solo se il target sopravvive
+EVT ROOM COMBAT_DEATH_NPC {"player":"...","npc":"..."}                            # se il target muore (non insieme a COMBAT)
 ```
 Non fa parte del set di comandi base dell'RFC, quindi lo documentiamo qui
 come nostra estensione. Ogni item usabile ha un `effect` (`heal` o `damage`)
@@ -217,12 +319,15 @@ S: OK [{"id":"quest.fetch_ale","name":"Fetch the Ale","status":"in_progress"}]
 
 C: QUEST <id>
 S: OK {"id":"quest.fetch_ale","name":"...","description":"...","type":"fetch","status":"completed"}
-S: ERR ERR_QUEST_NOT_FOUND ...
+S: ERR 404 QUEST_NOT_FOUND ...
 ```
 Evento broadcast al solo player interessato quando una quest si completa:
 ```
 EVT ROOM QUEST_COMPLETE <player> <quest_id>
 ```
+Categoria `ROOM` per coerenza con lo schema `EVT <categoria> <sottotipo>
+singola-parola>` usato ovunque altrove, anche se l'invio è diretto al player
+interessato e non un vero broadcast alla stanza.
 **Design choice — progressione**: due tipi di quest, `fetch` (si completa al
 `TAKE` dell'item target, un solo `target_id`) e `defeat` (si completa quando
 **tutti** gli NPC in `target_ids` sono morti — una lista, non un singolo id,
@@ -250,27 +355,40 @@ S: OK {"room":["alice","bob"],"server":5}
 
 ### GROUP
 ```
+C: GROUP CREATE
+S: OK group=<group_id>
+S: ERR 402 ALREADY_IN_GROUP ...  # sei già in un gruppo
+
 C: GROUP INVITE <player>
-S: OK invited=<player>
-S: ERR ERR_TARGET_NOT_FOUND ...   # player non connesso
+S: OK {"invited":"<player>"}
+S: ERR 404 PLAYER_NOT_FOUND ...   # player non connesso
 
 C: GROUP ACCEPT <inviter>
-S: OK joined=<group_id>
-S: ERR ERR_BAD_ARGS ...           # nessun invito pendente da quel giocatore
+S: OK {"joined":"<group_id>"}
+S: ERR 200 BAD_MESSAGE ...        # nessun invito pendente da quel giocatore
+```
+**Alias di compatibilità**: `GROUP JOIN <inviter>` è accettato come sinonimo
+esatto di `GROUP ACCEPT <inviter>` — è la stringa che il client CLI manda
+oggi al posto di ACCEPT.
+```
 
 C: GROUP LEAVE
-S: OK left
+S: OK {"left":"<group_id>"}
 ```
 Eventi broadcast ai membri del gruppo (non a chi compie l'azione):
 ```
-EVT GROUP INVITE <inviter>     # solo all'invitato
-EVT GROUP JOIN <player>
-EVT GROUP LEAVE <player>
+EVT GROUP INVITE {"player":"...","group":"..."}     # solo all'invitato
+EVT GROUP JOIN {"player":"...","group":"..."}
+EVT GROUP LEAVE {"player":"...","group":"..."}
 ```
 **Design choice**: un solo invito pendente per invitato (un nuovo INVITE
 sovrascrive il precedente). Il group id coincide con il nome di chi lo ha
-fondato (chi manda il primo INVITE). Alla disconnessione un player viene
-rimosso automaticamente dal proprio gruppo (con relativo `EVT GROUP LEAVE`).
+fondato (chi manda il primo INVITE, o chi manda GROUP CREATE). Alla
+disconnessione un player viene rimosso automaticamente dal proprio gruppo
+(con relativo `EVT GROUP LEAVE`). `GROUP CREATE` è stato aggiunto perché
+la RFC lo elenca esplicitamente come comando a sé; prima esisteva solo la
+creazione implicita al primo INVITE, che resta invariata per compatibilità
+— sono due modi per arrivare allo stesso stato, non uno sostituisce l'altro.
 
 ### QUIT
 ```
@@ -278,7 +396,7 @@ C: QUIT
 S: OK bye
 (connessione chiusa dal server)
 EVT ROOM PRESENCE_LEAVE <player>
-EVT GROUP LEAVE <player>   # se il player era in un gruppo
+EVT GROUP LEAVE {"player":"...","group":"..."}   # se il player era in un gruppo
 ```
 
 ## 5. Convenzioni sui payload JSON
@@ -305,3 +423,5 @@ Vedi il codice sorgente per i dettagli esatti:
 - `server/src/commands/quest_commands.cpp` — trigger di completamento
 - `server/src/world/loader.cpp` — item, npc, quest attualmente definiti nel
   world data
+- `server/src/world/character_store.cpp` — creazione/login/salvataggio dei
+  personaggi su disco
