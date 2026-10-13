@@ -1,14 +1,16 @@
 #pragma once
 
-#include "TapWindow.hpp"
-
 #include <cstdint>
 
+#include "Window.hpp"
 
-class PlayerCreateWindow : public TapWindow
+
+class PlayerCreateWindow : public Window
 {
 	public:
-		PlayerCreateWindow(int32_t commandFd);
+		using Window::Window;
+
+		PlayerCreateWindow(int32_t commandFd, UI* engine);
 
 		virtual ~PlayerCreateWindow(void) noexcept { this->clear(); }
 
@@ -18,6 +20,8 @@ class PlayerCreateWindow : public TapWindow
 		static constexpr size_t FRAME = 0UL;
 		static constexpr size_t INFO = 1UL;
 		static constexpr size_t USERNAME = 2UL;
+		static constexpr size_t BACK = 3UL;
+		static constexpr size_t CLOSE = 4UL;
 
 		int32_t commandFd;
 };

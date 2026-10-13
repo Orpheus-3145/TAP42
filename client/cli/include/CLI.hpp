@@ -259,35 +259,31 @@ class CLI : public UI
 {
 	public:
 		using UI::UI;
-		CLI(int32_t clientSocket);
+		CLI(void);
 
 		virtual ~CLI(void) noexcept override;
 
 		void start(void) override;
 
 	private:
-		void switchWindow(GamePhase newPhase) override;
-		void handleResize(void) override;
-		void handleCommand(void) override;
-		void handleError(ErrorCode const& code, std::string const& errorInfo) override;
-		void handleServerDisconnect(void) noexcept override {}
+		void handleResize(void);
 
-		void updateResponse(std::string const& response) noexcept override;
-		void updateEvent(std::string const& event) noexcept override;
-
-		bool isErrorSituation(void) const noexcept { return this->currentWindow == this->errorWin.get(); }
+		void shakeHands(void) noexcept override;
+		void switchWindow(std::optional<GamePhase> newPhase = std::nullopt) override;
+		void handleException(ErrorData& error) override;
+	
+		void showResponse(Message const& response) noexcept override;
+		void showEvent(Message const& event) noexcept override;
+		void showError(Message const& error) noexcept override;
 
 		static constexpr size_t POLL_SIZE = 4UL;
-		static constexpr size_t RESIZE = 1UL;
-		static constexpr size_t STDIN = 2UL;
-		static constexpr size_t CMD = 3UL;
-
-		ioUtils::Pipe commandPipe;
+		static constexpr size_t RESIZE = 2UL;
+		static constexpr size_t STDIN = 3UL;
 
 		std::unique_ptr<LoginWindow>		loginWin;
 		std::unique_ptr<PlayerCreateWindow>	newPlayerWin;
 		std::unique_ptr<GameWindow>			gameWin;
 		std::unique_ptr<ErrorWindow>		errorWin;
 
-		TapWindow* currentWindow{nullptr};
+		Window* currentWindow{nullptr};
 };

@@ -5,7 +5,7 @@
 #include <string>
 #include <functional>
 
-#include <TapWindow.hpp>
+#include "Window.hpp"
 
 
 class BasicTab
@@ -13,7 +13,7 @@ class BasicTab
 	using InputDispatcher = std::unordered_map<int32_t,std::function<void()>>;
 
 	public:
-		BasicTab(int32_t borderChar = -1, int32_t colorPair = -1, TapWindow* parent = nullptr);
+		BasicTab(int32_t borderChar = -1, int32_t colorPair = -1, Window* parent = nullptr);
 
 		BasicTab(BasicTab const& other) noexcept = delete;
 		BasicTab& operator=(BasicTab const& other) noexcept = delete;
@@ -35,7 +35,7 @@ class BasicTab
 		WINDOW* borderWin{nullptr};
 
 		int32_t		borderChar, colorPair;
-		TapWindow*	parent;
+		Window*	parent;
 
 		InputDispatcher	dispatcher{};
 		bool			isActive{false};

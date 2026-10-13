@@ -30,6 +30,8 @@ public:
 
     const std::string& as_string() const; // "" if not a string
     int as_int() const;                   // 0 if not a number
+
+    std::string toString() const;
 };
 
 // Returns false on a parse error, with `error` set.

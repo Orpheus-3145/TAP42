@@ -7,9 +7,9 @@
 #include <cstring>
 #include <cstdint>
 
-#include <Config.hpp>
-#include <BasicTab.hpp>
-#include <TapWindow.hpp>
+#include "Config.hpp"
+#include "BasicTab.hpp"
+#include "Window.hpp"
 
 
 class InputTab : public virtual BasicTab
@@ -23,7 +23,7 @@ class InputTab : public virtual BasicTab
 			std::string const& prompt = "<?> ",
 			int32_t colorPair = -1,
 			int32_t borderChar = -1,
-			TapWindow* parent = nullptr
+			Window* parent = nullptr
 		);
 
 		InputTab(InputTab&& other) noexcept;
@@ -55,10 +55,9 @@ class InputTab : public virtual BasicTab
 		void activate(void) override;
 		void deactivate(void) override;
 
-		void setChar(int32_t input);
+		void appendInputChar(int32_t input);
 
-		virtual void appendInputChar(int32_t input);
-		virtual void terminateInput(void);
+		virtual void terminateCommand(void);
 
 	protected:
 		void updateHints(void) noexcept;

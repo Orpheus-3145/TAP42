@@ -1,4 +1,5 @@
 #include "InOutTab.hpp"
+#include "CLI.hpp"
 #include "Exceptions.hpp"
 
 #include <cassert>
@@ -11,12 +12,14 @@ InOutTab::InOutTab(
 	std::string const& title,
 	int32_t borderChar,
 	int32_t colorPair,
-	TapWindow* parent
+	Window* parent
 ) :
 	BasicTab(borderChar, colorPair, parent),
 	InputTab(forwardInputFd, hints, prompt, borderChar, colorPair, parent),
 	OutputTab(title, borderChar, colorPair, parent)
 {
+	// because InputTab cst is called after OutputTab cst, callbacks when pressing
+	// up/down arrow will be overwritten (scroll tab content intstead of suggesting a command/showind history)
 }
 
 InOutTab::InOutTab(InOutTab&& other) noexcept :
@@ -144,11 +147,42 @@ void InOutTab::deactivate(void)
 	InputTab::deactivate();
 }
 
-void InOutTab::terminateInput(void)
+void InOutTab::terminateCommand(void)
 {
-	InputTab::terminateInput();
+	if (this->bufferSize == 0UL)
+		return;
 
+	std::string	command = std::string(this->commandBuffer, this->bufferSize);
+	bool		badCommand = false;
+
+	try
+	{
+		Message testParse(command);
+		// check if input is a command and if such command belongs to this tab
+		if ((testParse.isCommand() == false) or
+			std::find(this->hints.begin(), this->hints.end(), toString(testParse.getCommandType())) == this->hints.end())
+			badCommand = true;
+		
+	}
+	catch(AppException const& e)
+	{
+		if (e.getError().code == ErrorCode::BAD_MESSAGE)
+			badCommand = true;
+		else
+			throw e;
+	}
+
+	this->appendContent(command, TextAlign::LEFT, COLOR_PAIR(this->colorPair) | A_BOLD);
+	this->inputHistory.emplace_front(std::move(command));
+
+	if (badCommand == false)
+		ioUtils::write(this->forwardInputFd, this->commandBuffer, this->bufferSize);
+	else
+		this->appendContent("Invalid command", TextAlign::LEFT, COLOR_PAIR(RED_COLOR) | A_BOLD);
+
+	this->bufferSize = 0UL;
 	// show last input
-	this->appendContent(this->prompt + this->inputHistory.front(), true);
 	this->updateContent();
+	this->clearHints();
+	this->writePromptLine();
 }

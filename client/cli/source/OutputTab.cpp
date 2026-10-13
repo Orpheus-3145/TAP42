@@ -1,27 +1,17 @@
 #include "OutputTab.hpp"
 #include "Exceptions.hpp"
 #include "Logger.hpp"
+#include <sstream>
 
 #include <cassert>
-#include <ctime>
-#include <chrono>
-#include <iomanip>
 
 
-OutputTab::OutputTab(std::string const& title, int32_t borderChar, int32_t colorPair, TapWindow* parent) :
+OutputTab::OutputTab(std::string const& title, int32_t borderChar, int32_t colorPair, Window* parent) :
 	BasicTab(borderChar, colorPair, parent),
 	title{title}
 {
 	this->dispatcher[KEY_UP]        = [this] { this->scrollContentUp(); };
 	this->dispatcher[KEY_DOWN]      = [this] { this->scrollContentDown(); };
-	// this->dispatcher[KEY_MOUSE]     = [this] {
-	// 	MEVENT event;
-	// 	if (::getmouse(&event) == OK)
-	// 	{
-	// 		if (event.bstate & BUTTON4_PRESSED)			this->scrollContentUp();
-	// 		else if (event.bstate & BUTTON5_PRESSED)	this->scrollContentDown();
-	// 	}
-	// };
 }
 
 OutputTab::OutputTab(OutputTab&& other) noexcept :
@@ -105,7 +95,7 @@ void OutputTab::draw(int32_t h, int32_t w, int32_t y, int32_t x)
 
 	this->topLineScroll = 0UL;
 	if (static_cast<int32_t>(this->state.size()) > h)
-		this->topLineScroll = h - this->state.size();
+		this->topLineScroll = this->state.size() - h;
 
 	::keypad(this->outputWin, true);
 	::scrollok(this->outputWin, true);
@@ -185,27 +175,24 @@ void OutputTab::deactivate(void)
 	this->refresh();
 }
 
-void OutputTab::appendContent(std::string const& newContent, bool addTimestamp, TextAlign align)
+void OutputTab::appendContent(std::string const& newContent, TextAlign align, uint32_t attrs, bool saveTimestamp)
 {
-	std::string content;
-	if (addTimestamp == true)
+	if (saveTimestamp)
+		this->hasTimeStamp = true;
+
+	if (newContent.find('\n') != std::string::npos)
 	{
-		auto now = std::chrono::system_clock::now();
-		auto nowTimeT = std::chrono::system_clock::to_time_t(now);
-		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-			now.time_since_epoch()) % 1000;
-	
-		std::tm tmBuf;
-		localtime_r(&nowTimeT, &tmBuf); // thread safe
-	
-		std::ostringstream oss;
-		oss << std::put_time(&tmBuf, "%H:%M:%S");
-		content = std::format("[{}]  {}", oss.str(), newContent);
+		std::stringstream ss(newContent);
+		std::string line;
+
+		std::getline(ss, line, '\n');
+		this->state.emplace_back(line, align, attrs, saveTimestamp);
+		while (std::getline(ss, line, '\n'))
+			this->state.emplace_back(line, align, attrs, false);
 	}
 	else
-		content = newContent;
+		this->state.emplace_back(newContent, align, attrs, saveTimestamp);
 
-	this->state.emplace_back(content, align);
 	if (this->outputWin == nullptr)
 		return;
 
@@ -214,7 +201,7 @@ void OutputTab::appendContent(std::string const& newContent, bool addTimestamp, 
 	getmaxyx(this->outputWin, maxVerticalSpace, _);
 
 	if (static_cast<int32_t>(this->state.size()) > maxVerticalSpace)
-		this->topLineScroll += 1;
+		this->topLineScroll += static_cast<int32_t>(this->state.size()) - maxVerticalSpace;
 }
 
 void OutputTab::updateContent(void) const noexcept
@@ -225,36 +212,47 @@ void OutputTab::updateContent(void) const noexcept
 	getmaxyx(this->outputWin, newMaxheight, _);
 
 	int32_t nLinesToPrint = std::min(newMaxheight, static_cast<int32_t>(this->state.size() - this->topLineScroll));
-
 	for (int32_t i = 0; i < nLinesToPrint; i++)
 		this->printLine(this->state[this->topLineScroll + i]);
 }
 
-void OutputTab::printLine(std::string const& newContent, TextAlign align) const noexcept
+void OutputTab::printLine(TabMessage const& message) const
 {
-	int32_t y, _;
-	(void)_;
-	getyx(this->outputWin, y, _);
+	int32_t y, x;
+	getyx(this->outputWin, y, x);
 
-	if (align != TextAlign::LEFT_ALIGN)
+	::wclrtoeol(this->outputWin);
+	if (message.timestamp.has_value())
 	{
-		int32_t w;
+		auto timestamp = std::chrono::time_point_cast<std::chrono::seconds>(message.timestamp.value());
+		std::string strTimestamp = std::format("[{:%H:%M:%S}]  ", timestamp);
+		waddstr(this->outputWin, strTimestamp.data());
+	}
+	else if (this->hasTimeStamp)
+		waddstr(this->outputWin, "            ");
+
+	if (message.align != TextAlign::LEFT)
+	{
+		int32_t w, _;
 		getmaxyx(this->outputWin, _, w);
+		getyx(this->outputWin, y, x);
+		w -= x;
+		if (w < 0)
+			throw AppException(ErrorCode::UI_INVALID_SIZE);
 
-		uint32_t lenWord = newContent.size();
-		if (w > static_cast<int32_t>(lenWord))
+		int32_t start = w - static_cast<int32_t>(message.content.size());
+		if (start > 0)
 		{
-			uint32_t startText = 0U;
-			if (align == TextAlign::MID_ALIGN)			startText = (w - lenWord) / 2U;
-			else if (align == TextAlign::RIGHT_ALIGN)	startText = w - lenWord;
-
-			::wmove(this->outputWin, y, startText);
+			if (message.align == TextAlign::MID)		::wmove(this->outputWin, y, x + start / 2U);
+			else if (message.align == TextAlign::RIGHT) ::wmove(this->outputWin, y, x + start);
 		}
 	}
 
-	waddstr(this->outputWin, newContent.data());
-	::wmove(this->outputWin, y + 1, 0);
+	::wattron(this->outputWin, message.attrs);
+	waddstr(this->outputWin, message.content.data());
+	::wattroff(this->outputWin, message.attrs);
 
+	::wmove(this->outputWin, y + 1, 0);
 	this->refresh();
 }
 
@@ -277,9 +275,8 @@ void OutputTab::scrollContentDown(void) noexcept
 	(void)_;
 	getmaxyx(this->outputWin, maxVerticalSpace, _);
 
-	if (maxVerticalSpace >= static_cast<int32_t>(this->state.size()))
-		return;
-	else if (this->topLineScroll + maxVerticalSpace == this->state.size())
+	if ((maxVerticalSpace >= static_cast<int32_t>(this->state.size())) or
+		(this->topLineScroll + maxVerticalSpace == this->state.size()))
 		return;
 
 	::wscrl(this->outputWin, 1);

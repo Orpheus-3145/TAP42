@@ -60,5 +60,5 @@ void closePipe(Pipe& pipe) noexcept;
 
 void printMutated(std::string const& content) noexcept;
 std::string createLogPath(const char* logFolder);
-std::string escapeNewLine(const char* buffer, size_t size) noexcept;
+std::string escapeString(std::string const& toEscape) noexcept;
 bool timerElapsed(int32_t intervalSeconds);

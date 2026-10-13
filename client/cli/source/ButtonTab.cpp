@@ -8,12 +8,12 @@
 #include <format>
 
 
-ButtonTab::ButtonTab(std::string const& content, std::function<void()> action, int32_t colorPair, TapWindow* parent) :
+ButtonTab::ButtonTab(std::string const& content, std::function<void()> action, int32_t colorPair, Window* parent) :
 	BasicTab(-1, colorPair, parent),
 	content{content},
 	action{action}
 {
-	this->dispatcher[COMMAND_TERM] = [this] { this->action(); };
+	this->dispatcher['\n'] = [this] { this->action(); };
 }
 
 ButtonTab::ButtonTab(ButtonTab&& other) noexcept :
@@ -87,6 +87,7 @@ void ButtonTab::clear(void) noexcept
 void ButtonTab::activate(void)
 {
 	BasicTab::activate();
+	curs_set(0);
 
 	if (this->colorPair != -1)
 		::wattron(this->btnWin, COLOR_PAIR(this->colorPair));
@@ -106,6 +107,7 @@ void ButtonTab::activate(void)
 void ButtonTab::deactivate(void)
 {
 	BasicTab::deactivate();
+	curs_set(1);
 
 	if (this->colorPair != -1)
 		::wattron(this->btnWin, COLOR_PAIR(this->colorPair));

@@ -4,9 +4,9 @@
 #include <vector>
 #include <string>
 
-#include <InputTab.hpp>
-#include <OutputTab.hpp>
-#include <TapWindow.hpp>
+#include "InputTab.hpp"
+#include "OutputTab.hpp"
+#include "Window.hpp"
 
 
 class InOutTab : public InputTab, public OutputTab
@@ -19,7 +19,7 @@ class InOutTab : public InputTab, public OutputTab
 			std::string const& title = "",
 			int32_t borderChar = -1,
 			int32_t colorPair = -1,
-			TapWindow* parent = nullptr
+			Window* parent = nullptr
 		);
 
 		InOutTab(InOutTab const& other) noexcept = delete;
@@ -36,7 +36,7 @@ class InOutTab : public InputTab, public OutputTab
 		void activate(void) override;
 		void deactivate(void) override;
 
-		void terminateInput(void) override;
+		void terminateCommand(void) override;
 
 	protected:
 		WINDOW*	inputFrame{nullptr};

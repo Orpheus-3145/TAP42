@@ -1,6 +1,6 @@
 CXX := g++
-CXXFLAGS := -std=c++17 -Wall -Wextra -Wpedantic -Isrc
-SRC := $(wildcard src/*.cpp src/*/*.cpp)
+CXXFLAGS := -std=c++20 -Wall -Wextra -Wpedantic -Isrc -I../shared/include
+SRC := $(wildcard src/*.cpp src/*/*.cpp ../shared/source/*.cpp)
 OBJ := $(SRC:.cpp=.o)
 TARGET := tap-server
 

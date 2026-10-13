@@ -102,8 +102,8 @@ void cmd_move(const std::shared_ptr<Session>& session, const std::vector<std::st
     }
     send_line(*session, response);
     if (!new_room.empty()) {
-        broadcast_to_room(old_room, session->player_id, "EVT ROOM PRESENCE LEAVE " + session->player_id);
-        broadcast_to_room(new_room, session->player_id, "EVT ROOM PRESENCE ENTER " + session->player_id);
+        broadcast_to_room(old_room, session->player_id, "EVT ROOM PRESENCE_LEAVE " + session->player_id);
+        broadcast_to_room(new_room, session->player_id, "EVT ROOM PRESENCE_ENTER " + session->player_id);
         log_info("player_moved",
                  {{"player", session->player_id}, {"from", old_room}, {"to", new_room}});
     }
@@ -146,7 +146,7 @@ void cmd_chat(const std::shared_ptr<Session>& session, const std::vector<std::st
         return;
     }
     std::string text = join_from(args, 1);
-    std::string evt = "EVT " + scope + " CHAT " + session->player_id + " " + text;
+    std::string evt = "EVT " + scope + " CHAT { \"player\":\"" + session->player_id + "\",\"text\": \"" + text + "\"}";
 
     if (scope == "GROUP") {
         auto& world = World::instance();
@@ -254,7 +254,7 @@ void handle_disconnect(std::shared_ptr<Session> session) {
     log_info("player_disconnected", {{"player", session->player_id}});
 
     if (!room_id.empty()) {
-        broadcast_to_room(room_id, session->player_id, "EVT ROOM PRESENCE LEAVE " + session->player_id);
+        broadcast_to_room(room_id, session->player_id, "EVT ROOM PRESENCE_LEAVE " + session->player_id);
     }
     if (!group_id.empty()) {
         broadcast_to_group(group_id, session->player_id, "EVT GROUP LEAVE " + session->player_id);

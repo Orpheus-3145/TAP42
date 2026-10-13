@@ -5,7 +5,8 @@
 #include <cstdint>
 #include <vector>
 
-#include "TapWindow.hpp"
+#include "Window.hpp"
+#include "Message.hpp"
 
 
 static std::vector<std::string> CMD_HINTS
@@ -21,7 +22,8 @@ static std::vector<std::string> CMD_HINTS
 	"STATUS",
 	"QUEST",
 	"QUESTS",
-	"QUIT"
+	"QUIT",
+	"USE"
 };
 
 static std::vector<std::string> CHAT_CMD_HINTS
@@ -30,23 +32,26 @@ static std::vector<std::string> CHAT_CMD_HINTS
 	"GROUP INVITE",
 	"GROUP JOIN",
 	"GROUP LEAVE",
-	"CHAT",
+	"CHAT GROUP",
+	"CHAT ROOM",
+	"CHAT GLOBAL",
+	"QUIT"
 };
 
-class GameWindow : public TapWindow
+class GameWindow : public Window
 {
 	public:
-		using TapWindow::TapWindow;
+		using Window::Window;
 
-		GameWindow(int32_t commandFd);
+		GameWindow(int32_t commandFd, UI* engine);
 
 		virtual ~GameWindow(void) noexcept { this->clear(); }
 
 		void draw(int32_t height, int32_t width) override;
 
-		void appendResponse(std::string const& response);
-		void appendChatMsg(std::string const& response);
-		void appendEvent(std::string const& event);
+		void appendResponse(Message const& response, CommandType cmdType);
+		void appendEvent(Message const& event);
+		void appendError(Message const& error, CommandType cmdType);
 
 	protected:
 		static constexpr size_t FRAME = 0UL;

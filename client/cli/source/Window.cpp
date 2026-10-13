@@ -1,23 +1,29 @@
-#include "TapWindow.hpp"
+#include "Window.hpp"
 #include "BasicTab.hpp"
 #include "Logger.hpp"
+#include "UI.hpp"
 
 #include <cassert>
 #include <format>
 
 
-TapWindow::~TapWindow(void) noexcept
+Window::Window(UI* engine) noexcept : engine{engine}
+{
+	assert(engine != nullptr and "Null pointer for engine instance received");
+}
+
+Window::~Window(void) noexcept
 {
 }
 
-void TapWindow::clear(void) noexcept
+void Window::clear(void) noexcept
 {
 	for (auto const& [_, tab] : this->tabs)
 		tab->clear();
 	this->refresh();
 }
 
-void TapWindow::updateContentWindow(void) noexcept
+void Window::updateContentWindow(void) noexcept
 {
 	for (auto const& [_, tab] : this->tabs)
 		tab->updateContent();
@@ -25,13 +31,13 @@ void TapWindow::updateContentWindow(void) noexcept
 	this->refresh();
 }
 
-void TapWindow::handleUserInput(void)
+void Window::handleUserInput(void)
 {
 	this->getActiveTab()->handleUserInput();
 	this->refresh();
 }
 
-void TapWindow::switchActiveTab(int32_t index)
+void Window::switchActiveTab(int32_t index)
 {
 	if (this->tabs.empty() == true)
 		return;
@@ -52,7 +58,7 @@ void TapWindow::switchActiveTab(int32_t index)
 	this->getActiveTab()->activate();
 }
 
-void TapWindow::resize(int32_t height, int32_t width)
+void Window::resize(int32_t height, int32_t width)
 {
 	this->clear();
 	this->draw(height, width);

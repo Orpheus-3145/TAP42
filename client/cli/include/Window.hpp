@@ -6,20 +6,23 @@
 #include <set>
 #include <cstdint>
 
+#include "UI.hpp"
+
 
 class BasicTab;
+class UI;
 
-class TapWindow
+class Window
 {
 	public:
-		TapWindow(void) noexcept = default;
+		Window(UI* engine) noexcept;
 
-		TapWindow(TapWindow const& other) = delete;
-		TapWindow& operator=(TapWindow const& other) = delete;
-		TapWindow(TapWindow&& other) = delete;
-		TapWindow& operator=(TapWindow&& other) = delete;
+		Window(Window const& other) = delete;
+		Window& operator=(Window const& other) = delete;
+		Window(Window&& other) = delete;
+		Window& operator=(Window&& other) = delete;
 
-		virtual ~TapWindow(void) noexcept;
+		virtual ~Window(void) noexcept;
 
 		virtual void draw(int32_t height, int32_t width) = 0;
 		virtual void resize(int32_t height, int32_t width);
@@ -27,12 +30,14 @@ class TapWindow
 		virtual void updateContentWindow(void) noexcept;
 		virtual void handleUserInput(void);
 
-		virtual void	switchActiveTab(int32_t index = -1);
-		BasicTab*		getActiveTab(void) { return this->tabs.at(this->activeTabIndex).get(); }
+		void		switchActiveTab(int32_t index = -1);
+		BasicTab*	getActiveTab(void) { return this->tabs.at(this->activeTabIndex).get(); }
 
 		void refresh(void) const noexcept { ::doupdate(); }
 
 	protected:
+		UI* const engine;
+
 		std::map<size_t,std::unique_ptr<BasicTab>>	tabs{};
 		std::set<size_t>							tabsToSkip{};
 

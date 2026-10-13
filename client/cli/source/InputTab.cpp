@@ -12,13 +12,14 @@ InputTab::InputTab(
 	std::string const& prompt,
 	int32_t borderChar,
 	int32_t colorPair,
-	TapWindow* parent
+	Window* parent
 ) :
 	BasicTab(borderChar, colorPair, parent),
-forwardInputFd{forwardInputFd},
+	forwardInputFd{forwardInputFd},
 	hints{hints},
 	prompt{prompt}
 {
+	this->dispatcher['\n']          = [this] { this->terminateCommand(); };
 	this->dispatcher[KEY_LEFT]      = [this] { this->moveCursorLeft(); };
 	this->dispatcher[KEY_RIGHT]     = [this] { this->moveCursorRight(); };
 	this->dispatcher[KEY_HOME]      = [this] { this->moveStartLine(); };
@@ -165,7 +166,7 @@ void InputTab::suggestHint(void) noexcept
 		
 		this->bufferSize = suggestedHint.size(); 
 		::memcpy(this->commandBuffer, suggestedHint.data(), this->bufferSize);
-		this->commandBuffer[this->bufferSize++] = COMMAND_SP;
+		this->commandBuffer[this->bufferSize++] = ' ';
 		this->currentSuggestedIndex++;
 	}
 	else			// show command previously typed
@@ -329,7 +330,7 @@ void InputTab::handleUserInput(void)
 	}
 
 	// Default handling
-	this->setChar(inputChar);
+	this->appendInputChar(inputChar);
 }
 
 void InputTab::updateHints(void) noexcept
@@ -354,6 +355,7 @@ void InputTab::clearHints(void) noexcept
 {
 	this->autocompleteMode = false;
 	this->suggestedHintIndexes.clear();
+	this->currentCommandIndex = -1L;
 }
 
 void InputTab::writePromptLine(void) const noexcept
@@ -399,14 +401,6 @@ void InputTab::deactivate(void)
 	this->writePromptLine();
 }
 
-void InputTab::setChar(int32_t input)
-{
-	if (input != COMMAND_TERM)		// append normal char to buffer
-		this->appendInputChar(input);
-	else							// if got end msg and buffer is not empty store current command
-		this->terminateInput();
-}
-
 void InputTab::appendInputChar(int32_t input)
 {
 	if (this->bufferSize >= Config::CMD_BUFFER_SIZE)
@@ -444,7 +438,7 @@ void InputTab::appendInputChar(int32_t input)
 	}
 }
 
-void InputTab::terminateInput(void)
+void InputTab::terminateCommand(void)
 {
 	if (this->bufferSize == 0UL)
 		return;
@@ -453,10 +447,7 @@ void InputTab::terminateInput(void)
 	ioUtils::write(this->forwardInputFd, command.data(), command.size());
 
 	this->inputHistory.emplace_front(std::move(command));
-
 	this->bufferSize = 0UL;
-	// in case a command from history has been submitted reset move commandIndex as the most recent command 
-	this->currentCommandIndex = -1L;
 
 	this->clearHints();
 	this->writePromptLine();
