@@ -10,14 +10,38 @@
 
 namespace {
 
+// Explicit creation, for a client that wants to found a group without also
+// naming someone to invite in the same breath. GROUP INVITE still auto-creates
+// on first use too (kept for backward compatibility) - CREATE is just a second
+// way to reach the same "I now have an empty group" state.
+void cmd_group_create(const std::shared_ptr<Session>& session) {
+    auto& world = World::instance();
+    std::string response, group_id;
+    {
+        std::lock_guard<std::mutex> lock(world.mutex);
+        if (!world.player_group[session->player_id].empty()) {
+            response = "ERR 402 ALREADY_IN_GROUP already in a group";
+        } else {
+            group_id = session->player_id; // the group takes its founder's id
+            world.player_group[session->player_id] = group_id;
+            world.groups[group_id] = {session->player_id};
+            response = "OK group=" + group_id;
+        }
+    }
+    send_line(*session, response);
+    if (!group_id.empty()) {
+        log_info("group_created", {{"player", session->player_id}, {"group", group_id}});
+    }
+}
+
 void cmd_group_invite(const std::shared_ptr<Session>& session, const std::vector<std::string>& args) {
     if (args.size() < 2) {
-        send_line(*session, "ERR ERR_BAD_ARGS GROUP INVITE requires a player name");
+        send_line(*session, "ERR 200 BAD_MESSAGE GROUP INVITE requires a player name");
         return;
     }
     std::string target = args[1];
     if (target == session->player_id) {
-        send_line(*session, "ERR ERR_BAD_ARGS cannot invite yourself");
+        send_line(*session, "ERR 200 BAD_MESSAGE cannot invite yourself");
         return;
     }
 
@@ -26,7 +50,7 @@ void cmd_group_invite(const std::shared_ptr<Session>& session, const std::vector
     {
         std::lock_guard<std::mutex> lock(world.mutex);
         if (!world.players.count(target)) {
-            response = "ERR ERR_TARGET_NOT_FOUND " + target;
+            response = "ERR 404 PLAYER_NOT_FOUND " + target;
         } else {
             group_id = world.player_group[session->player_id];
             if (group_id.empty()) {
@@ -41,16 +65,18 @@ void cmd_group_invite(const std::shared_ptr<Session>& session, const std::vector
     send_line(*session, response);
     if (!group_id.empty()) {
         auto target_session = SessionRegistry::instance().get(target);
-        if (target_session) send_line(*target_session, "EVT GROUP INVITE " +
-                                    std::string("{\"player\":\"") + session->player_id + "\"," +
-                                    "\"group\":\"" + group_id + "\"}");
+        if (target_session) {
+            send_line(*target_session, "EVT GROUP INVITE " +
+                          ("{\"player\":\"" + session->player_id + "\"," +
+                           "\"group\":\"" + group_id + "\"}"));
+        }
         log_info("group_invite", {{"inviter", session->player_id}, {"invited", target}, {"group", group_id}});
     }
 }
 
 void cmd_group_accept(const std::shared_ptr<Session>& session, const std::vector<std::string>& args) {
     if (args.size() < 2) {
-        send_line(*session, "ERR ERR_BAD_ARGS GROUP ACCEPT requires the inviter's name");
+        send_line(*session, "ERR 200 BAD_MESSAGE GROUP ACCEPT requires the inviter's name");
         return;
     }
     std::string inviter = args[1];
@@ -61,11 +87,11 @@ void cmd_group_accept(const std::shared_ptr<Session>& session, const std::vector
         std::lock_guard<std::mutex> lock(world.mutex);
         auto it = world.pending_invites.find(session->player_id);
         if (it == world.pending_invites.end() || it->second != inviter) {
-            response = "ERR ERR_BAD_ARGS no pending invite from " + inviter;
+            response = "ERR 200 BAD_MESSAGE no pending invite from " + inviter;
         } else {
             group_id = world.player_group[inviter];
             if (group_id.empty()) {
-                response = "ERR ERR_INTERNAL inviter is no longer in a group";
+                response = "ERR 500 INTERNAL inviter is no longer in a group";
             } else {
                 // Must leave any previous group BEFORE joining the new one:
                 // otherwise they'd stay registered as a member of both,
@@ -81,8 +107,8 @@ void cmd_group_accept(const std::shared_ptr<Session>& session, const std::vector
     send_line(*session, response);
     if (!group_id.empty()) {
         broadcast_to_group(group_id, session->player_id, "EVT GROUP JOIN " +
-                                    std::string("{\"player\":\"") + session->player_id + "\"," +
-                                    "\"group\":\"" + group_id + "\"}");
+                               ("{\"player\":\"" + session->player_id + "\"," +
+                                "\"group\":\"" + group_id + "\"}"));
         log_info("group_join", {{"player", session->player_id}, {"group", group_id}});
     }
 }
@@ -98,8 +124,8 @@ void cmd_group_leave(const std::shared_ptr<Session>& session) {
     send_line(*session, "OK {\"left\":\"" + group_id + "\"}");
     if (!group_id.empty()) {
         broadcast_to_group(group_id, "", "EVT GROUP LEAVE " +
-                                    std::string("{\"player\":\"") + session->player_id + "\"," +
-                                    "\"group\":\"" + group_id + "\"}");
+                               ("{\"player\":\"" + session->player_id + "\"," +
+                                "\"group\":\"" + group_id + "\"}"));
         log_info("group_leave", {{"player", session->player_id}, {"group", group_id}});
     }
 }
@@ -119,20 +145,24 @@ void leave_group_locked(const std::string& player_id) {
 
 void cmd_group(const std::shared_ptr<Session>& session, const std::vector<std::string>& args) {
     if (session->player_id.empty()) {
-        send_line(*session, "ERR ERR_NOT_CONNECTED CONNECT first");
+        send_line(*session, "ERR 102 NOT_CONNECTED CONNECT first");
         return;
     }
     if (args.empty()) {
-        send_line(*session, "ERR ERR_BAD_ARGS GROUP requires a subcommand");
+        send_line(*session, "ERR 200 BAD_MESSAGE GROUP requires a subcommand");
         return;
     }
-    if (args[0] == "INVITE") {
+    if (args[0] == "CREATE") {
+        cmd_group_create(session);
+    } else if (args[0] == "INVITE") {
         cmd_group_invite(session, args);
-    } else if (args[0] == "ACCEPT") {
+    } else if (args[0] == "ACCEPT" || args[0] == "JOIN") {
+        // "JOIN" is a compatibility alias: the CLI client currently sends
+        // "GROUP JOIN <inviter>" rather than "GROUP ACCEPT <inviter>".
         cmd_group_accept(session, args);
     } else if (args[0] == "LEAVE") {
         cmd_group_leave(session);
     } else {
-        send_line(*session, "ERR ERR_BAD_ARGS unknown GROUP subcommand " + args[0]);
+        send_line(*session, "ERR 200 BAD_MESSAGE unknown GROUP subcommand " + args[0]);
     }
 }

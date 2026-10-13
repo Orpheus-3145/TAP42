@@ -4,6 +4,7 @@
 
 #include "commands/common.hpp"
 #include "logging/logger.hpp"
+#include "world/character_store.hpp"
 
 // Design choice: an NPC's dialogue is cyclic (each TALK shows the next
 // line, wrapping back to the first after the last), not random or a
@@ -13,24 +14,26 @@
 // hear line 1 first, independently of what the other has already heard.
 void cmd_talk(const std::shared_ptr<Session>& session, const std::vector<std::string>& args) {
     if (session->player_id.empty()) {
-        send_line(*session, "ERR ERR_NOT_CONNECTED CONNECT first");
+        send_line(*session, "ERR 102 NOT_CONNECTED CONNECT first");
         return;
     }
     if (args.empty()) {
-        send_line(*session, "ERR ERR_BAD_ARGS TALK requires an npc");
+        send_line(*session, "ERR 200 BAD_MESSAGE TALK requires an npc");
         return;
     }
     std::string ref = join_from(args, 0);
 
     auto& world = World::instance();
     std::string response;
+    PlayerState talker;
+    bool talker_mutated = false;
     {
         std::lock_guard<std::mutex> lock(world.mutex);
         auto& player = world.players.at(session->player_id);
         const auto& room = world.rooms.at(player.current_room);
         std::string npc_id = resolve_npc_ref_locked(room.npc_ids, ref);
         if (npc_id.empty()) {
-            response = "ERR ERR_NPC_NOT_FOUND " + ref;
+            response = "ERR 404 NPC_NOT_FOUND " + ref;
         } else {
             const auto& npc = world.npcs.at(npc_id);
 
@@ -57,7 +60,10 @@ void cmd_talk(const std::shared_ptr<Session>& session, const std::vector<std::st
             std::ostringstream oss;
             oss << "OK {\"npc\":\"" << npc_id << "\",\"dialogue\":\"" << json_escape(line) << "\"}";
             response = oss.str();
+            talker = player;
+            talker_mutated = true;
         }
     }
     send_line(*session, response);
+    if (talker_mutated) character_store::save(talker);
 }
