@@ -12,11 +12,11 @@
 
 void cmd_take(const std::shared_ptr<Session>& session, const std::vector<std::string>& args) {
     if (session->player_id.empty()) {
-        send_line(*session, "ERR ERR_NOT_CONNECTED CONNECT first");
+        send_line(*session, "ERR 102 NOT_CONNECTED CONNECT first");
         return;
     }
     if (args.empty()) {
-        send_line(*session, "ERR ERR_BAD_ARGS TAKE requires an item");
+        send_line(*session, "ERR 200 BAD_MESSAGE TAKE requires an item");
         return;
     }
     std::string ref = join_from(args, 0);
@@ -30,13 +30,13 @@ void cmd_take(const std::shared_ptr<Session>& session, const std::vector<std::st
         auto& room = world.rooms.at(player.current_room);
         std::string item_id = resolve_item_ref_locked(room.item_instance_ids, ref);
         if (item_id.empty()) {
-            response = "ERR ERR_ITEM_NOT_FOUND " + ref;
+            response = "ERR 404 ITEM_NOT_FOUND " + ref;
         } else {
             room.item_instance_ids.erase(
                 std::remove(room.item_instance_ids.begin(), room.item_instance_ids.end(), item_id),
                 room.item_instance_ids.end());
             player.inventory.push_back(item_id);
-            response = "OK taken=" + item_id;
+            response = "OK {\"taken\":\"" + item_id + "\"}";
             taken_id = item_id;
             taker = player;
         }
@@ -51,11 +51,11 @@ void cmd_take(const std::shared_ptr<Session>& session, const std::vector<std::st
 
 void cmd_drop(const std::shared_ptr<Session>& session, const std::vector<std::string>& args) {
     if (session->player_id.empty()) {
-        send_line(*session, "ERR ERR_NOT_CONNECTED CONNECT first");
+        send_line(*session, "ERR 102 NOT_CONNECTED CONNECT first");
         return;
     }
     if (args.empty()) {
-        send_line(*session, "ERR ERR_BAD_ARGS DROP requires an item");
+        send_line(*session, "ERR 200 BAD_MESSAGE DROP requires an item");
         return;
     }
     std::string ref = join_from(args, 0);
@@ -69,12 +69,12 @@ void cmd_drop(const std::shared_ptr<Session>& session, const std::vector<std::st
         auto& room = world.rooms.at(player.current_room);
         std::string item_id = resolve_item_ref_locked(player.inventory, ref);
         if (item_id.empty()) {
-            response = "ERR ERR_ITEM_NOT_FOUND " + ref;
+            response = "ERR 404 ITEM_NOT_IN_INVENTORY " + ref;
         } else {
             player.inventory.erase(std::remove(player.inventory.begin(), player.inventory.end(), item_id),
                                     player.inventory.end());
             room.item_instance_ids.push_back(item_id);
-            response = "OK dropped=" + item_id;
+            response = "OK {\"dropped\":\"" + item_id + "\"}";
             dropped_id = item_id;
             dropper = player;
         }
@@ -93,11 +93,11 @@ void cmd_drop(const std::shared_ptr<Session>& session, const std::vector<std::st
 // send + broadcast after releasing it.
 void cmd_use(const std::shared_ptr<Session>& session, const std::vector<std::string>& args) {
     if (session->player_id.empty()) {
-        send_line(*session, "ERR ERR_NOT_CONNECTED CONNECT first");
+        send_line(*session, "ERR 102 NOT_CONNECTED CONNECT first");
         return;
     }
     if (args.empty()) {
-        send_line(*session, "ERR ERR_BAD_ARGS USE requires an item");
+        send_line(*session, "ERR 200 BAD_MESSAGE USE requires an item");
         return;
     }
     std::string item_ref = args[0];
@@ -114,11 +114,11 @@ void cmd_use(const std::shared_ptr<Session>& session, const std::vector<std::str
         std::lock_guard<std::mutex> lock(world.mutex);
         auto& player = world.players.at(session->player_id);
         if (player.hp <= 0) {
-            response = "ERR ERR_DEAD you are down, cannot use items";
+            response = "ERR 409 DEAD you are down, cannot use items";
         } else {
             std::string item_id = resolve_item_ref_locked(player.inventory, item_ref);
             if (item_id.empty()) {
-                response = "ERR ERR_ITEM_NOT_FOUND " + item_ref;
+                response = "ERR 404 ITEM_NOT_IN_INVENTORY " + item_ref;
             } else {
                 const auto& item = world.items.at(item_id);
                 room_id = player.current_room;
@@ -130,15 +130,17 @@ void cmd_use(const std::shared_ptr<Session>& session, const std::vector<std::str
                                             player.inventory.end());
                     player.hp = std::min(player.max_hp, player.hp + item.effect_amount);
                     heal_amount = item.effect_amount;
-                    response = "OK healed=" + std::to_string(heal_amount) + " hp=" + std::to_string(player.hp);
+                    response = "OK {\"used\":\"" + used_item_id + "\",\"effect\":{" +
+                               "\"healed\":" + std::to_string(heal_amount) + ",\"hp\":" + std::to_string(player.hp) +
+                               "}}";
                 } else if (item.effect == ItemEffect::Damage) {
                     if (target_ref.empty()) {
-                        response = "ERR ERR_BAD_ARGS USE " + item_ref + " requires a target";
+                        response = "ERR 200 BAD_MESSAGE USE " + item_ref + " requires a target";
                     } else {
                         auto& room = world.rooms.at(player.current_room);
                         npc_id = resolve_npc_ref_locked(room.npc_ids, target_ref);
                         if (npc_id.empty()) {
-                            response = "ERR ERR_TARGET_NOT_FOUND " + target_ref;
+                            response = "ERR 404 NPC_NOT_FOUND " + target_ref;
                         } else {
                             is_damage = true;
                             used_item_id = item_id;
@@ -154,14 +156,14 @@ void cmd_use(const std::shared_ptr<Session>& session, const std::vector<std::str
                                 room.npc_ids.erase(std::remove(room.npc_ids.begin(), room.npc_ids.end(), npc_id),
                                                     room.npc_ids.end());
                             }
-                            std::ostringstream oss;
-                            oss << "OK {\"target\":\"" << npc_id << "\",\"damage_dealt\":" << damage_dealt
-                                << ",\"target_hp\":" << target_hp << "}";
-                            response = oss.str();
+                            response = "OK {\"used\":\"" + used_item_id + "\",\"effect\":{" +
+                                       "\"target\":\"" + npc_id + "\",\"damage_dealt\":" +
+                                       std::to_string(damage_dealt) + ",\"target_hp\":" +
+                                       std::to_string(target_hp) + "}}";
                         }
                     }
                 } else {
-                    response = "ERR ERR_BAD_ARGS " + item_ref + " cannot be used";
+                    response = "ERR 200 BAD_MESSAGE " + item_ref + " cannot be used";
                 }
                 if (is_heal || is_damage) {
                     user = player;
@@ -178,27 +180,35 @@ void cmd_use(const std::shared_ptr<Session>& session, const std::vector<std::str
                                 {"item", used_item_id},
                                 {"effect", "heal"},
                                 {"amount", std::to_string(heal_amount)}});
-        broadcast_to_room(room_id, session->player_id, "EVT ROOM ITEM_USE " + session->player_id + " " + used_item_id);
+        broadcast_to_room(room_id, session->player_id, "EVT ROOM ITEM_USE " +
+                              ("{\"player\":\"" + session->player_id + "\"," +
+                               "\"item\":\"" + used_item_id + "\"}"));
     } else if (is_damage) {
         log_info("item_used", {{"player", session->player_id},
                                 {"item", used_item_id},
                                 {"effect", "damage"},
                                 {"target", npc_id},
                                 {"damage", std::to_string(damage_dealt)}});
-        broadcast_to_room(room_id, session->player_id,
-                           "EVT ROOM COMBAT " + session->player_id + " " + npc_id + " " +
-                               std::to_string(damage_dealt) + " " + std::to_string(target_hp));
         if (npc_died) {
-            broadcast_to_room(room_id, "", "EVT ROOM COMBAT_DEATH " + npc_id);
+            broadcast_to_room(room_id, "", "EVT ROOM COMBAT_DEATH_NPC " +
+                                  ("{\"player\":\"" + session->player_id + "\"," +
+                                   "\"npc\":\"" + npc_id + "\"}"));
             log_info("npc_defeated", {{"player", session->player_id}, {"npc", npc_id}});
             on_npc_defeated(session->player_id, npc_id);
+        } else {
+            broadcast_to_room(room_id, session->player_id,
+                               "EVT ROOM COMBAT " +
+                                   ("{\"player\":\"" + session->player_id + "\"," +
+                                    "\"npc\":\"" + npc_id + "\"," +
+                                    "\"damage\":\"" + std::to_string(damage_dealt) + "\"," +
+                                    "\"health\":\"" + std::to_string(target_hp) + "\"}"));
         }
     }
 }
 
 void cmd_inventory(const std::shared_ptr<Session>& session) {
     if (session->player_id.empty()) {
-        send_line(*session, "ERR ERR_NOT_CONNECTED CONNECT first");
+        send_line(*session, "ERR 102 NOT_CONNECTED CONNECT first");
         return;
     }
     auto& world = World::instance();

@@ -28,7 +28,7 @@ bool all_defeat_targets_dead_locked(const Quest& quest) {
 void complete_quest_and_notify(const std::string& player_id, const std::string& quest_id,
                                 const std::string& trigger, const std::string& trigger_ref) {
     auto session = SessionRegistry::instance().get(player_id);
-    if (session) send_line(*session, "EVT QUEST COMPLETE " + player_id + " " + quest_id);
+    if (session) send_line(*session, "EVT ROOM QUEST_COMPLETE " + player_id + " " + quest_id);
     log_info("quest_completed",
              {{"player", player_id}, {"quest", quest_id}, {"trigger", trigger}, {"ref", trigger_ref}});
 }
@@ -118,7 +118,7 @@ void on_npc_defeated(const std::string& player_id, const std::string& npc_id) {
 
 void cmd_quests(const std::shared_ptr<Session>& session) {
     if (session->player_id.empty()) {
-        send_line(*session, "ERR ERR_NOT_CONNECTED CONNECT first");
+        send_line(*session, "ERR 102 NOT_CONNECTED CONNECT first");
         return;
     }
     auto& world = World::instance();
@@ -142,11 +142,11 @@ void cmd_quests(const std::shared_ptr<Session>& session) {
 
 void cmd_quest(const std::shared_ptr<Session>& session, const std::vector<std::string>& args) {
     if (session->player_id.empty()) {
-        send_line(*session, "ERR ERR_NOT_CONNECTED CONNECT first");
+        send_line(*session, "ERR 102 NOT_CONNECTED CONNECT first");
         return;
     }
     if (args.empty()) {
-        send_line(*session, "ERR ERR_BAD_ARGS QUEST requires an id");
+        send_line(*session, "ERR 200 BAD_MESSAGE QUEST requires an id");
         return;
     }
     auto& world = World::instance();
@@ -155,7 +155,7 @@ void cmd_quest(const std::shared_ptr<Session>& session, const std::vector<std::s
         std::lock_guard<std::mutex> lock(world.mutex);
         auto q_it = world.quests.find(args[0]);
         if (q_it == world.quests.end()) {
-            response = "ERR ERR_QUEST_NOT_FOUND " + args[0];
+            response = "ERR 404 QUEST_NOT_FOUND " + args[0];
         } else {
             auto& player = world.players.at(session->player_id);
             std::string status =

@@ -48,11 +48,11 @@ bool roll_hit(double hit_chance) {
 // not required by the RFC's base command set.
 void cmd_attack(const std::shared_ptr<Session>& session, const std::vector<std::string>& args) {
     if (session->player_id.empty()) {
-        send_line(*session, "ERR ERR_NOT_CONNECTED CONNECT first");
+        send_line(*session, "ERR 102 NOT_CONNECTED CONNECT first");
         return;
     }
     if (args.empty()) {
-        send_line(*session, "ERR ERR_BAD_ARGS ATTACK requires a target");
+        send_line(*session, "ERR 200 BAD_MESSAGE ATTACK requires a target");
         return;
     }
     std::string ref = join_from(args, 0);
@@ -70,12 +70,12 @@ void cmd_attack(const std::shared_ptr<Session>& session, const std::vector<std::
         std::lock_guard<std::mutex> lock(world.mutex);
         auto& player = world.players.at(session->player_id);
         if (player.hp <= 0) {
-            response = "ERR ERR_DEAD you are down, cannot attack";
+            response = "ERR 409 DEAD you are down, cannot attack";
         } else {
             auto& room = world.rooms.at(player.current_room);
             npc_id = resolve_npc_ref_locked(room.npc_ids, ref);
             if (npc_id.empty()) {
-                response = "ERR ERR_TARGET_NOT_FOUND " + ref;
+                response = "ERR 404 NPC_NOT_FOUND " + ref;
             } else {
                 room_id = room.id;
                 auto& npc = world.npcs.at(npc_id);
@@ -125,23 +125,31 @@ void cmd_attack(const std::shared_ptr<Session>& session, const std::vector<std::
     send_line(*session, response);
     if (attacker_mutated) character_store::save(attacker);
     if (!room_id.empty()) {
-        broadcast_to_room(room_id, session->player_id,
-                           "EVT ROOM COMBAT " + session->player_id + " " + npc_id + " " +
-                               std::to_string(damage_dealt) + " " + std::to_string(target_hp));
         log_info("combat_attack", {{"player", session->player_id},
                                     {"target", npc_id},
                                     {"damage", std::to_string(damage_dealt)},
                                     {"target_hp", std::to_string(target_hp)}});
         if (npc_died) {
-            broadcast_to_room(room_id, "", "EVT ROOM COMBAT_DEATH " + npc_id);
+            broadcast_to_room(room_id, "", "EVT ROOM COMBAT_DEATH_NPC " +
+                                  ("{\"player\":\"" + session->player_id + "\"," +
+                                   "\"npc\":\"" + npc_id + "\"}"));
             log_info("npc_defeated", {{"player", session->player_id}, {"npc", npc_id}});
             on_npc_defeated(session->player_id, npc_id);
+        } else {
+            broadcast_to_room(room_id, session->player_id,
+                               "EVT ROOM COMBAT " +
+                                   ("{\"player\":\"" + session->player_id + "\"," +
+                                    "\"npc\":\"" + npc_id + "\"," +
+                                    "\"damage\":\"" + std::to_string(damage_dealt) + "\"," +
+                                    "\"health\":\"" + std::to_string(target_hp) + "\"}"));
         }
     }
     if (player_died) {
-        broadcast_to_room(old_room, session->player_id, "EVT ROOM COMBAT_DEATH " + session->player_id);
-        broadcast_to_room(old_room, session->player_id, "EVT ROOM PRESENCE LEAVE " + session->player_id);
-        broadcast_to_room(new_room, session->player_id, "EVT ROOM PRESENCE ENTER " + session->player_id);
+        broadcast_to_room(old_room, session->player_id, "EVT ROOM COMBAT_DEATH_PLAYER " +
+                              ("{\"player\":\"" + session->player_id + "\"," +
+                               "\"npc\":\"" + npc_id + "\"}"));
+        broadcast_to_room(old_room, session->player_id, "EVT ROOM PRESENCE_LEAVE " + session->player_id);
+        broadcast_to_room(new_room, session->player_id, "EVT ROOM PRESENCE_ENTER " + session->player_id);
         log_info("player_respawned",
                  {{"player", session->player_id}, {"room", new_room}, {"hp", std::to_string(player_hp)}});
     }
@@ -149,7 +157,7 @@ void cmd_attack(const std::shared_ptr<Session>& session, const std::vector<std::
 
 void cmd_status(const std::shared_ptr<Session>& session) {
     if (session->player_id.empty()) {
-        send_line(*session, "ERR ERR_NOT_CONNECTED CONNECT first");
+        send_line(*session, "ERR 102 NOT_CONNECTED CONNECT first");
         return;
     }
     auto& world = World::instance();

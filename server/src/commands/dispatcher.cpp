@@ -18,11 +18,16 @@
 
 namespace {
 
+// Precondition: world.mutex already held (reads World::instance().player_group).
 std::string character_info_json(const PlayerState& p) {
+    auto& world = World::instance();
+    std::string group_id = world.player_group.count(p.player_id) ? world.player_group.at(p.player_id) : "";
+
     std::ostringstream oss;
     oss << "{\"name\":\"" << p.player_id << "\",\"race\":\"" << json_escape(p.race)
         << "\",\"special_attributes\":\"" << json_escape(p.special_attributes) << "\",\"room\":\""
-        << p.current_room << "\",\"hp\":" << p.hp << ",\"max_hp\":" << p.max_hp << ",\"inventory\":[";
+        << p.current_room << "\",\"hp\":" << p.hp << ",\"max_hp\":" << p.max_hp << ",\"group\":"
+        << (group_id.empty() ? "null" : "\"" + group_id + "\"") << ",\"inventory\":[";
     for (size_t i = 0; i < p.inventory.size(); ++i) {
         if (i > 0) oss << ",";
         oss << "\"" << p.inventory[i] << "\"";
@@ -41,11 +46,11 @@ std::string character_info_json(const PlayerState& p) {
 // sees it taken even before the file exists on disk.
 void cmd_create_character(const std::shared_ptr<Session>& session, const std::vector<std::string>& args) {
     if (!session->player_id.empty()) {
-        send_line(*session, "ERR ERR_ALREADY_CONNECTED already connected as " + session->player_id);
+        send_line(*session, "ERR 201 NAME_IN_USE already connected as " + session->player_id);
         return;
     }
     if (args.size() < 2) {
-        send_line(*session, "ERR ERR_BAD_ARGS CREATE_CHARACTER requires a name and a race");
+        send_line(*session, "ERR 200 BAD_MESSAGE CREATE_CHARACTER requires a name and a race");
         return;
     }
     std::string name = args[0];
@@ -53,7 +58,7 @@ void cmd_create_character(const std::shared_ptr<Session>& session, const std::ve
     std::string special_attributes = args.size() > 2 ? join_from(args, 2) : "";
 
     if (!character_store::is_valid_name(name)) {
-        send_line(*session, "ERR ERR_BAD_ARGS invalid character name");
+        send_line(*session, "ERR 200 BAD_MESSAGE invalid character name");
         return;
     }
 
@@ -64,7 +69,7 @@ void cmd_create_character(const std::shared_ptr<Session>& session, const std::ve
     {
         std::lock_guard<std::mutex> lock(world.mutex);
         if (world.players.count(name) || character_store::exists(name)) {
-            response = "ERR ERR_NAME_TAKEN name already in use";
+            response = "ERR 201 NAME_IN_USE name already in use";
         } else {
             PlayerState p;
             p.player_id = name;
@@ -95,17 +100,17 @@ void cmd_create_character(const std::shared_ptr<Session>& session, const std::ve
 // character at the same time.
 void cmd_connect(const std::shared_ptr<Session>& session, const std::vector<std::string>& args) {
     if (!session->player_id.empty()) {
-        send_line(*session, "ERR ERR_ALREADY_CONNECTED already connected as " + session->player_id);
+        send_line(*session, "ERR 201 NAME_IN_USE already connected as " + session->player_id);
         return;
     }
     if (args.empty()) {
-        send_line(*session, "ERR ERR_BAD_ARGS CONNECT requires a name");
+        send_line(*session, "ERR 200 BAD_MESSAGE CONNECT requires a name");
         return;
     }
     std::string name = args[0];
 
     if (!character_store::is_valid_name(name)) {
-        send_line(*session, "ERR ERR_BAD_ARGS invalid character name");
+        send_line(*session, "ERR 200 BAD_MESSAGE invalid character name");
         return;
     }
 
@@ -113,14 +118,14 @@ void cmd_connect(const std::shared_ptr<Session>& session, const std::vector<std:
     {
         std::lock_guard<std::mutex> lock(world.mutex);
         if (world.players.count(name)) {
-            send_line(*session, "ERR ERR_ALREADY_CONNECTED character is already online");
+            send_line(*session, "ERR 201 NAME_IN_USE character is already online");
             return;
         }
     }
 
     PlayerState loaded;
     if (!character_store::load(name, loaded)) {
-        send_line(*session, "ERR ERR_CHARACTER_NOT_FOUND no such character, use CREATE_CHARACTER");
+        send_line(*session, "ERR 404 CHARACTER_NOT_FOUND no such character, use CREATE_CHARACTER");
         return;
     }
 
@@ -129,7 +134,7 @@ void cmd_connect(const std::shared_ptr<Session>& session, const std::vector<std:
     {
         std::lock_guard<std::mutex> lock(world.mutex);
         if (world.players.count(name)) {
-            response = "ERR ERR_ALREADY_CONNECTED character is already online";
+            response = "ERR 201 NAME_IN_USE character is already online";
         } else {
             init_player_quests_locked(loaded); // seeds any quest added to world.json since the last save
             world.players[name] = loaded;
@@ -148,7 +153,7 @@ void cmd_connect(const std::shared_ptr<Session>& session, const std::vector<std:
 
 void cmd_look(const std::shared_ptr<Session>& session) {
     if (session->player_id.empty()) {
-        send_line(*session, "ERR ERR_NOT_CONNECTED CONNECT first");
+        send_line(*session, "ERR 102 NOT_CONNECTED CONNECT first");
         return;
     }
     auto& world = World::instance();
@@ -157,7 +162,7 @@ void cmd_look(const std::shared_ptr<Session>& session) {
         std::lock_guard<std::mutex> lock(world.mutex);
         auto it = world.rooms.find(session->current_room);
         if (it == world.rooms.end()) {
-            response = "ERR ERR_INTERNAL room not found";
+            response = "ERR 500 INTERNAL room not found";
         } else {
             response = "OK " + serialize_room_locked(it->second);
         }
@@ -167,11 +172,11 @@ void cmd_look(const std::shared_ptr<Session>& session) {
 
 void cmd_move(const std::shared_ptr<Session>& session, const std::vector<std::string>& args) {
     if (session->player_id.empty()) {
-        send_line(*session, "ERR ERR_NOT_CONNECTED CONNECT first");
+        send_line(*session, "ERR 102 NOT_CONNECTED CONNECT first");
         return;
     }
     if (args.empty()) {
-        send_line(*session, "ERR ERR_BAD_ARGS MOVE requires a direction");
+        send_line(*session, "ERR 200 BAD_MESSAGE MOVE requires a direction");
         return;
     }
     std::string direction = args[0];
@@ -184,7 +189,7 @@ void cmd_move(const std::shared_ptr<Session>& session, const std::vector<std::st
         auto& room = world.rooms.at(player.current_room);
         auto exit_it = room.exits.find(direction);
         if (exit_it == room.exits.end()) {
-            response = "ERR ERR_NO_EXIT no exit " + direction;
+            response = "ERR 301 NO_EXIT no exit " + direction;
         } else {
             old_room = player.current_room;
             new_room = exit_it->second;
@@ -197,8 +202,8 @@ void cmd_move(const std::shared_ptr<Session>& session, const std::vector<std::st
     send_line(*session, response);
     if (!new_room.empty()) {
         character_store::save(moved);
-        broadcast_to_room(old_room, session->player_id, "EVT ROOM PRESENCE LEAVE " + session->player_id);
-        broadcast_to_room(new_room, session->player_id, "EVT ROOM PRESENCE ENTER " + session->player_id);
+        broadcast_to_room(old_room, session->player_id, "EVT ROOM PRESENCE_LEAVE " + session->player_id);
+        broadcast_to_room(new_room, session->player_id, "EVT ROOM PRESENCE_ENTER " + session->player_id);
         log_info("player_moved",
                  {{"player", session->player_id}, {"from", old_room}, {"to", new_room}});
     }
@@ -206,7 +211,7 @@ void cmd_move(const std::shared_ptr<Session>& session, const std::vector<std::st
 
 void cmd_who(const std::shared_ptr<Session>& session) {
     if (session->player_id.empty()) {
-        send_line(*session, "ERR ERR_NOT_CONNECTED CONNECT first");
+        send_line(*session, "ERR 102 NOT_CONNECTED CONNECT first");
         return;
     }
     auto& world = World::instance();
@@ -232,7 +237,7 @@ void cmd_who(const std::shared_ptr<Session>& session) {
 // callable any time after login, not just right after it.
 void cmd_profile(const std::shared_ptr<Session>& session) {
     if (session->player_id.empty()) {
-        send_line(*session, "ERR ERR_NOT_CONNECTED CONNECT first");
+        send_line(*session, "ERR 102 NOT_CONNECTED CONNECT first");
         return;
     }
     auto& world = World::instance();
@@ -246,20 +251,21 @@ void cmd_profile(const std::shared_ptr<Session>& session) {
 
 void cmd_chat(const std::shared_ptr<Session>& session, const std::vector<std::string>& args) {
     if (session->player_id.empty()) {
-        send_line(*session, "ERR ERR_NOT_CONNECTED CONNECT first");
+        send_line(*session, "ERR 102 NOT_CONNECTED CONNECT first");
         return;
     }
     if (args.size() < 2) {
-        send_line(*session, "ERR ERR_BAD_ARGS CHAT requires scope and text");
+        send_line(*session, "ERR 200 BAD_MESSAGE CHAT requires scope and text");
         return;
     }
     std::string scope = args[0];
     if (scope != "GLOBAL" && scope != "ROOM" && scope != "GROUP") {
-        send_line(*session, "ERR ERR_BAD_ARGS unknown chat scope " + scope);
+        send_line(*session, "ERR 200 BAD_MESSAGE unknown chat scope " + scope);
         return;
     }
     std::string text = join_from(args, 1);
-    std::string evt = "EVT " + scope + " CHAT " + session->player_id + " " + text;
+    std::string evt = "EVT " + scope + " CHAT {\"player\":\"" + session->player_id + "\",\"text\":\"" +
+                       json_escape(text) + "\"}";
 
     if (scope == "GROUP") {
         auto& world = World::instance();
@@ -269,7 +275,7 @@ void cmd_chat(const std::shared_ptr<Session>& session, const std::vector<std::st
             group_id = world.player_group.count(session->player_id) ? world.player_group.at(session->player_id) : "";
         }
         if (group_id.empty()) {
-            send_line(*session, "ERR ERR_NOT_IN_GROUP not in a group");
+            send_line(*session, "ERR 401 NOT_IN_GROUP not in a group");
             return;
         }
         send_line(*session, "OK");
@@ -297,7 +303,7 @@ void cmd_quit(const std::shared_ptr<Session>& session) {
 void handle_command(std::shared_ptr<Session> session, const std::string& line) {
     auto tokens = split_ws(line);
     if (tokens.empty()) {
-        send_line(*session, "ERR ERR_BAD_ARGS empty command");
+        send_line(*session, "ERR 200 BAD_MESSAGE empty command");
         return;
     }
     std::string cmd = tokens[0];
@@ -348,7 +354,7 @@ void handle_command(std::shared_ptr<Session> session, const std::string& line) {
     } else if (cmd == "QUIT") {
         cmd_quit(session);
     } else {
-        send_line(*session, "ERR ERR_UNKNOWN_CMD unknown command " + cmd);
+        send_line(*session, "ERR 200 BAD_MESSAGE unknown command " + cmd);
     }
 }
 
@@ -380,7 +386,7 @@ void handle_disconnect(std::shared_ptr<Session> session) {
     log_info("player_disconnected", {{"player", session->player_id}});
 
     if (!room_id.empty()) {
-        broadcast_to_room(room_id, session->player_id, "EVT ROOM PRESENCE LEAVE " + session->player_id);
+        broadcast_to_room(room_id, session->player_id, "EVT ROOM PRESENCE_LEAVE " + session->player_id);
     }
     if (!group_id.empty()) {
         broadcast_to_group(group_id, session->player_id, "EVT GROUP LEAVE " + session->player_id);
