@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "TapWindow.hpp"
+#include "Window.hpp"
 #include "Message.hpp"
 
 
@@ -38,10 +38,10 @@ static std::vector<std::string> CHAT_CMD_HINTS
 	"QUIT"
 };
 
-class GameWindow : public TapWindow
+class GameWindow : public Window
 {
 	public:
-		using TapWindow::TapWindow;
+		using Window::Window;
 
 		GameWindow(int32_t commandFd, UI* engine);
 

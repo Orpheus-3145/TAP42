@@ -2,13 +2,13 @@
 
 #include <cstdint>
 
-#include "TapWindow.hpp"
+#include "Window.hpp"
 
 
-class LoginWindow : public TapWindow
+class LoginWindow : public Window
 {
 	public:
-		using TapWindow::TapWindow;
+		using Window::Window;
 
 		LoginWindow(int32_t commandFd, UI* engine);
 

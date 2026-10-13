@@ -12,7 +12,7 @@ InputTab::InputTab(
 	std::string const& prompt,
 	int32_t borderChar,
 	int32_t colorPair,
-	TapWindow* parent
+	Window* parent
 ) :
 	BasicTab(borderChar, colorPair, parent),
 	forwardInputFd{forwardInputFd},

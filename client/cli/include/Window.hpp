@@ -12,17 +12,17 @@
 class BasicTab;
 class UI;
 
-class TapWindow
+class Window
 {
 	public:
-		TapWindow(UI* engine) noexcept;
+		Window(UI* engine) noexcept;
 
-		TapWindow(TapWindow const& other) = delete;
-		TapWindow& operator=(TapWindow const& other) = delete;
-		TapWindow(TapWindow&& other) = delete;
-		TapWindow& operator=(TapWindow&& other) = delete;
+		Window(Window const& other) = delete;
+		Window& operator=(Window const& other) = delete;
+		Window(Window&& other) = delete;
+		Window& operator=(Window&& other) = delete;
 
-		virtual ~TapWindow(void) noexcept;
+		virtual ~Window(void) noexcept;
 
 		virtual void draw(int32_t height, int32_t width) = 0;
 		virtual void resize(int32_t height, int32_t width);

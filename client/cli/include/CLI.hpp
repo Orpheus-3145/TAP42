@@ -285,5 +285,5 @@ class CLI : public UI
 		std::unique_ptr<GameWindow>			gameWin;
 		std::unique_ptr<ErrorWindow>		errorWin;
 
-		TapWindow* currentWindow{nullptr};
+		Window* currentWindow{nullptr};
 };

@@ -4,14 +4,14 @@
 #include <string>
 #include <functional>
 
-#include "TapWindow.hpp"
+#include "Window.hpp"
 #include "UI.hpp"
 
 
-class ErrorWindow : public TapWindow
+class ErrorWindow : public Window
 {
 	public:
-		using TapWindow::TapWindow;
+		using Window::Window;
 
 		ErrorWindow(UI* engine);
 
