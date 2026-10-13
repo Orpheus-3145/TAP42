@@ -1,11 +1,9 @@
 #include "GameWindow.hpp"
 
 
-GameWindow::GameWindow(QWidget *parent, int32_t height, int32_t width) :
-	QMainWindow(parent)
+GameWindow::GameWindow(QWidget *parent, int32_t height, int32_t width, UI* engine) :
+	Window(parent, height, width, engine)
 {
-	this->draw(height, width);
-
 	// signal when to app when user presses enter on command input 
 	QObject::connect(
 		this->promptField,
@@ -73,4 +71,27 @@ void GameWindow::draw(int32_t height, int32_t width)
 
 	rootLayout->addWidget(leftPanel, /*stretch=*/1);
 	rootLayout->addWidget(rightSplitter, /*stretch=*/1);
+}
+
+void GameWindow::appendResponse(Message const& response, CommandType cmdType)
+{
+	// std::string strCommand = toString(cmdType);
+	// find which tab the response belongs to
+	std::string content = response.toStringResponse(cmdType);
+	this->responsesLog->appendPlainText(QString::fromStdString(content));
+}
+
+void GameWindow::appendEvent(Message const& event)
+{
+	std::string content = event.toStringEvent();
+	this->eventsLog->appendPlainText(QString::fromStdString(content));
+}
+
+void GameWindow::appendError(Message const& error, CommandType cmdType)
+{
+	(void) cmdType;
+	// std::string strCommand = toString(cmdType);
+	// find which tab the error belongs to
+	std::string content = error.toStringError();
+	this->responsesLog->appendPlainText(QString::fromStdString(content));
 }
