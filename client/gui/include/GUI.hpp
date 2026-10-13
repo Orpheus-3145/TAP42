@@ -8,7 +8,10 @@
 #include <string>
 
 #include "UI.hpp"
+#include "LoginWindow.hpp"
+#include "PlayerCreateWindow.hpp"
 #include "GameWindow.hpp"
+#include "ErrorWindow.hpp"
 
 
 class GUI : public QObject, public UI
@@ -16,7 +19,7 @@ class GUI : public QObject, public UI
 	Q_OBJECT
 
 	public:
-		GUI(int32_t clientSocket, int32_t height, int32_t width);
+		GUI(int32_t height, int32_t width);
 
 		GUI(GUI const& other) noexcept = delete;
 		GUI& operator=(GUI const& other) noexcept = delete;
@@ -25,19 +28,24 @@ class GUI : public QObject, public UI
 
 		~GUI(void) noexcept override;
 
-		void start(void) override { this->app->exec(); }
-		void stop(void) noexcept override { this->app->quit(); }
-		// void resize(int32_t height, int32_t width) { this->gameWin->resize(width, height); }
+		void start(void) override;
+		void stop(void) noexcept override;
+		void switchWindow(std::optional<GamePhase> newPhase = std::nullopt) override;
 		
 	private:
-		void handleException(std::string const& errMsg) noexcept override { (void) errMsg; }
-		void handleServerDisconnect(void) noexcept override {}
+		void handleException(ErrorData& error) noexcept override { (void) error; }
 
-		void handleResponse(std::string const& response) noexcept override;
-		void handleEvent(std::string const& event) noexcept override;
+		void showResponse(Message const& response) noexcept override;
+		void showEvent(Message const& event) noexcept override;
+		void showError(Message const& error) noexcept override;
 
-		std::unique_ptr<QApplication>	app;
-		std::unique_ptr<GameWindow>		gameWin;
+		std::unique_ptr<QApplication>		app;
+		std::unique_ptr<QSocketNotifier>	readFromServerNotifier;
 
-		std::unique_ptr<QSocketNotifier> readFromServerNotifier;
+		std::unique_ptr<LoginWindow>		loginWin;
+		std::unique_ptr<PlayerCreateWindow>	newPlayerWin;
+		std::unique_ptr<GameWindow>			gameWin;
+		std::unique_ptr<ErrorWindow>		errorWin;
+
+		Window* currentWindow{nullptr};
 };

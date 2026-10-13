@@ -1,6 +1,7 @@
 #pragma once
 
-#include <QMainWindow>
+#include <vector>
+
 #include <QWidget>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -10,6 +11,39 @@
 #include <QSplitter>
 #include <QFont>
 #include <QSocketNotifier>
+
+#include "Window.hpp"
+#include "Message.hpp"
+
+
+static std::vector<std::string> CMD_HINTS
+{
+	"LOOK",
+	"MOVE",
+	"WHO",
+	"TAKE",
+	"DROP",
+	"INVENTORY",
+	"TALK",
+	"ATTACK",
+	"STATUS",
+	"QUEST",
+	"QUESTS",
+	"QUIT",
+	"USE"
+};
+
+static std::vector<std::string> CHAT_CMD_HINTS
+{
+	"GROUP CREATE",
+	"GROUP INVITE",
+	"GROUP JOIN",
+	"GROUP LEAVE",
+	"CHAT GROUP",
+	"CHAT ROOM",
+	"CHAT GLOBAL",
+	"QUIT"
+};
 
 
 // Stile "terminale" condiviso da tutti i pannelli: sfondo scuro, testo bianco,
@@ -22,17 +56,20 @@ static const QString kPanelStyle = R"(
     font-size: 13px;
 )";
 
-class GameWindow : public QMainWindow
+class GameWindow : public Window
 {
-    Q_OBJECT
+	Q_OBJECT
 
 	public:
-		GameWindow(QWidget *parent, int32_t height, int32_t width);
+		using Window::Window;
+
+		GameWindow(QWidget *parent, UI* engine, int32_t height, int32_t width);
 
 		~GameWindow(void) noexcept {}
 
-		void appendResponse(const QString &text)  { this->responsesLog->appendPlainText(text); }
-		void appendEvent(const QString &text)     { this->eventsLog->appendPlainText(text); }
+		void appendResponse(Message const& response, CommandType cmdType);
+		void appendEvent(Message const& event);
+		void appendError(Message const& error, CommandType cmdType);
 
 	signals:
 		void commandEntered(const QString &command);
@@ -41,7 +78,7 @@ class GameWindow : public QMainWindow
 		void onPromptSubmitted();
 
 	private:
-		void draw(int32_t height, int32_t width);
+		void draw(int32_t height, int32_t width) override;
 
 		QPlainTextEdit *inputLog;
 		QLineEdit      *promptField;

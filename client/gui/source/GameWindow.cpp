@@ -1,8 +1,8 @@
 #include "GameWindow.hpp"
 
 
-GameWindow::GameWindow(QWidget *parent, int32_t height, int32_t width) :
-	QMainWindow(parent)
+GameWindow::GameWindow(QWidget *parent, UI* engine, int32_t height, int32_t width) :
+	Window(parent, engine)
 {
 	this->draw(height, width);
 
@@ -28,11 +28,11 @@ void GameWindow::onPromptSubmitted()
 
 void GameWindow::draw(int32_t height, int32_t width)
 {
-	setWindowTitle("TAP 42");
-	resize(width, height);
+	this->setWindowTitle("TAP 42");
+	this->resize(width, height);
 
 	QWidget *central = new QWidget(this);
-	setCentralWidget(central);
+	this->setCentralWidget(central);
 
 	QHBoxLayout *rootLayout = new QHBoxLayout(central);
 	rootLayout->setContentsMargins(10, 10, 10, 10);
@@ -73,4 +73,29 @@ void GameWindow::draw(int32_t height, int32_t width)
 
 	rootLayout->addWidget(leftPanel, /*stretch=*/1);
 	rootLayout->addWidget(rightSplitter, /*stretch=*/1);
+
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing game window, size h: {}, w: {}", height, width));
+}
+
+void GameWindow::appendResponse(Message const& response, CommandType cmdType)
+{
+	// std::string strCommand = toString(cmdType);
+	// find which tab the response belongs to
+	std::string content = response.toStringResponse(cmdType);
+	this->responsesLog->appendPlainText(QString::fromStdString(content));
+}
+
+void GameWindow::appendEvent(Message const& event)
+{
+	std::string content = event.toStringEvent();
+	this->eventsLog->appendPlainText(QString::fromStdString(content));
+}
+
+void GameWindow::appendError(Message const& error, CommandType cmdType)
+{
+	(void) cmdType;
+	// std::string strCommand = toString(cmdType);
+	// find which tab the error belongs to
+	std::string content = error.toStringError();
+	this->responsesLog->appendPlainText(QString::fromStdString(content));
 }
