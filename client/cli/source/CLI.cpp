@@ -2,6 +2,7 @@
 #include "BasicTab.hpp"
 #include "Logger.hpp"
 #include "Exceptions.hpp"
+#include "Utils.hpp"
 
 #include <format>
 #include <cassert>
