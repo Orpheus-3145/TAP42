@@ -156,7 +156,9 @@ void cmd_group(const std::shared_ptr<Session>& session, const std::vector<std::s
         cmd_group_create(session);
     } else if (args[0] == "INVITE") {
         cmd_group_invite(session, args);
-    } else if (args[0] == "ACCEPT") {
+    } else if (args[0] == "ACCEPT" || args[0] == "JOIN") {
+        // "JOIN" is a compatibility alias: the CLI client currently sends
+        // "GROUP JOIN <inviter>" rather than "GROUP ACCEPT <inviter>".
         cmd_group_accept(session, args);
     } else if (args[0] == "LEAVE") {
         cmd_group_leave(session);

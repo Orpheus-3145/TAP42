@@ -109,8 +109,9 @@ S: ERR 201 NAME_IN_USE ...   # sessione già connessa a un altro personaggio
 ```
 Crea un personaggio nuovo e ci connette la sessione corrente, in un solo
 passo. `name` e `race` sono un solo token ciascuno; `special_attributes` è
-libero, può contenere spazi, prende tutto il resto della riga ed è
-opzionale.
+libero, può contenere spazi, prende tutto il resto della riga. Solo `name`
+è obbligatorio: `race` e `special_attributes` possono mancare entrambi,
+restano semplicemente stringhe vuote finché il client non li raccoglie.
 
 `race` e `special_attributes` sono campi fissi (lo slot esiste sempre) ma a
 valore libero: il giocatore scrive quello che vuole, il server li salva e li
@@ -119,6 +120,11 @@ di dado — sono lì solo perché il client li mostri. Tutti i personaggi
 partono identici: stesse HP (100/100), stesso punto di spawn (`loc.start`),
 indipendentemente da cosa è stato scritto in questi campi. Lo stesso punto
 di spawn viene usato anche per il respawn dopo la morte (§ ATTACK).
+
+**Alias di compatibilità**: `CREATE PLAYER <name>` (due token) è accettato
+come sinonimo esatto di `CREATE_CHARACTER <name>` — è la stringa che il
+client CLI manda oggi. Stesso handler, stessa risposta; documentato qui
+solo perché non è il nome canonico del comando.
 
 `NAME_IN_USE` scatta sia se il nome è già online sia se esiste già un
 file di quel personaggio su disco da una sessione precedente — un nome, una
@@ -360,6 +366,11 @@ S: ERR 404 PLAYER_NOT_FOUND ...   # player non connesso
 C: GROUP ACCEPT <inviter>
 S: OK {"joined":"<group_id>"}
 S: ERR 200 BAD_MESSAGE ...        # nessun invito pendente da quel giocatore
+```
+**Alias di compatibilità**: `GROUP JOIN <inviter>` è accettato come sinonimo
+esatto di `GROUP ACCEPT <inviter>` — è la stringa che il client CLI manda
+oggi al posto di ACCEPT.
+```
 
 C: GROUP LEAVE
 S: OK {"left":"<group_id>"}

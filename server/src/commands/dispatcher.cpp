@@ -49,12 +49,16 @@ void cmd_create_character(const std::shared_ptr<Session>& session, const std::ve
         send_line(*session, "ERR 201 NAME_IN_USE already connected as " + session->player_id);
         return;
     }
-    if (args.size() < 2) {
-        send_line(*session, "ERR 200 BAD_MESSAGE CREATE_CHARACTER requires a name and a race");
+    if (args.empty()) {
+        send_line(*session, "ERR 200 BAD_MESSAGE CREATE_CHARACTER requires a name");
         return;
     }
+    // race/special_attributes are purely cosmetic (never read by any game
+    // logic), so a client that only sends a name still gets a valid
+    // character - the fields just come back empty until the client has
+    // somewhere to collect them.
     std::string name = args[0];
-    std::string race = args[1];
+    std::string race = args.size() > 1 ? args[1] : "";
     std::string special_attributes = args.size() > 2 ? join_from(args, 2) : "";
 
     if (!character_store::is_valid_name(name)) {
@@ -321,6 +325,11 @@ void handle_command(std::shared_ptr<Session> session, const std::string& line) {
         cmd_connect(session, args);
     } else if (cmd == "CREATE_CHARACTER") {
         cmd_create_character(session, args);
+    } else if (cmd == "CREATE" && !args.empty() && args[0] == "PLAYER") {
+        // Compatibility alias: the CLI client currently sends "CREATE PLAYER
+        // <name>" rather than "CREATE_CHARACTER <name>". Same handler, just
+        // strip the "PLAYER" token first.
+        cmd_create_character(session, std::vector<std::string>(args.begin() + 1, args.end()));
     } else if (cmd == "PROFILE") {
         cmd_profile(session);
     } else if (cmd == "LOOK") {
