@@ -102,7 +102,7 @@ void CLI::start(void)
 				this->handlePollError();
 			// read command from UI (and forward it to server)
 			if (this->pollFds[CLI::CMD].revents & POLLIN)
-				this->handleCommand();
+				this->handleCommand("");
 			// resize window
 			if (this->pollFds[CLI::RESIZE].revents & POLLIN)
 				this->handleResize();
@@ -147,7 +147,7 @@ void CLI::shakeHands(void) noexcept
 	this->pollFds[CLI::STDIN].events = POLLIN;
 }
 
-void CLI::handleException(ErrorData& error)
+void CLI::handleException(ErrorData const& error)
 {
 	if (error.code == ErrorCode::UI_INVALID_SIZE)		// trigger a resize
 	{
@@ -165,15 +165,31 @@ void CLI::handleException(ErrorData& error)
 	UI::handleException(error);
 
 	if (this->phase == GamePhase::ERROR)
+		this->errorWin->adaptWinToError({ErrorCode::UI_DOUBLE_ERROR, mapError(error)});		// NB check this
+	else
+		this->errorWin->adaptWinToError(error);
+
+	this->switchWindow(GamePhase::ERROR);
+}
+
+void CLI::handleCommand(std::string const& input)
+{
+	(void) input;
+	char buffer[Config::CMD_BUFFER_SIZE];
+	ssize_t n = 0L;
+
+	try
 	{
-		// if there's another error happening already just print message and
-		// stop session
-		error.info = mapError(error);
-		error.code = ErrorCode::UI_DOUBLE_ERROR;
+		n = ioUtils::read(this->pollFds[CLI::CMD].fd, buffer, Config::CMD_BUFFER_SIZE);
+	}
+	catch(AppException& e)
+	{
+		if (e.getError().code == ErrorCode::IO_READ_FAILED)
+			e.getError().info += ", couldn't read command";
+		throw e;
 	}
 
-	this->errorWin->adaptWinToError(error);
-	this->switchWindow(GamePhase::ERROR);
+	UI::handleCommand(std::string(buffer, n));
 }
 
 void CLI::showResponse(Message const& response) noexcept
@@ -223,6 +239,7 @@ void CLI::switchWindow(std::optional<GamePhase> newPhase)
 	}
 	this->currentWindow->draw(this->height, this->width);
 }
+
 
 std::unique_ptr<UI> uiFactory()
 {

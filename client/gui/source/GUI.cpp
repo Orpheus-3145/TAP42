@@ -13,47 +13,65 @@ GUI::GUI(int32_t height, int32_t width) : UI()
 {
 	this->app = std::make_unique<QApplication>(argc, argv);
 
-	// server data: responses, events
-	this->readFromServerNotifier = std::make_unique<QSocketNotifier>(this->pollFds[GUI::CLIENT].fd, QSocketNotifier::Read, nullptr);
+	this->readClientNotifier = std::make_unique<QSocketNotifier>(this->pollFds[GUI::CLIENT].fd, QSocketNotifier::Read, nullptr);
 	QObject::connect(
-		this->readFromServerNotifier.get(),
+		this->readClientNotifier.get(),
 		&QSocketNotifier::activated,
-	    this,
-		[this]() {
-			this->readFromServer();
-		}
+		this,
+		&GUI::readFromServer
 	);
 
-	this->loginWin = std::make_unique<LoginWindow>(nullptr, this);
-	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(nullptr, this);
-	this->gameWin = std::make_unique<GameWindow>(nullptr, this);
-	this->gameWin->draw(height, width);
-	this->errorWin = std::make_unique<ErrorWindow>(nullptr, this);
-
-	// when user sends a command from the UI
+	this->writeClientNotifier = std::make_unique<QSocketNotifier>(this->pollFds[GUI::CLIENT].fd, QSocketNotifier::Write, nullptr);
+	this->writeClientNotifier->setEnabled(false);
 	QObject::connect(
-		this->gameWin.get(),
-		&GameWindow::commandEntered,
-	    this,
-		[this](const QString &cmd) {
-			std::string cmdStr = cmd.toStdString();
-			this->toServerSize = cmdStr.size();
-			::memcpy(this->toServerBuffer, cmdStr.data(), this->toServerSize);
-			this->writeToServer();
-		}
+		this->writeClientNotifier.get(),
+		&QSocketNotifier::activated,
+		this,
+		&GUI::writeToServer
 	);
-    this->gameWin->show();
+
+	this->loginWin = std::make_unique<LoginWindow>(height, width, this);
+	QObject::connect(
+		loginWin.get(),
+		&LoginWindow::commandEntered,
+		this,
+		&GUI::handleCommand
+	);
+
+	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(height, width, this);
+	QObject::connect(
+		newPlayerWin.get(),
+		&PlayerCreateWindow::commandEntered,
+		this,
+		&GUI::handleCommand
+	);
+
+	this->gameWin = std::make_unique<GameWindow>(height, width, this);
+	QObject::connect(
+		gameWin.get(),
+		&GameWindow::commandEntered,
+		this,
+		&GUI::handleCommand
+	);
+
+	this->errorWin = std::make_unique<ErrorWindow>(height, width, this);
+
 	LOG_INFO(LogContext::INTERFACE, "Done setup GUI");
 }
 
 GUI::~GUI(void) noexcept
 {
-	if (this->readFromServerNotifier)
-		this->readFromServerNotifier->setEnabled(false);
+	this->readClientNotifier->setEnabled(false);
+	this->writeClientNotifier->setEnabled(false);
 
 	// destroy manually to be sure to kill the app last
+	this->readClientNotifier.reset();
+	this->writeClientNotifier.reset();
+
+	this->loginWin.reset();
+	this->newPlayerWin.reset();
 	this->gameWin.reset();
-	this->app.reset();
+	this->errorWin.reset();
 }
 
 void GUI::start(void)
@@ -72,6 +90,9 @@ void GUI::switchWindow(std::optional<GamePhase> newPhase)
 {
 	UI::switchWindow(newPhase);
 
+	if (this->currentWindow and this->phase != GamePhase::ERROR)
+		this->currentWindow->close();
+
 	switch (this->phase)
 	{
 		case GamePhase::LOGIN:			this->currentWindow = this->loginWin.get(); break;
@@ -80,25 +101,72 @@ void GUI::switchWindow(std::optional<GamePhase> newPhase)
 		case GamePhase::ERROR:			this->currentWindow = this->errorWin.get(); break;
 		default:						assert(false and "phase not mapped to any window");
 	}
-	this->currentWindow->show();
+	this->currentWindow->draw();
+}
+
+void GUI::writeToServer(void)
+{
+	try
+	{
+		UI::writeToServer();
+		if (this->pollFds[GUI::CLIENT].revents & POLLHUP)
+			throw AppException({ErrorCode::CLIENT_DISCONNECTED});
+		else if (this->pollFds[GUI::CLIENT].events & POLLIN)
+			this->writeClientNotifier->setEnabled(false);
+	}
+	catch (AppException const& e)
+	{
+		this->handleException(e.getError());
+	}
+}
+
+void GUI::readFromServer(void)
+{
+	try
+	{
+		UI::readFromServer();
+		if (this->pollFds[GUI::CLIENT].revents & POLLHUP)
+			throw AppException({ErrorCode::CLIENT_DISCONNECTED});
+		else if (this->pollFds[GUI::CLIENT].events & POLLOUT)
+			this->writeClientNotifier->setEnabled(true);
+	}
+	catch (AppException const& e)
+	{
+		this->handleException(e.getError());
+	}
+}
+
+void GUI::handleException(ErrorData const& error) noexcept
+{
+	UI::handleException(error);
+	// NB ...
+}
+
+void GUI::handleCommand(std::string const& input)
+{
+	UI::handleCommand(input);
+
+	if (this->pollFds[GUI::CLIENT].events & POLLOUT)
+		this->writeClientNotifier->setEnabled(true);
 }
 
 void GUI::showResponse(Message const& response) noexcept
 {
+	assert(!this->commandQueue.empty() and "no command in queue");
+
 	this->gameWin->appendResponse(response, this->commandQueue.front().getCommandType());
-	// this->gameWin->appendResponse(QString::fromStdString(response.));
 }
 
 void GUI::showEvent(Message const& event) noexcept
 {
 	this->gameWin->appendEvent(event);
-	// this->gameWin->appendEvent(QString::fromStdString(event.));
 }
 
 void GUI::showError(Message const& error) noexcept
 {
-	this->gameWin->appendResponse(error, this->commandQueue.front().getCommandType());
-	// this->gameWin->appendResponse(QString::fromStdString(error));
+	assert(!this->commandQueue.empty() and "no command in queue");
+
+	this->gameWin->appendError(error, this->commandQueue.front().getCommandType());
 }
 
 

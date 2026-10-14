@@ -14,6 +14,5 @@ class LoginWindow : public Window
 
 		~LoginWindow(void) noexcept {}
 
-	private:
-		void draw(int32_t height, int32_t width) override;
+		void draw(void) override;
 };

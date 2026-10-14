@@ -93,7 +93,10 @@ void UI::start(void)
 	this->keepAlive = true;
 	this->clientHTTP->startWorker();
 	// add an artifacted command whose response is gonna be the handshake from server
-	this->commandQueue.push(Message(toString(CommandType::WAIT_HANDSHAKE)));
+	// this->commandQueue.push(Message(toString(CommandType::WAIT_HANDSHAKE)));
+
+	this->shakeHands();
+	this->switchWindow(GamePhase::GAME);
 }
 
 void UI::stop(void) noexcept
@@ -291,7 +294,7 @@ void UI::handlePollError(void)
 	}
 }
 
-void UI::handleException(ErrorData& error)
+void UI::handleException(ErrorData const& error)
 {
 	LOG_ERROR(LogContext::INTERFACE, mapError(error));
 
@@ -318,24 +321,21 @@ void UI::handleException(ErrorData& error)
 	}
 }
 
-void UI::handleCommand(void)
+void UI::handleCommand(std::string const& input)
 {
-	char buffer[Config::CMD_BUFFER_SIZE];
-	ssize_t n = ioUtils::read(this->pollFds[UI::CMD].fd, buffer, Config::CMD_BUFFER_SIZE);
-
 	std::string command;
 	if (this->phase == GamePhase::LOGIN)
 	{
-		this->username = std::string(buffer, n);
+		this->username = input;
 		command = std::format("{} {}", toString(CommandType::CONNECT), this->username);
 	}
 	else if (this->phase == GamePhase::PLAYER_CREATE)
 	{
-		this->username = std::string(buffer, n);
+		this->username = input;
 		command = std::format("{} {}", toString(CommandType::CREATE_PLAYER), this->username);
 	}
 	else
-		command = std::string(buffer, n);
+		command = input;
 
 	// if queue's empty send this command, otherwise there's
 	// one being already handled

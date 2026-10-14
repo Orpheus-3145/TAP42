@@ -158,7 +158,7 @@ void InOutTab::terminateCommand(void)
 	try
 	{
 		Message testParse(command);
-		// check if input is a command and if such command belongs to this tab
+		// check 1. if input is a command and 2. if such command belongs to this tab
 		if ((testParse.isCommand() == false) or
 			std::find(this->hints.begin(), this->hints.end(), toString(testParse.getCommandType())) == this->hints.end())
 			badCommand = true;

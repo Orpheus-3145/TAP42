@@ -6,7 +6,7 @@
 #include <format>
 
 
-void PlayerCreateWindow::draw(int32_t height, int32_t width)
+void PlayerCreateWindow::draw(void)
 {
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing player create window, size h: {}, w: {}", height, width));
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing player create window, size h: {}, w: {}", this->height(), this->width()));
 }

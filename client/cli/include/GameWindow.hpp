@@ -9,6 +9,7 @@
 #include "Message.hpp"
 
 
+<<<<<<< HEAD
 static std::vector<std::string> CMD_HINTS
 {
 	"LOOK",
@@ -39,6 +40,9 @@ static std::vector<std::string> CHAT_CMD_HINTS
 };
 
 class GameWindow : public Window
+=======
+class GameWindow : public TapWindow
+>>>>>>> b2113a8 (GUI - game window ok)
 {
 	public:
 		using Window::Window;

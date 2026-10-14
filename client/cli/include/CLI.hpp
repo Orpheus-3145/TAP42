@@ -270,7 +270,8 @@ class CLI : public UI
 
 		void shakeHands(void) noexcept override;
 		void switchWindow(std::optional<GamePhase> newPhase = std::nullopt) override;
-		void handleException(ErrorData& error) override;
+		void handleException(ErrorData const& error) override;
+		void handleCommand(std::string const& input) override;
 	
 		void showResponse(Message const& response) noexcept override;
 		void showEvent(Message const& event) noexcept override;

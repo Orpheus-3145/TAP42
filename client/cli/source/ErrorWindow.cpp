@@ -90,7 +90,7 @@ void ErrorWindow::clear(void) noexcept
 	this->activeTabIndex = 0;
 }
 
-void ErrorWindow::adaptWinToError(ErrorData& error) noexcept
+void ErrorWindow::adaptWinToError(ErrorData const& error) noexcept
 {
 	this->clear();
 

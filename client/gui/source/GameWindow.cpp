@@ -1,99 +1,95 @@
 #include "GameWindow.hpp"
+#include "UI.hpp"
+#include "GUI.hpp"
+
+#include <chrono>
+#include <QStringList>
 
 
-GameWindow::GameWindow(QWidget *parent, UI* engine) :
-	Window(parent, engine)
+void GameWindow::draw(void)
 {
-	// signal when to app when user presses enter on command input 
-	QObject::connect(
-		this->promptField,
-		&QLineEdit::returnPressed,
-		this,
-		&GameWindow::onPromptSubmitted
-	);
-}
+	this->setWindowTitle("Game");
 
-void GameWindow::onPromptSubmitted()
-{
-	QString text = this->promptField->text();
-	if (text.isEmpty())
-		return;
-
-	emit commandEntered(text);
-
-	this->promptField->clear();
-}
-
-void GameWindow::draw(int32_t height, int32_t width)
-{
-	this->setWindowTitle("TAP 42");
-	this->resize(width, height);
-
-	QWidget *central = new QWidget(this);
+	QWidget* central = new QWidget(this);
+	central->setObjectName("central");
+	central->setStyleSheet("QWidget#central { background: #0f0f18; border: 1px solid #1f5fa8; }");
 	this->setCentralWidget(central);
 
-	QHBoxLayout *rootLayout = new QHBoxLayout(central);
-	rootLayout->setContentsMargins(10, 10, 10, 10);
-	rootLayout->setSpacing(10);
+	this->playerPanel = new Panel("", BLUE_COLOR, false, false, false, central);
+	this->playerPanel->setMaximumHeight(158);
+	this->playerPanel->appendInput("Player: " + this->engine->getUsername());
+	this->playerPanel->appendInput("Data: <CLASS | RACE | ...>");
+	this->playerPanel->appendInput("Currently in: <LOCATION>");
+	this->playerPanel->appendInput("<IN GROUP | NOT IN GROUP>");
 
-	QWidget *leftPanel = new QWidget(central);
-	QVBoxLayout *leftLayout = new QVBoxLayout(leftPanel);
-	leftLayout->setContentsMargins(0, 0, 0, 0);
-	leftLayout->setSpacing(0);
+	this->worldPanel = new Panel("World events", YELLOW_COLOR, false, true, false, central);
+	this->cmdPanel = new Panel("User Events", CYAN_COLOR, true, true, true, central, CMD_HINTS);
+	this->chatPanel = new Panel("Chat", GREEN_COLOR, true, true, true, central, CHAT_CMD_HINTS);
 
-	this->inputLog = new QPlainTextEdit(leftPanel);
-	this->inputLog->setReadOnly(true);
-	this->inputLog->setStyleSheet(kPanelStyle);
-	this->inputLog->setPlainText("This is where the input is shown");
+	QVBoxLayout* left = new QVBoxLayout();
+	left->setSpacing(10);
+	left->addWidget(this->playerPanel, 0);
+	left->addWidget(this->worldPanel, 1);
 
-	this->promptField = new QLineEdit(leftPanel);
-	this->promptField->setStyleSheet(kPanelStyle);
-	this->promptField->setFrame(false);
+	QVBoxLayout* right = new QVBoxLayout();
+	right->setSpacing(10);
+	right->addWidget(this->cmdPanel, 1);
+	right->addWidget(this->chatPanel, 1);
 
-	leftLayout->addWidget(this->inputLog, /*stretch=*/1);
-	leftLayout->addWidget(this->promptField, /*stretch=*/0);
+	QHBoxLayout* root = new QHBoxLayout(central);
+	root->setContentsMargins(20, 20, 20, 20);
+	root->setSpacing(10);
+	root->addLayout(left, 1);
+	root->addLayout(right, 1);
 
-	QSplitter *rightSplitter = new QSplitter(Qt::Vertical, central);
+	QObject::connect(
+		this->cmdPanel,
+		&Panel::submitted,
+		this,
+		[this] (QString const& text) { emit commandEntered(text.toStdString()); }
+	);
+	QObject::connect(
+		this->chatPanel,
+		&Panel::submitted,
+		this,
+		[this] (QString const& text) { emit commandEntered(text.toStdString()); }
+	);
 
-	this->responsesLog = new QPlainTextEdit(rightSplitter);
-	this->responsesLog->setReadOnly(true);
-	this->responsesLog->setStyleSheet(kPanelStyle);
-	this->responsesLog->setPlainText("This is where responses are shown");
+	this->cmdPanel->focusPrompt();
+	QMainWindow::show();		// NB this should not be here
 
-	this->eventsLog = new QPlainTextEdit(rightSplitter);
-	this->eventsLog->setReadOnly(true);
-	this->eventsLog->setStyleSheet(kPanelStyle);
-	this->eventsLog->setPlainText("This is where events are shown");
-
-	rightSplitter->addWidget(this->responsesLog);
-	rightSplitter->addWidget(this->eventsLog);
-	rightSplitter->setSizes({600, 400});
-
-	rootLayout->addWidget(leftPanel, /*stretch=*/1);
-	rootLayout->addWidget(rightSplitter, /*stretch=*/1);
-
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing game window, size h: {}, w: {}", height, width));
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing game window, size h: {}, w: {}", this->height(), this->width()));
 }
 
 void GameWindow::appendResponse(Message const& response, CommandType cmdType)
 {
-	// std::string strCommand = toString(cmdType);
-	// find which tab the response belongs to
-	std::string content = response.toStringResponse(cmdType);
-	this->responsesLog->appendPlainText(QString::fromStdString(content));
+	if ((cmdType == CommandType::GROUP_CHAT) or (cmdType == CommandType::ROOM_CHAT) or (cmdType == CommandType::GLOBAL_CHAT))
+		return;
+
+	std::string commandStr = toString(cmdType), responseStr = response.toStringResponse(cmdType), color;
+
+	if (std::find(CMD_HINTS.begin(), CMD_HINTS.end(), commandStr) != CMD_HINTS.end())
+		this->cmdPanel->appendInput(responseStr);
+	else if (std::find(CHAT_CMD_HINTS.begin(), CHAT_CMD_HINTS.end(), commandStr) != CHAT_CMD_HINTS.end())
+		this->chatPanel->appendInput(responseStr);
+	else
+		assert(false and "response doesn't belong to any panel");
 }
 
 void GameWindow::appendEvent(Message const& event)
 {
-	std::string content = event.toStringEvent();
-	this->eventsLog->appendPlainText(QString::fromStdString(content));
+	std::string eventStr = event.toStringEvent();
+	this->worldPanel->appendInput(eventStr);
 }
 
 void GameWindow::appendError(Message const& error, CommandType cmdType)
 {
-	(void) cmdType;
-	// std::string strCommand = toString(cmdType);
-	// find which tab the error belongs to
-	std::string content = error.toStringError();
-	this->responsesLog->appendPlainText(QString::fromStdString(content));
+	std::string commandStr = toString(cmdType), errorStr = error.toStringError();
+
+	if (std::find(CMD_HINTS.begin(), CMD_HINTS.end(), commandStr) != CMD_HINTS.end())
+		this->cmdPanel->appendInput(errorStr);
+	else if (std::find(CHAT_CMD_HINTS.begin(), CHAT_CMD_HINTS.end(), commandStr) != CHAT_CMD_HINTS.end())
+		this->chatPanel->appendInput(errorStr);
+	else
+		assert(false and "error doesn't belong to any panel");
 }

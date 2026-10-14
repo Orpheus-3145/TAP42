@@ -6,7 +6,7 @@
 #include <format>
 
 
-void LoginWindow::draw(int32_t height, int32_t width)
+void LoginWindow::draw(void)
 {
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing error window, size h: {}, w: {}", height, width));
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing login window, size h: {}, w: {}", this->height(), this->width()));
 }
