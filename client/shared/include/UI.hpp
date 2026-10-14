@@ -55,13 +55,14 @@ class UI
 		std::string const& getUsername(void) const noexcept { return this->username; }
 
 	protected:
-		void writeToServer(void);
-		void readFromServer(void);
+		virtual void writeToServer(void);
+		virtual void readFromServer(void);
+
 		void splitIntoMessages(void);
 		void dispatchMessage(std::string const& message);
 		
 		void handlePollError(void);
-		void handleCommand(void);
+		virtual void handleCommand(void);
 
 		virtual void shakeHands(void) noexcept;
 		virtual void handleException(ErrorData& error);
