@@ -13,48 +13,57 @@ GUI::GUI(int32_t height, int32_t width) : UI()
 {
 	this->app = std::make_unique<QApplication>(argc, argv);
 
-	this->readClientNotifier = new QSocketNotifier(this->pollFds[GUI::CLIENT].fd, QSocketNotifier::Read, this);
+	this->readClientNotifier = std::make_unique<QSocketNotifier>(this->pollFds[GUI::CLIENT].fd, QSocketNotifier::Read, nullptr);
 	QObject::connect(
-		this->readClientNotifier,
+		this->readClientNotifier.get(),
 		&QSocketNotifier::activated,
 		this,
-		&CLI::readFromServer
+		&GUI::readFromServer
 	);
 
-	this->writeClientNotifier = new QSocketNotifier(this->pollFds[GUI::CLIENT].fd, QSocketNotifier::Write, this);
+	this->writeClientNotifier = std::make_unique<QSocketNotifier>(this->pollFds[GUI::CLIENT].fd, QSocketNotifier::Write, nullptr);
 	this->writeClientNotifier->setEnabled(false);
 	QObject::connect(
-		this->writeClientNotifier,
+		this->writeClientNotifier.get(),
 		&QSocketNotifier::activated,
 		this,
-		&CLI::writeToServer
+		&GUI::writeToServer
 	);
 
-	this->commandNotifier = new QSocketNotifier(this->pollFds[GUI::CMD].fd, QSocketNotifier::Read, this);
-	QObject::connect(
-		this->commandNotifier,
-		&QSocketNotifier::activated,
-		this,
-		&CLI::handleCommand
-	);
+	this->loginWin = std::make_unique<LoginWindow>(height, width, this);
+	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(height, width, this);
+	this->gameWin = std::make_unique<GameWindow>(height, width, this);
+	this->errorWin = std::make_unique<ErrorWindow>(height, width, this);
 
-	this->loginWin = std::make_unique<LoginWindow>(nullptr, this, height, width);
-	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(nullptr, this, height, width);
-	this->gameWin = std::make_unique<GameWindow>(nullptr, this, height, width);
-	this->errorWin = std::make_unique<ErrorWindow>(nullptr, this, height, width);
+	// for (Window *w : {
+	// 	static_cast<Window*>(loginWin.get()),
+	// 	static_cast<Window*>(newPlayerWin.get()),
+	// 	static_cast<Window*>(gameWin.get()),
+	// 	static_cast<Window*>(errorWin.get())
+	// })
+		QObject::connect(
+			gameWin.get(),
+			&GameWindow::commandEntered,
+			this,
+			&GUI::handleCommand
+		);
 
-    this->gameWin->show();
 	LOG_INFO(LogContext::INTERFACE, "Done setup GUI");
 }
 
 GUI::~GUI(void) noexcept
 {
-	if (this->readFromServerNotifier)
-		this->readFromServerNotifier->setEnabled(false);
+	this->readClientNotifier->setEnabled(false);
+	this->writeClientNotifier->setEnabled(false);
 
 	// destroy manually to be sure to kill the app last
+	this->readClientNotifier.reset();
+	this->writeClientNotifier.reset();
+
+	this->loginWin.reset();
+	this->newPlayerWin.reset();
 	this->gameWin.reset();
-	this->app.reset();
+	this->errorWin.reset();
 }
 
 void GUI::start(void)
@@ -73,6 +82,9 @@ void GUI::switchWindow(std::optional<GamePhase> newPhase)
 {
 	UI::switchWindow(newPhase);
 
+	if (this->currentWindow)
+		this->currentWindow->close();
+
 	switch (this->phase)
 	{
 		case GamePhase::LOGIN:			this->currentWindow = this->loginWin.get(); break;
@@ -89,9 +101,9 @@ void GUI::writeToServer(void)
 	try
 	{
 		UI::writeToServer();
-		if (this->pollFds[GUI::CLIENT].revents == POLLHUP)
+		if (this->pollFds[GUI::CLIENT].revents & POLLHUP)
 			throw AppException({ErrorCode::CLIENT_DISCONNECTED});
-		else if (this->pollFds[GUI::CLIENT].events == POLLIN)
+		else if (this->pollFds[GUI::CLIENT].events & POLLIN)
 			this->writeClientNotifier->setEnabled(false);
 	}
 	catch (AppException const& e)
@@ -105,9 +117,9 @@ void GUI::readFromServer(void)
 	try
 	{
 		UI::readFromServer();
-		if (this->pollFds[GUI::CLIENT].revents == POLLHUP)
+		if (this->pollFds[GUI::CLIENT].revents & POLLHUP)
 			throw AppException({ErrorCode::CLIENT_DISCONNECTED});
-		else if (this->pollFds[GUI::CLIENT].events == POLLOUT)
+		else if (this->pollFds[GUI::CLIENT].events & POLLOUT)
 			this->writeClientNotifier->setEnabled(true);
 	}
 	catch (AppException const& e)
@@ -116,105 +128,36 @@ void GUI::readFromServer(void)
 	}
 }
 
-Sì, in Qt la pipe non serve più. Serviva solo perché il `poll()` bloccava il thread e l'unico modo di svegliarlo era scrivere su un fd. Con l'event loop di Qt basta un **segnale**: il widget emette un segnale all'invio, e lo slot che lo riceve inoltra il comando al server.
-
-## Lato widget
-
-`QLineEdit` ha già il segnale `returnPressed()`, quindi spesso non serve nemmeno una classe custom:
-
-```cpp
-class InputWidget : public QWidget {
-    Q_OBJECT
-public:
-    explicit InputWidget(QWidget *parent = nullptr) : QWidget(parent) {
-        m_edit = new QLineEdit(this);
-        // layout...
-
-        connect(m_edit, &QLineEdit::returnPressed, this, [this] {
-            const QString cmd = m_edit->text();
-            m_edit->clear();
-            if (!cmd.isEmpty())
-                emit commandEntered(cmd);
-        });
-    }
-
-signals:
-    void commandEntered(const QString &cmd);
-
-private:
-    QLineEdit *m_edit;
-};
-```
-
-## Lato GUI / CLI
-
-```cpp
-connect(inputWidget, &InputWidget::commandEntered,
-        this, &GUI::onCommand);
-
-void GUI::onCommand(const QString &cmd) {
-    // 1. eventuale elaborazione/echo locale nella GUI
-    appendToOutput("> " + cmd);
-
-    // 2. inoltro al server
-    m_cli->queueForServer(cmd.toUtf8() + '\n');
-}
-```
-
-Oppure, se la GUI non deve toccare il comando, colleghi direttamente il segnale a `CLI`:
-
-```cpp
-connect(inputWidget, &InputWidget::commandEntered,
-        m_cli, &CLI::sendCommand);
-```
-
-## Cosa sparisce
-
-- La pipe `CMD` e il suo `QSocketNotifier` (`m_cmdNotifier`, `m_cmdFd`).
-- `handleCommand()` come lettura da fd: diventa lo slot `onCommand(const QString &)`, che riceve già il comando e non deve fare `read()` né parsing del buffer.
-- Il problema dei comandi spezzati o concatenati: con una pipe potevi leggere mezzo comando o due insieme, con i segnali ricevi sempre una stringa completa.
-
-## Nota sui thread
-
-Se widget e `CLI` stanno nello stesso thread (il caso normale, la GUI), la connessione è diretta e immediata. Se `CLI` è in un altro `QThread`, Qt usa automaticamente una connessione queued, quindi è thread-safe senza fare altro. In quel caso `queueForServer` verrebbe eseguito nel thread di `CLI`, dove vive anche il `QSocketNotifier`, ed è quello che vuoi: **i notifier e le chiamate che li toccano (`setEnabled`) devono stare nel thread a cui appartengono**.
-
-Se la pipe serve anche a un processo esterno, allora ha senso tenerla con il suo `QSocketNotifier`. Se è solo comunicazione interna widget → GUI, il segnale è la soluzione giusta.
-
-void GUI::handleCommand(void)
-{
-	// UI::handleCommand();
-	// if (this->pollFds[GUI::CLIENT].events == POLLOUT)
-	// 	this->writeClientNotifier->setEnabled(true);
-
-	if (input.isEmpty())
-		return;
-
-	const std::string text = input.toStdString();
-	std::string command;
-
-	if (this->phase == GamePhase::LOGIN)
-	{
-		this->username = text;
-		command = std::format("{} {}", toString(CommandType::CONNECT), this->username);
-	}
-	else if (this->phase == GamePhase::PLAYER_CREATE)
-	{
-		this->username = text;
-		command = std::format("{} {}", toString(CommandType::CREATE_PLAYER), this->username);
-	}
-	else
-		command = text;
-
-	this->commandQueue.push(Message(command));
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Command '{}' added to queue", command));
-
-	this->writeNotifier->setEnabled(true);
-}
-
-void GUI::handleException(ErrorData& error) noexcept
+void GUI::handleException(ErrorData const& error) noexcept
 {
 	UI::handleException(error);
 	// NB ...
+}
+
+void GUI::handleCommand(std::string const& input)
+{
+	// NB move this check in the panels
+	// try
+	// {
+	// 	Message testParse(input);
+	// 	// check 1. if input is a command and 2. if such command belongs to this tab
+	// 	if ((testParse.isCommand() == false) or
+	// 		std::find(this->hints.begin(), this->hints.end(), toString(testParse.getCommandType())) == this->hints.end())
+	// 		throw AppException({ErrorCode::BAD_MESSAGE});
+	// }
+	// catch (AppException const& e)
+	// {
+	// 	if (e.getError().code == ErrorCode::BAD_MESSAGE)
+	// 	{
+	// 		// update the window with 'wrong input'
+	// 		return;
+	// 	}
+	// 	throw e;		// Qt callbacks do not support exceptions, we should never get here
+	// }
+	UI::handleCommand(input);
+
+	if (this->pollFds[GUI::CLIENT].events & POLLOUT)
+		this->writeClientNotifier->setEnabled(true);
 }
 
 void GUI::showResponse(Message const& response) noexcept

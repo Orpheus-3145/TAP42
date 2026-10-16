@@ -6,13 +6,13 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QPlainTextEdit>
-#include <QLineEdit>
 #include <QLabel>
 #include <QSplitter>
 #include <QFont>
 #include <QSocketNotifier>
 
 #include "Window.hpp"
+#include "Panel.hpp"
 #include "Message.hpp"
 
 
@@ -45,17 +45,6 @@ static std::vector<std::string> CHAT_CMD_HINTS
 	"QUIT"
 };
 
-
-// Stile "terminale" condiviso da tutti i pannelli: sfondo scuro, testo bianco,
-// font monospace, bordo sottile bianco — per assomigliare all'immagine di riferimento.
-static const QString kPanelStyle = R"(
-    background-color: #1a1a1a;
-    color: #e6e6e6;
-    border: 1px solid #ffffff;
-    font-family: "Courier New", monospace;
-    font-size: 13px;
-)";
-
 class GameWindow : public Window
 {
 	Q_OBJECT
@@ -63,25 +52,26 @@ class GameWindow : public Window
 	public:
 		using Window::Window;
 
-		GameWindow(QWidget *parent, UI* engine, int32_t height, int32_t width);
-
 		~GameWindow(void) noexcept {}
 
+		void setPlayerInfo(QString const& info);
 		void appendResponse(Message const& response, CommandType cmdType);
 		void appendEvent(Message const& event);
 		void appendError(Message const& error, CommandType cmdType);
 
 	signals:
-		void commandEntered(const QString &command);
-
-	private slots:
-		void onPromptSubmitted();
+		void commandEntered(std::string input);
 
 	private:
 		void draw(int32_t height, int32_t width) override;
 
-		QPlainTextEdit *inputLog;
-		QLineEdit      *promptField;
-		QPlainTextEdit *responsesLog;
-		QPlainTextEdit *eventsLog;
+		// panel that sent the oldest command still waiting for its response
+		Panel* takePending(void);
+ 
+		Panel* playerPanel{nullptr};	// top left, static text
+		Panel* worldPanel{nullptr};		// bottom left, output only
+		Panel* userPanel{nullptr};		// top right, with prompt
+		Panel* chatPanel{nullptr};		// bottom right, with prompt
+ 
+		std::queue<Panel*> pending;
 };

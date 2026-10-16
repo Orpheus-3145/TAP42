@@ -12,8 +12,6 @@ class PlayerCreateWindow : public Window
 	public:
 		using Window::Window;
 
-		PlayerCreateWindow(QWidget *parent, UI* engine, int32_t height, int32_t width);
-
 		~PlayerCreateWindow(void) noexcept {}
 
 	// signals:

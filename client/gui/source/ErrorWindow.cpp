@@ -6,12 +6,6 @@
 #include <format>
 
 
-ErrorWindow::ErrorWindow(QWidget *parent, UI* engine, int32_t height, int32_t width) :
-	Window(parent, engine)
-{
-	this->draw(height, width);
-}
-
 void ErrorWindow::draw(int32_t height, int32_t width)
 {
 	(void) height;

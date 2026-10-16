@@ -15,8 +15,6 @@ class ErrorWindow : public Window
 	public:
 		using Window::Window;
 
-		ErrorWindow(QWidget *parent, UI* engine, int32_t height, int32_t width);
-
 		~ErrorWindow(void) noexcept {}
 
 	// signals:

@@ -32,18 +32,20 @@ class GUI : public QObject, public UI
 		void stop(void) noexcept override;
 		void switchWindow(std::optional<GamePhase> newPhase = std::nullopt) override;
 
-	private:
+	private slots:
 		void writeToServer(void) override;
 		void readFromServer(void) override;
-		void handleCommand(void) override;
-		void handleException(ErrorData& error) noexcept override;
+		void handleCommand(std::string const& input) override;
+
+	private:
+		void handleException(ErrorData const& error) noexcept override;
 
 		void showResponse(Message const& response) noexcept override;
 		void showEvent(Message const& event) noexcept override;
 		void showError(Message const& error) noexcept override;
 
 		std::unique_ptr<QApplication>		app;
-		std::unique_ptr<QSocketNotifier>	readClientNotifier, writeClientNotifier, commandNotifier;
+		std::unique_ptr<QSocketNotifier>	readClientNotifier, writeClientNotifier;
 
 		std::unique_ptr<LoginWindow>		loginWin;
 		std::unique_ptr<PlayerCreateWindow>	newPlayerWin;

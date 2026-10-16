@@ -1,101 +1,98 @@
 #include "GameWindow.hpp"
 
 
-GameWindow::GameWindow(QWidget *parent, UI* engine, int32_t height, int32_t width) :
-	Window(parent, engine)
-{
-	this->draw(height, width);
-
-	// signal when to app when user presses enter on command input 
-	QObject::connect(
-		this->promptField,
-		&QLineEdit::returnPressed,
-		this,
-		&GameWindow::onPromptSubmitted
-	);
-}
-
-void GameWindow::onPromptSubmitted()
-{
-	QString text = this->promptField->text();
-	if (text.isEmpty())
-		return;
-
-	emit commandEntered(text);
-
-	this->promptField->clear();
-}
-
 void GameWindow::draw(int32_t height, int32_t width)
 {
 	this->setWindowTitle("TAP 42");
 	this->resize(width, height);
-
-	QWidget *central = new QWidget(this);
+ 
+	QWidget* central = new QWidget(this);
+	central->setObjectName("central");
+	central->setStyleSheet("QWidget#central { background: #0f0f18; border: 1px solid #1f5fa8; }");
 	this->setCentralWidget(central);
-
-	QHBoxLayout *rootLayout = new QHBoxLayout(central);
-	rootLayout->setContentsMargins(10, 10, 10, 10);
-	rootLayout->setSpacing(10);
-
-	QWidget *leftPanel = new QWidget(central);
-	QVBoxLayout *leftLayout = new QVBoxLayout(leftPanel);
-	leftLayout->setContentsMargins(0, 0, 0, 0);
-	leftLayout->setSpacing(0);
-
-	this->inputLog = new QPlainTextEdit(leftPanel);
-	this->inputLog->setReadOnly(true);
-	this->inputLog->setStyleSheet(kPanelStyle);
-	this->inputLog->setPlainText("This is where the input is shown");
-
-	this->promptField = new QLineEdit(leftPanel);
-	this->promptField->setStyleSheet(kPanelStyle);
-	this->promptField->setFrame(false);
-
-	leftLayout->addWidget(this->inputLog, /*stretch=*/1);
-	leftLayout->addWidget(this->promptField, /*stretch=*/0);
-
-	QSplitter *rightSplitter = new QSplitter(Qt::Vertical, central);
-
-	this->responsesLog = new QPlainTextEdit(rightSplitter);
-	this->responsesLog->setReadOnly(true);
-	this->responsesLog->setStyleSheet(kPanelStyle);
-	this->responsesLog->setPlainText("This is where responses are shown");
-
-	this->eventsLog = new QPlainTextEdit(rightSplitter);
-	this->eventsLog->setReadOnly(true);
-	this->eventsLog->setStyleSheet(kPanelStyle);
-	this->eventsLog->setPlainText("This is where events are shown");
-
-	rightSplitter->addWidget(this->responsesLog);
-	rightSplitter->addWidget(this->eventsLog);
-	rightSplitter->setSizes({600, 400});
-
-	rootLayout->addWidget(leftPanel, /*stretch=*/1);
-	rootLayout->addWidget(rightSplitter, /*stretch=*/1);
-
+ 
+	// colors taken from the ncurses version
+	this->playerPanel = new Panel("",              "#1f5fa8", false, "", central);
+	this->worldPanel  = new Panel("World events",  "#b87333", false, "", central);
+	this->userPanel   = new Panel("User Events",   "#1fa3b8", true,  "",   central);
+	this->chatPanel   = new Panel("Chat",          "#1fa870", true,  "->", central);
+ 
+	this->playerPanel->setMaximumHeight(130);
+	this->setPlayerInfo(
+		"Player:\n"
+		"Data: <CLASS | RACE | ...>\n"
+		"Currently in: <LOCATION>\n"
+		"<IN GROUP | NOT IN GROUP>"
+	);
+ 
+	// left column: player info (fixed) + world events (takes the rest)
+	QVBoxLayout* left = new QVBoxLayout();
+	left->setSpacing(10);
+	left->addWidget(this->playerPanel, 0);
+	left->addWidget(this->worldPanel, 1);
+ 
+	// right column: two equal panels, each with its own prompt
+	QVBoxLayout* right = new QVBoxLayout();
+	right->setSpacing(10);
+	right->addWidget(this->userPanel, 1);
+	right->addWidget(this->chatPanel, 1);
+ 
+	QHBoxLayout* root = new QHBoxLayout(central);
+	root->setContentsMargins(20, 20, 20, 20);
+	root->setSpacing(10);
+	root->addLayout(left, 1);
+	root->addLayout(right, 1);
+ 
+	// when a prompt is submitted: echo it in its own panel, remember who asked
+	// (responses come back in order), then forward to GUI via Window::commandEntered
+	for (Panel* p : {this->userPanel, this->chatPanel})
+	{
+		QObject::connect(
+			p,
+			&Panel::submitted,
+			this,
+			[this, p] (QString const& text) {
+				p->appendInput(text);
+				this->pending.push(p);
+				emit commandEntered(text.toStdString());
+			}
+		);
+	}
+ 
+	this->userPanel->focusPrompt();
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing game window, size h: {}, w: {}", height, width));
 }
 
+Panel* GameWindow::takePending(void)
+{
+	if (this->pending.empty())
+		return this->userPanel;		// e.g. command sent from another window
+ 
+	Panel* p = this->pending.front();
+	this->pending.pop();
+	return p;
+}
+ 
+void GameWindow::setPlayerInfo(QString const& info)
+{
+	this->playerPanel->setText(info);
+}
+ 
 void GameWindow::appendResponse(Message const& response, CommandType cmdType)
 {
-	// std::string strCommand = toString(cmdType);
-	// find which tab the response belongs to
 	std::string content = response.toStringResponse(cmdType);
-	this->responsesLog->appendPlainText(QString::fromStdString(content));
+	this->takePending()->appendLine(QString::fromStdString(content));
 }
-
+ 
 void GameWindow::appendEvent(Message const& event)
 {
 	std::string content = event.toStringEvent();
-	this->eventsLog->appendPlainText(QString::fromStdString(content));
+	this->worldPanel->appendLine(QString::fromStdString(content));
 }
-
+ 
 void GameWindow::appendError(Message const& error, CommandType cmdType)
 {
 	(void) cmdType;
-	// std::string strCommand = toString(cmdType);
-	// find which tab the error belongs to
 	std::string content = error.toStringError();
-	this->responsesLog->appendPlainText(QString::fromStdString(content));
+	this->takePending()->appendLine(QString::fromStdString(content));
 }

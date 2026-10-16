@@ -12,8 +12,6 @@ class LoginWindow : public Window
 	public:
 		using Window::Window;
 
-		LoginWindow(QWidget *parent, UI* engine, int32_t height, int32_t width);
-
 		~LoginWindow(void) noexcept {}
 
 	// signals:

@@ -62,10 +62,10 @@ class UI
 		void dispatchMessage(std::string const& message);
 		
 		void handlePollError(void);
-		virtual void handleCommand(void);
+		virtual void handleCommand(std::string const& input);
 
 		virtual void shakeHands(void) noexcept;
-		virtual void handleException(ErrorData& error);
+		virtual void handleException(ErrorData const& error);
 
 		virtual void showResponse(Message const& response) noexcept = 0;
 		virtual void showEvent(Message const& event) noexcept = 0;
