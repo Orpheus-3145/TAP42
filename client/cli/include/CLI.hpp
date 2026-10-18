@@ -264,22 +264,37 @@ class CLI : public UI
 		virtual ~CLI(void) noexcept override;
 
 		void start(void) override;
+		void stop(void) noexcept override;
+		void switchWindow(std::optional<GamePhase> newPhase = std::nullopt) override;
 
 	private:
 		void handleResize(void);
+		void handlePollError(void);
+
+		ssize_t writeToServer(void) override;
+		ssize_t readFromServer(void) override;
+		void	handleCommand(std::string const& input) override;
 
 		void shakeHands(void) noexcept override;
-		void switchWindow(std::optional<GamePhase> newPhase = std::nullopt) override;
 		void handleException(ErrorData const& error) override;
-		void handleCommand(std::string const& input) override;
 	
 		void showResponse(Message const& response) noexcept override;
 		void showEvent(Message const& event) noexcept override;
 		void showError(Message const& error) noexcept override;
 
 		static constexpr size_t POLL_SIZE = 4UL;
+		static constexpr size_t CLIENT = 0UL;
+		static constexpr size_t CMD = 1UL;
 		static constexpr size_t RESIZE = 2UL;
 		static constexpr size_t STDIN = 3UL;
+
+		std::array<struct pollfd,CLI::POLL_SIZE>	pollFds;
+		ioUtils::Pipe								commandPipe;
+
+		bool	keepAlive{false};
+
+		int32_t height{0};
+		int32_t width{0};
 
 		std::unique_ptr<LoginWindow>		loginWin;
 		std::unique_ptr<PlayerCreateWindow>	newPlayerWin;

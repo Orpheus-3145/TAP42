@@ -27,16 +27,8 @@ std::ostream& operator<<(std::ostream& out, GamePhase phase)
 }
 
 
-UI::UI(void) noexcept :
-	gameClientSockets{ioUtils::createSocketPair()},
-	commandPipe{ioUtils::createPipe()}
+UI::UI(void) noexcept : gameClientSockets{ioUtils::createSocketPair()}
 {
-	this->pollFds.resize(UI::POLL_SIZE);
-	this->pollFds[UI::CLIENT].fd = this->gameClientSockets.first;
-	this->pollFds[UI::CLIENT].events = POLLIN;
-	this->pollFds[UI::CMD].fd = this->commandPipe.out;	// to send a full command to client
-	this->pollFds[UI::CMD].events = POLLIN;
-
 	this->responseDispatcher[GamePhase::ND] = 			 [this] (Message const& m) { (void) m; this->shakeHands(); };
 	this->responseDispatcher[GamePhase::LOGIN] =		 [this] (Message const& m) { (void) m; this->switchWindow(GamePhase::GAME); };
 	this->responseDispatcher[GamePhase::PLAYER_CREATE] = [this] (Message const& m) { (void) m; this->switchWindow(GamePhase::GAME); };
@@ -72,7 +64,7 @@ UI::UI(void) noexcept :
 	this->errorDispatcher[GamePhase::GAME] =		  [this] (Message const& m) { this->showError(m); };
 	this->errorDispatcher[GamePhase::ERROR] =		  [this] (Message const& m) { throw AppException(ErrorCode::SERVER_ERROR, m.getRawMessage()); };
 		
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Listening to client socket: {}", this->pollFds[UI::CLIENT].fd));
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Listening to client socket: {}", this->gameClientSockets.first));
 }
 
 UI::~UI(void) noexcept
@@ -81,7 +73,6 @@ UI::~UI(void) noexcept
 		this->clientHTTP->stopWorker();
 
 	ioUtils::closePair(this->gameClientSockets);
-	ioUtils::closePipe(this->commandPipe);
 }
 
 void UI::connect(std::string host, uint32_t port)
@@ -91,7 +82,6 @@ void UI::connect(std::string host, uint32_t port)
 
 void UI::start(void)
 {
-	this->keepAlive = true;
 	this->clientHTTP->startWorker();
 	// add an artifacted command whose response is gonna be the handshake from server
 	this->commandQueue.push(Message(toString(CommandType::WAIT_HANDSHAKE)));
@@ -99,7 +89,6 @@ void UI::start(void)
 
 void UI::stop(void) noexcept
 {
-	this->keepAlive = false;
 	this->clientHTTP->stopWorker();
 }
 
@@ -118,11 +107,6 @@ void UI::switchWindow(std::optional<GamePhase> newPhase)
 		newPhase = this->lastPhase;
 	}
 
-	if (newPhase.value() == GamePhase::ERROR)				// error win: keep listening server data but stop talking
-		this->pollFds[UI::CLIENT].events = POLLIN;
-	else if (this->toServerSize > 0UL)						// if recovering from error and there's data left, start talking
-		this->pollFds[UI::CLIENT].events |= POLLOUT;
-
 	if ((newPhase.value() == GamePhase::LOGIN) or
 		(newPhase.value() == GamePhase::PLAYER_CREATE))
 		this->username = "";
@@ -135,7 +119,7 @@ void UI::switchWindow(std::optional<GamePhase> newPhase)
 	this->phase = newPhase.value();
 }
 
-void UI::writeToServer(void)
+ssize_t UI::writeToServer(void)
 {
 	if (this->connEstablished == false)
 		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE, "Tried to send data without handshake");
@@ -149,32 +133,27 @@ void UI::writeToServer(void)
 		this->toServerBuffer[this->toServerSize++] = Config::COMMAND_TERM;
 	}
 
-	int32_t clientSocket = this->pollFds[UI::CLIENT].fd;
-	ssize_t n = ioUtils::writeNonBlock(clientSocket, this->toServerBuffer, this->toServerSize);
-
-	if (n < 0L)		// disconnected
-		this->pollFds[UI::CLIENT].revents = POLLHUP;
-	else if (n > 0L)	
+	ssize_t n = ioUtils::writeNonBlock(this->gameClientSockets.first, this->toServerBuffer, this->toServerSize);
+	if (n < 0L)
+		throw AppException({ErrorCode::CLIENT_DISCONNECTED});
+	else if (n > 0L)
 	{
 		LOG_DEBUG(LogContext::INTERFACE, std::format("Sent to client: '{}'", std::string(this->toServerBuffer, n)));
 
 		this->toServerSize -= n;
 		if (this->toServerSize > 0UL)		// move the remaining data to send at the beginning of the buffer
 			::memmove(this->toServerBuffer, this->toServerBuffer + n, this->toServerSize);
-		else
-			this->pollFds[UI::CLIENT].events = POLLIN;		// written everything, just listen while waiting for server response
 	}
 	else
 		LOG_WARN(LogContext::INTERFACE, "Client socket buffer is busy, try again later");
+	return n;
 }
 
-void UI::readFromServer(void)
+ssize_t UI::readFromServer(void)
 {
-	int32_t clientSocket = this->pollFds[UI::CLIENT].fd;
-	ssize_t n = ioUtils::readNonBlock(clientSocket, this->toGameBuffer + this->toGameSize, Config::BUFF_SIZE - this->toGameSize);
-
-	if (n < 0L)		// disconnected
-		this->pollFds[UI::CLIENT].revents = POLLHUP;
+	ssize_t n = ioUtils::readNonBlock(this->gameClientSockets.first, this->toGameBuffer + this->toGameSize, Config::BUFF_SIZE - this->toGameSize);
+	if (n < 0L)
+		throw AppException({ErrorCode::CLIENT_DISCONNECTED});
 	else if (n > 0L)
 	{
 		std::string serverData = std::string(this->toGameBuffer + this->toGameSize, n);
@@ -185,6 +164,7 @@ void UI::readFromServer(void)
 	}
 	else
 		LOG_WARN(LogContext::INTERFACE, "Client socket buffer is full, send data to UI and empty it");
+	return n;
 }
 
 void UI::splitIntoMessages(void)
@@ -232,8 +212,6 @@ void UI::dispatchMessage(std::string const& msg)
 				this->stop();
 
 			this->commandQueue.pop();
-			if (this->commandQueue.empty() == false)		// there's another command queued up, send it
-				this->pollFds[UI::CLIENT].events |= POLLOUT;
 		}
 		else
 			LOG_ERROR(LogContext::INTERFACE, std::format("Got response without any pending command: '{}' - discarded", message->getRawMessage()));
@@ -245,10 +223,7 @@ void UI::dispatchMessage(std::string const& msg)
 		else if (this->commandQueue.empty() == false)
 		{
 			this->errorDispatcher.at(this->phase)(*message);
-
 			this->commandQueue.pop();
-			if (this->commandQueue.empty() == false)		// there's another command queued up, send it
-				this->pollFds[UI::CLIENT].events |= POLLOUT;
 		}
 		else
 			LOG_ERROR(LogContext::INTERFACE, std::format("Got error without any pending command: '{}' - discarded", message->getRawMessage()));
@@ -271,25 +246,6 @@ void UI::shakeHands(void) noexcept
 		// forward the previously used username to server
 		std::string loginCommand = std::format("{} {}", toString(CommandType::CONNECT), this->username);
 		this->commandQueue.push(Message(loginCommand));
-		this->pollFds[UI::CLIENT].events |= POLLOUT;
-	}
-}
-
-void UI::handlePollError(void)
-{
-	if (this->pollFds[CLIENT].revents & POLLHUP)
-		throw AppException(ErrorCode::CLIENT_DISCONNECTED);
-	else if (this->pollFds[CLIENT].revents & POLLNVAL)
-		throw AppException(ErrorCode::IO_POLL_FAILED, "invalid socket (POLLNVAL)");
-	else if (this->pollFds[CLIENT].revents & POLLERR)	// something actually went wrong with poll
-	{
-		int32_t sockErr = 0;
-		socklen_t len = sizeof(sockErr);
-	
-		if (ioUtils::getsockopt(this->pollFds[UI::CLIENT].fd, SOL_SOCKET, SO_ERROR, &sockErr, &len) < 0)
-			throw AppException(ErrorCode::IO_POLL_FAILED, std::format("getsockopt failed during POLLERR: {}", ::strerror(errno)));
-		else if (sockErr != 0)
-			throw AppException(ErrorCode::IO_POLL_FAILED, ::strerror(sockErr));
 	}
 }
 
@@ -325,21 +281,22 @@ void UI::handleCommand(std::string const& input)
 	std::string command;
 	if (this->phase == GamePhase::LOGIN)
 	{
+		if (this->commandQueue.empty() == false)	// to avoid sending multiple requests for connections
+			this->commandQueue.pop();
+
 		this->username = input;
 		command = std::format("{} {}", toString(CommandType::CONNECT), this->username);
 	}
 	else if (this->phase == GamePhase::PLAYER_CREATE)
 	{
+		if (this->commandQueue.empty() == false)	// to avoid sending multiple requests for connections
+			this->commandQueue.pop();
+
 		this->username = input;
 		command = std::format("{} {}", toString(CommandType::CREATE_PLAYER), this->username);
 	}
 	else
 		command = input;
-
-	// if queue's empty send this command, otherwise there's
-	// one being already handled
-	if (this->commandQueue.empty() == true)
-		this->pollFds[UI::CLIENT].events |= POLLOUT;
 
 	this->commandQueue.push(Message(command));
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Command '{}' added to queue", command));

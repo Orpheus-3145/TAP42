@@ -13,7 +13,7 @@ GUI::GUI(void) : UI()
 {
 	this->app = std::make_unique<QApplication>(argc, argv);
 
-	this->readClientNotifier = std::make_unique<QSocketNotifier>(this->pollFds[GUI::CLIENT].fd, QSocketNotifier::Read, nullptr);
+	this->readClientNotifier = std::make_unique<QSocketNotifier>(this->gameClientSockets.first, QSocketNotifier::Read, nullptr);
 	QObject::connect(
 		this->readClientNotifier.get(),
 		&QSocketNotifier::activated,
@@ -21,7 +21,7 @@ GUI::GUI(void) : UI()
 		&GUI::readFromServer
 	);
 
-	this->writeClientNotifier = std::make_unique<QSocketNotifier>(this->pollFds[GUI::CLIENT].fd, QSocketNotifier::Write, nullptr);
+	this->writeClientNotifier = std::make_unique<QSocketNotifier>(this->gameClientSockets.first, QSocketNotifier::Write, nullptr);
 	this->writeClientNotifier->setEnabled(false);
 	QObject::connect(
 		this->writeClientNotifier.get(),
@@ -106,36 +106,32 @@ void GUI::switchWindow(std::optional<GamePhase> newPhase)
 	this->currentWindow->show();
 }
 
-void GUI::writeToServer(void)
+ssize_t GUI::writeToServer(void)
 {
-	try
-	{
-		UI::writeToServer();
-		if (this->pollFds[GUI::CLIENT].revents & POLLHUP)
-			throw AppException({ErrorCode::CLIENT_DISCONNECTED});
-		else if (this->pollFds[GUI::CLIENT].events & POLLIN)
-			this->writeClientNotifier->setEnabled(false);
-	}
-	catch (AppException const& e)
-	{
-		this->handleException(e.getError());
-	}
+	ssize_t n = UI::writeToServer();
+
+	if (this->toServerSize == 0UL)					// written everything, just listen while waiting for server response
+		this->writeClientNotifier->setEnabled(false);
+
+	return n;
 }
 
-void GUI::readFromServer(void)
+ssize_t GUI::readFromServer(void)
 {
-	try
-	{
-		UI::readFromServer();
-		if (this->pollFds[GUI::CLIENT].revents & POLLHUP)
-			throw AppException({ErrorCode::CLIENT_DISCONNECTED});
-		else if (this->pollFds[GUI::CLIENT].events & POLLOUT)
-			this->writeClientNotifier->setEnabled(true);
-	}
-	catch (AppException const& e)
-	{
-		this->handleException(e.getError());
-	}
+	ssize_t n = UI::readFromServer();
+
+	if (this->commandQueue.empty() == false)		// there's another command queued up, send it
+		this->writeClientNotifier->setEnabled(true);
+
+	return n;
+}
+
+void GUI::shakeHands(void) noexcept
+{
+	UI::shakeHands();
+
+	if (this->phase == GamePhase::ERROR)
+		this->writeClientNotifier->setEnabled(true);
 }
 
 void GUI::handleException(ErrorData const& error) noexcept
@@ -146,10 +142,10 @@ void GUI::handleException(ErrorData const& error) noexcept
 
 void GUI::handleCommand(std::string const& input)
 {
-	UI::handleCommand(input);
-
-	if (this->pollFds[GUI::CLIENT].events & POLLOUT)
+	if (this->commandQueue.empty() == true)
 		this->writeClientNotifier->setEnabled(true);
+
+	UI::handleCommand(input);
 }
 
 void GUI::showResponse(Message const& response) noexcept

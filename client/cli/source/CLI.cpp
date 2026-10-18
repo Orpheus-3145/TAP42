@@ -12,9 +12,14 @@
 #include <sys/signalfd.h>
 
 
-CLI::CLI(void) : UI()
+CLI::CLI(void) :
+	UI(),
+	commandPipe{ioUtils::createPipe()}
 {
-	this->pollFds.resize(CLI::POLL_SIZE);
+	this->pollFds[CLI::CLIENT].fd = this->gameClientSockets.first;
+	this->pollFds[CLI::CLIENT].events = POLLIN;
+	this->pollFds[CLI::CMD].fd = this->commandPipe.out;	// to send a full command to client
+	this->pollFds[CLI::CMD].events = POLLIN;
 	this->pollFds[CLI::RESIZE].fd = ioUtils::createSignalRedirectFd(SIGWINCH);	// redirected signal resize to this fd
 	this->pollFds[CLI::RESIZE].events = POLLIN;
 	this->pollFds[CLI::STDIN].fd = STDIN_FILENO;		// to handle any user input
@@ -75,12 +80,14 @@ CLI::~CLI(void) noexcept
 	LOG_DEBUG(LogContext::CLI, std::format("Cleaned Ncurses data"));
 
 	ioUtils::close(this->pollFds[CLI::RESIZE].fd);
+	ioUtils::closePipe(this->commandPipe);
 }
 
 void CLI::start(void)
 {
 	UI::start();
 
+	this->keepAlive = true;
 	while (this->keepAlive == true)
 	{
 		try
@@ -119,6 +126,12 @@ void CLI::start(void)
 	LOG_INFO(LogContext::CLI, "CLI stopped");
 }
 
+void CLI::stop(void) noexcept
+{
+	UI::stop();
+	this->keepAlive = false;
+}
+
 void CLI::handleResize(void)
 {
 	struct signalfd_siginfo si;
@@ -139,12 +152,52 @@ void CLI::handleResize(void)
 		this->currentWindow->resize(this->height, this->width);
 }
 
+void CLI::handlePollError(void)
+{
+	if (this->pollFds[CLIENT].revents & POLLHUP)
+		throw AppException(ErrorCode::CLIENT_DISCONNECTED);
+	else if (this->pollFds[CLIENT].revents & POLLNVAL)
+		throw AppException(ErrorCode::IO_POLL_FAILED, "invalid socket (POLLNVAL)");
+	else if (this->pollFds[CLIENT].revents & POLLERR)	// something actually went wrong with poll
+	{
+		int32_t sockErr = 0;
+		socklen_t len = sizeof(sockErr);
+	
+		if (ioUtils::getsockopt(this->gameClientSockets.first, SOL_SOCKET, SO_ERROR, &sockErr, &len) < 0)
+			throw AppException(ErrorCode::IO_POLL_FAILED, std::format("getsockopt failed during POLLERR: {}", ::strerror(errno)));
+		else if (sockErr != 0)
+			throw AppException(ErrorCode::IO_POLL_FAILED, ::strerror(sockErr));
+	}
+}
+
+ssize_t CLI::writeToServer(void)
+{
+	ssize_t n = UI::writeToServer();
+
+	if (this->toServerSize == 0UL)
+		this->pollFds[CLI::CLIENT].events = POLLIN;		// written everything, just listen while waiting for server response
+
+	return n;
+}
+
+ssize_t CLI::readFromServer(void)
+{
+	ssize_t n = UI::readFromServer();
+
+	if (this->commandQueue.empty() == false)		// there's another command queued up, send it
+		this->pollFds[CLI::CLIENT].events |= POLLOUT;
+
+	return n;
+}
+
 void CLI::shakeHands(void) noexcept
 {
 	UI::shakeHands();
 
 	::flushinp();		// flush what might have been typed between window creation and handshake
 	this->pollFds[CLI::STDIN].events = POLLIN;
+	if (this->phase == GamePhase::ERROR)
+		this->pollFds[CLI::CLIENT].events |= POLLOUT;
 }
 
 void CLI::handleException(ErrorData const& error)
@@ -189,6 +242,11 @@ void CLI::handleCommand(std::string const& input)
 		throw e;
 	}
 
+	// if queue's empty send this command, otherwise there's
+	// one being already handled, so wait before sending it
+	if (this->commandQueue.empty() == true)
+		this->pollFds[CLI::CLIENT].events |= POLLOUT;
+
 	UI::handleCommand(std::string(buffer, n));
 }
 
@@ -227,6 +285,11 @@ void CLI::showError(Message const& error) noexcept
 void CLI::switchWindow(std::optional<GamePhase> newPhase)
 {
 	UI::switchWindow(newPhase);
+
+	if (this->phase == GamePhase::ERROR)				// error win: keep listening server data but stop talking
+		this->pollFds[CLI::CLIENT].events = POLLIN;
+	else if (this->toServerSize > 0UL)						// if recovering from error and there's data left, start talking
+		this->pollFds[CLI::CLIENT].events |= POLLOUT;
 
 	if (this->currentWindow and (this->phase != GamePhase::ERROR))
 		this->currentWindow->clear();

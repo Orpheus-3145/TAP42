@@ -32,18 +32,19 @@ class GUI : public QObject, public UI
 		GUI(GUI&& other) noexcept = delete;
 		GUI& operator=(GUI&& other) noexcept = delete;
 
-		~GUI(void) noexcept override;
+		virtual ~GUI(void) noexcept override;
 
 		void start(void) override;
 		void stop(void) noexcept override;
 		void switchWindow(std::optional<GamePhase> newPhase = std::nullopt) override;
 
 	private slots:
-		void writeToServer(void) override;
-		void readFromServer(void) override;
-		void handleCommand(std::string const& input) override;
+		ssize_t writeToServer(void) override;
+		ssize_t readFromServer(void) override;
+		void	handleCommand(std::string const& input) override;
 
 	private:
+		void shakeHands(void) noexcept override;
 		void handleException(ErrorData const& error) noexcept override;
 
 		void showResponse(Message const& response) noexcept override;
