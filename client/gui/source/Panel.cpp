@@ -81,7 +81,6 @@ Panel::Panel(
 			for (std::string const& cmd : hints.value())
 				this->hints.append(QString(cmd.data()));
 			QCompleter* completer = new QCompleter(this->hints, this->prompt);
-			completer->setCaseSensitivity(Qt::CaseInsensitive);
 			completer->setCompletionMode(QCompleter::InlineCompletion);
 			this->prompt->setCompleter(completer);
 		}

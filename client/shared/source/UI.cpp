@@ -53,13 +53,13 @@ UI::UI(void) noexcept : gameClientSockets{ioUtils::createSocketPair()}
 		if (m.getErrorType() == ErrorType::NOT_FOUND)
 			throw AppException(ErrorCode::UI_USERNAME_NOT_EXISTS);
 		else
-			throw AppException(ErrorCode::SERVER_ERROR, m.getRawMessage());
+			throw AppException(ErrorCode::SERVER_ERROR, m.toStringError());
 	};
 	this->errorDispatcher[GamePhase::PLAYER_CREATE] = [this] (Message const& m) {
 		if (m.getErrorType() == ErrorType::NAME_IN_USE)
 			throw AppException(ErrorCode::UI_USERNAME_IN_USE);
 		else
-			throw AppException(ErrorCode::SERVER_ERROR, m.getRawMessage());
+			throw AppException(ErrorCode::SERVER_ERROR, m.toStringError());
 	};
 	this->errorDispatcher[GamePhase::GAME] =		  [this] (Message const& m) { this->showError(m); };
 	this->errorDispatcher[GamePhase::ERROR] =		  [this] (Message const& m) { throw AppException(ErrorCode::SERVER_ERROR, m.getRawMessage()); };
@@ -94,11 +94,6 @@ void UI::stop(void) noexcept
 
 void UI::switchWindow(std::optional<GamePhase> newPhase)
 {
-	if ((this->connEstablished == false) and
-		(newPhase != GamePhase::LOGIN) and
-		(newPhase != GamePhase::ERROR))		// this is because technically there could a disconnection before login
-		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE);
-	
 	// without argument switch to
 	// the window shown before the error happened
 	if (newPhase.has_value() == false)
@@ -106,6 +101,11 @@ void UI::switchWindow(std::optional<GamePhase> newPhase)
 		assert(this->lastPhase != GamePhase::ND and "last phase was not set");
 		newPhase = this->lastPhase;
 	}
+
+	if ((this->connEstablished == false) and
+		(newPhase.value() != GamePhase::LOGIN) and
+		(newPhase.value() != GamePhase::ERROR))		// this is because technically there could a disconnection before login
+		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE);
 
 	if ((newPhase.value() == GamePhase::LOGIN) or
 		(newPhase.value() == GamePhase::PLAYER_CREATE))
@@ -197,7 +197,7 @@ void UI::dispatchMessage(std::string const& msg)
 	catch (AppException const& e)
 	{
 		if (e.getError().code != ErrorCode::BAD_MESSAGE)
-			throw e;
+		throw e;
 
 		LOG_ERROR(LogContext::INTERFACE, mapError(e.getError()));
 		return;
@@ -222,8 +222,8 @@ void UI::dispatchMessage(std::string const& msg)
 			throw AppException(ErrorCode::SERVER_DISCONNECTED);
 		else if (this->commandQueue.empty() == false)
 		{
-			this->errorDispatcher.at(this->phase)(*message);
 			this->commandQueue.pop();
+			this->errorDispatcher.at(this->phase)(*message);
 		}
 		else
 			LOG_ERROR(LogContext::INTERFACE, std::format("Got error without any pending command: '{}' - discarded", message->getRawMessage()));
@@ -251,26 +251,15 @@ void UI::shakeHands(void) noexcept
 
 void UI::handleException(ErrorData const& error)
 {
-	LOG_ERROR(LogContext::INTERFACE, mapError(error));
+	LOG_ERROR(LogContext::INTERFACE, std::format("Error: ", mapError(error)));
 
 	if (error.code == ErrorCode::SERVER_DISCONNECTED)
 	{
 		while (this->commandQueue.empty() == false)
-		{
-			LOG_WARN(LogContext::INTERFACE, std::format("Due to server disconnection, queued command '{}' has been discarded", this->commandQueue.front().getRawMessage()));
 			this->commandQueue.pop();
-		}
+		this->toGameSize = 0UL;
+		this->toServerSize = 0UL;
 
-		if (this->toGameSize > 0UL)
-		{
-			LOG_WARN(LogContext::INTERFACE, std::format("Due to server disconnection, incomplete message: '{}' has been discarded", std::string(this->toGameBuffer, this->toGameSize)));
-			this->toGameSize = 0UL;
-		}
-		if (this->toServerSize > 0UL)
-		{
-			LOG_WARN(LogContext::INTERFACE, std::format("Due to server disconnection, incomplete message: '{}' has been discarded", std::string(this->toServerBuffer, this->toServerSize)));
-			this->toServerSize = 0UL;
-		}
 		this->commandQueue.push(Message(toString(CommandType::WAIT_HANDSHAKE)));
 		this->connEstablished = false;
 	}

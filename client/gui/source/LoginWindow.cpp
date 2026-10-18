@@ -15,8 +15,8 @@
 
 void LoginWindow::draw(void)
 {
-	setObjectName("login");
-	setFixedSize(LoginWindow::WIDTH, LoginWindow::HEIGHT);
+	this->setObjectName("login");
+	this->setFixedSize(LoginWindow::WIDTH, LoginWindow::HEIGHT);
 
 	QLabel* title = new QLabel("Enter username:");
 	title->setObjectName("title");

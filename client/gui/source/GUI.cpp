@@ -57,6 +57,7 @@ GUI::GUI(void) : UI()
 	);
 
 	this->errorWin = std::make_unique<ErrorWindow>(this);
+	this->errorWin->draw();
 
 	LOG_INFO(LogContext::GUI, "Done setup GUI");
 }
@@ -92,37 +93,60 @@ void GUI::switchWindow(std::optional<GamePhase> newPhase)
 {
 	UI::switchWindow(newPhase);
 
-	if (this->currentWindow and this->phase != GamePhase::ERROR)
+	if (this->phase == GamePhase::ERROR)				// error win: keep listening server data but stop talking
+		this->writeClientNotifier->setEnabled(false);
+	else if (this->toServerSize > 0UL)					// if recovering from error and there's data left, start talking
+		this->writeClientNotifier->setEnabled(true);
+
+	if (this->currentWindow)
 		this->currentWindow->close();
 
 	switch (this->phase)
 	{
 		case GamePhase::LOGIN:			this->currentWindow = this->loginWin.get(); break;
 		case GamePhase::PLAYER_CREATE:	this->currentWindow = this->newPlayerWin.get(); break;
-		case GamePhase::GAME:			this->currentWindow = this->gameWin.get(); this->gameWin->draw(); break;		// NB handle re-creation of window
-		case GamePhase::ERROR:			this->currentWindow = this->errorWin.get(); this->errorWin->draw(); break;
+		case GamePhase::GAME:			this->currentWindow = this->gameWin.get(); this->gameWin->draw(); break;
+		case GamePhase::ERROR:			this->currentWindow = this->errorWin.get(); break;
 		default:						assert(false and "phase not mapped to any window");
 	}
+	QRect area = QGuiApplication::primaryScreen()->availableGeometry();
+	this->currentWindow->move(area.center() - this->currentWindow->rect().center());
+
+	this->currentWindow->setEnabled(true);
 	this->currentWindow->show();
 }
 
 ssize_t GUI::writeToServer(void)
 {
-	ssize_t n = UI::writeToServer();
-
-	if (this->toServerSize == 0UL)					// written everything, just listen while waiting for server response
-		this->writeClientNotifier->setEnabled(false);
-
+	ssize_t n = -1L;
+	try
+	{
+		n = UI::writeToServer();
+		if (this->toServerSize == 0UL)
+			this->writeClientNotifier->setEnabled(false);
+	}
+	catch (AppException const& e)
+	{
+		ErrorData err = e.getError();
+		this->handleException(err);
+	}
 	return n;
 }
 
 ssize_t GUI::readFromServer(void)
 {
-	ssize_t n = UI::readFromServer();
-
-	if (this->commandQueue.empty() == false)		// there's another command queued up, send it
-		this->writeClientNotifier->setEnabled(true);
-
+	ssize_t n = -1L;
+	try
+	{
+		n = UI::readFromServer();
+		if (this->commandQueue.empty() == false)
+			this->writeClientNotifier->setEnabled(true);
+	}
+	catch (AppException const& e)
+	{
+		ErrorData err = e.getError();
+		this->handleException(err);
+	}
 	return n;
 }
 
@@ -137,7 +161,13 @@ void GUI::shakeHands(void) noexcept
 void GUI::handleException(ErrorData const& error) noexcept
 {
 	UI::handleException(error);
-	// NB ...
+
+	if (this->phase == GamePhase::ERROR)
+		this->errorWin->adaptWinToError({ErrorCode::UI_DOUBLE_ERROR, mapError(error)});
+	else
+		this->errorWin->adaptWinToError(error);
+
+	this->switchWindow(GamePhase::ERROR);
 }
 
 void GUI::handleCommand(std::string const& input)

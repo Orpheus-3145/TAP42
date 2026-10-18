@@ -105,7 +105,7 @@ void ErrorWindow::adaptWinToError(ErrorData const& error) noexcept
 	{
 		case ErrorCode::UI_USERNAME_NOT_EXISTS:
 			this->setAction1("RETRY", [this] { this->engine->switchWindow(GamePhase::LOGIN); });
-			this->setAction2("CREATE NEW", [this] { this->engine->switchWindow(GamePhase::PLAYER_CREATE);	});
+			this->setAction2("CREATE NEW", [this] { this->engine->switchWindow(GamePhase::PLAYER_CREATE); });
 			break;
 
 		case ErrorCode::UI_USERNAME_IN_USE:

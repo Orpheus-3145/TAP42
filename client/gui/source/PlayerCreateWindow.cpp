@@ -17,8 +17,8 @@
 
 void PlayerCreateWindow::draw(void)
 {
-	setObjectName("playerCreate");
-	setFixedSize(PlayerCreateWindow::WIDTH, PlayerCreateWindow::HEIGHT);
+	this->setObjectName("playerCreate");
+	this->setFixedSize(PlayerCreateWindow::WIDTH, PlayerCreateWindow::HEIGHT);
 
 	QLabel* title = new QLabel("Create new username:");
 	title->setObjectName("title");
