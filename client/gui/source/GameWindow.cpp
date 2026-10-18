@@ -13,20 +13,20 @@ void GameWindow::draw(void)
 
 	QWidget* central = new QWidget(this);
 	central->setObjectName("central");
-	central->setStyleSheet(std::format("QWidget#central {{ background: #0f0f18; border: 1px solid {}; }}", BLUE_COLOR).data());
+	central->setStyleSheet(std::format("QWidget#central {{ background: #0f0f18; border: 1px solid {}; }}", QT_BLUE_COLOR).data());
 	this->setCentralWidget(central);
 
-	this->playerPanel = new Panel("", BLUE_COLOR, false, false, false, central);
+	this->playerPanel = new Panel("", QT_BLUE_COLOR, false, false, false, central);
 	this->playerPanel->setMaximumHeight(158);
 	this->playerPanel->appendInput("Player: " + this->engine->getUsername());
 	this->playerPanel->appendInput("Data: <CLASS | RACE | ...>");
 	this->playerPanel->appendInput("Currently in: <LOCATION>");
 	this->playerPanel->appendInput("<IN GROUP | NOT IN GROUP>");
 
-	this->worldPanel = new Panel("World events", YELLOW_COLOR, false, true, false, central);
-	this->cmdPanel = new Panel("User Events", CYAN_COLOR, true, true, true, central, CMD_HINTS);
+	this->worldPanel = new Panel("World events", QT_YELLOW_COLOR, false, true, false, central);
+	this->cmdPanel = new Panel("User Events", QT_CYAN_COLOR, true, true, true, central, CMD_HINTS);
 	this->cmdPanel->focusPrompt();
-	this->chatPanel = new Panel("Chat", GREEN_COLOR, true, true, true, central, CHAT_CMD_HINTS);
+	this->chatPanel = new Panel("Chat", QT_GREEN_COLOR, true, true, true, central, CHAT_CMD_HINTS);
 
 	QVBoxLayout* left = new QVBoxLayout();
 	left->setSpacing(10);

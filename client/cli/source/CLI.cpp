@@ -52,11 +52,11 @@ CLI::CLI(void) :
 	else
 	{
 		::start_color();
-		::init_pair(BLUE_COLOR, COLOR_BLUE, COLOR_BLACK);
-		::init_pair(RED_COLOR, COLOR_RED, COLOR_BLACK);
-		::init_pair(GREEN_COLOR, COLOR_GREEN, COLOR_BLACK);
-		::init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
-		::init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
+		::init_pair(NC_BLUE_COLOR, COLOR_BLUE, COLOR_BLACK);
+		::init_pair(NC_RED_COLOR, COLOR_RED, COLOR_BLACK);
+		::init_pair(NC_GREEN_COLOR, COLOR_GREEN, COLOR_BLACK);
+		::init_pair(NC_YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
+		::init_pair(NC_CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
 	}
 
 	this->loginWin = std::make_unique<LoginWindow>(this->commandPipe.in, this);

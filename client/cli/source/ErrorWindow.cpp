@@ -11,8 +11,8 @@
 
 ErrorWindow::ErrorWindow(UI* engine) : NcWindow(engine)
 {
-	this->tabs[ErrorWindow::FRAME] = std::make_unique<BasicTab>(-1, RED_COLOR, this);
-	this->tabs[ErrorWindow::INFO] = std::make_unique<OutputTab>("ERROR", 0, RED_COLOR, this);
+	this->tabs[ErrorWindow::FRAME] = std::make_unique<BasicTab>(-1, NC_RED_COLOR, this);
+	this->tabs[ErrorWindow::INFO] = std::make_unique<OutputTab>("ERROR", 0, NC_RED_COLOR, this);
 
 	this->tabsToSkip.insert(ErrorWindow::FRAME);
 	this->tabsToSkip.insert(ErrorWindow::INFO);

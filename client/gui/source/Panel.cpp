@@ -147,7 +147,7 @@ void Panel::submitCommand(void)
 		}
 		catch (AppException const& e)
 		{
-			this->appendInput("Invalid command", RED_COLOR);
+			this->appendInput("Invalid command", QT_RED_COLOR);
 			return;
 		}
 	}

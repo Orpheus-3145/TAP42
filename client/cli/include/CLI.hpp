@@ -249,11 +249,11 @@
 // ===========================================================================================================================================================================
 
 
-static constexpr int32_t BLUE_COLOR = 1;
-static constexpr int32_t RED_COLOR = 2;
-static constexpr int32_t GREEN_COLOR = 3;
-static constexpr int32_t YELLOW_COLOR = 4;
-static constexpr int32_t CYAN_COLOR = 5;
+static constexpr int32_t NC_BLUE_COLOR = 1;
+static constexpr int32_t NC_RED_COLOR = 2;
+static constexpr int32_t NC_GREEN_COLOR = 3;
+static constexpr int32_t NC_YELLOW_COLOR = 4;
+static constexpr int32_t NC_CYAN_COLOR = 5;
 
 class CLI : public UI
 {

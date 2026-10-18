@@ -178,7 +178,7 @@ void InOutTab::terminateCommand(void)
 	if (badCommand == false)
 		ioUtils::write(this->forwardInputFd, this->commandBuffer, this->bufferSize);
 	else
-		this->appendContent("Invalid command", TextAlign::LEFT, COLOR_PAIR(RED_COLOR) | A_BOLD);
+		this->appendContent("Invalid command", TextAlign::LEFT, COLOR_PAIR(NC_RED_COLOR) | A_BOLD);
 
 	this->bufferSize = 0UL;
 	// show last input

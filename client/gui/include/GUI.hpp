@@ -14,11 +14,11 @@
 #include "ErrorWindow.hpp"
 
 
-static constexpr char const* BLUE_COLOR = "#1f5fa8";
-static constexpr char const* RED_COLOR = "#ff0000";
-static constexpr char const* GREEN_COLOR = "#1fa870";
-static constexpr char const* YELLOW_COLOR = "#b87333";
-static constexpr char const* CYAN_COLOR = "#1fa3b8";
+static constexpr char const* QT_BLUE_COLOR = "#1f5fa8";
+static constexpr char const* QT_RED_COLOR = "#ff0000";
+static constexpr char const* QT_GREEN_COLOR = "#1fa870";
+static constexpr char const* QT_YELLOW_COLOR = "#b87333";
+static constexpr char const* QT_CYAN_COLOR = "#1fa3b8";
 
 class GUI : public QObject, public UI
 {
