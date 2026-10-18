@@ -135,7 +135,7 @@ void Message::parseCommand(std::string const& command)
 	if (!(iss >> cmd))
 		throw AppException(ErrorCode::BAD_MESSAGE, "Empty message: " + command);
 
-	if ((cmd == "GROUP") or (cmd == "CHAT") or (cmd == "WAIT"))		// there are commands with two words
+	if ((cmd == "GROUP") or (cmd == "CHAT") or (cmd == "WAIT") or (cmd == "CREATE"))		// there are commands with two words
 	{
 		if (!(iss >> secondCmd))
 			throw AppException(ErrorCode::BAD_MESSAGE, "Incomplete command: " + command);

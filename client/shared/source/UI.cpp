@@ -123,7 +123,8 @@ void UI::switchWindow(std::optional<GamePhase> newPhase)
 	else if (this->toServerSize > 0UL)						// if recovering from error and there's data left, start talking
 		this->pollFds[UI::CLIENT].events |= POLLOUT;
 
-	if (newPhase.value() == GamePhase::PLAYER_CREATE)
+	if ((newPhase.value() == GamePhase::LOGIN) or
+		(newPhase.value() == GamePhase::PLAYER_CREATE))
 		this->username = "";
 
 	if (newPhase.value() == GamePhase::ERROR)	// save this phase to restore it when the error has been solved

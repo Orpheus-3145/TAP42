@@ -67,7 +67,7 @@ void LoginWindow::draw(void)
 		QFrame#inputFrame { border: 1px solid #1e4a8a; background-color: #14141f; }
 		QLineEdit { background: transparent; border: none; color: #dddddd; selection-background-color: #3b82f6; }
 		QPushButton { background: transparent; padding: 6px 6px; border-width: 1px; border-style: solid; }
-		QPushButton#createBtn { color: #2ecc71; border-color: #3a8a5c; }
+		QPushButton#createBtn { color: #1fa870; border-color: #1fa870; }
 		QPushButton#createBtn:hover { background-color: rgba(46, 204, 113, 40); }
 		QPushButton#closeBtn { color: #e74c3c; border-color: #e74c3c; }
 		QPushButton#closeBtn:hover { background-color: rgba(231, 76, 60, 40); }

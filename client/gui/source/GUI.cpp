@@ -40,7 +40,7 @@ GUI::GUI(void) : UI()
 	);
 
 	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(this);
-	this->loginWin->draw();
+	this->newPlayerWin->draw();
 	QObject::connect(
 		newPlayerWin.get(),
 		&PlayerCreateWindow::commandEntered,

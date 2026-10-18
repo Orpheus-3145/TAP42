@@ -129,21 +129,21 @@ void Panel::printLine(std::string const& text)
 
 void Panel::submitCommand(void)
 {
-	QString const text = this->prompt->text();
-	if (text.isEmpty())
+	std::string const input = this->prompt->text().toStdString();
+	if (input.empty())
 		return;
-
 	this->prompt->clear();
+
+	this->appendInput(input);
 	if (this->checkInput)
 	{
 		try
 		{
-			Message testParse(text.toStdString());
+			Message testParse(input);
 			// check 1. if input is a command and 2. if such command belongs to this tab
 			if ((testParse.isCommand() == false) or
 				std::find(this->hints.begin(), this->hints.end(), QString(toString(testParse.getCommandType()).data())) == this->hints.end())
 				throw AppException({ErrorCode::BAD_MESSAGE});
-			this->appendInput(testParse.toStringCommand());
 		}
 		catch (AppException const& e)
 		{
@@ -151,5 +151,5 @@ void Panel::submitCommand(void)
 			return;
 		}
 	}
-	emit submitted(text);
+	emit submitted(QString(input.data()));
 }
