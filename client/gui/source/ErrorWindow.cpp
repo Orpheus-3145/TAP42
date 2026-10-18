@@ -8,5 +8,5 @@
 
 void ErrorWindow::draw(void)
 {
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing error window, size h: {}, w: {}", this->height(), this->width()));
+	LOG_DEBUG(LogContext::GUI, std::format("Showing error window, size h: {}, w: {}", this->height(), this->width()));
 }

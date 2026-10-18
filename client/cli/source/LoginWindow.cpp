@@ -99,5 +99,5 @@ void LoginWindow::draw(int32_t height, int32_t width)
 
 	this->updateContentWindow();
 
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing login window, size h: {}, w: {}", this->height, this->width));
+	LOG_DEBUG(LogContext::CLI, std::format("Showing login window, size h: {}, w: {}", this->height, this->width));
 }

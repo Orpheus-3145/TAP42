@@ -35,7 +35,7 @@ CLI::CLI(void) : UI()
 			this->width = Config::MIN_WIDTH_CLI;
 
 		std::cout << std::format("\033[8;{};{}t", this->height, this->width) << std::endl;
-		LOG_WARN(LogContext::INTERFACE, std::format("Window too small, triggering resize to h: {}, w: {}", this->height, this->width));
+		LOG_WARN(LogContext::CLI, std::format("Window too small, triggering resize to h: {}, w: {}", this->height, this->width));
 	}
 
 	::initscr();		// NB check if those functions fail
@@ -43,7 +43,7 @@ CLI::CLI(void) : UI()
 	::noecho();
 	curs_set(1);
 	if (::has_colors() == false)
-		LOG_WARN(LogContext::INTERFACE, "Colors not supported");
+		LOG_WARN(LogContext::CLI, "Colors not supported");
 	else
 	{
 		::start_color();
@@ -59,7 +59,7 @@ CLI::CLI(void) : UI()
 	this->gameWin = std::make_unique<GameWindow>(this->commandPipe.in, this);
 	this->errorWin = std::make_unique<ErrorWindow>(this);
 
-	LOG_INFO(LogContext::INTERFACE, "Done setup CLI");
+	LOG_INFO(LogContext::CLI, "Done setup CLI");
 }
 
 CLI::~CLI(void) noexcept
@@ -72,7 +72,7 @@ CLI::~CLI(void) noexcept
 	this->errorWin.reset();
 
 	::endwin();
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Cleaned Ncurses data"));
+	LOG_DEBUG(LogContext::CLI, std::format("Cleaned Ncurses data"));
 
 	ioUtils::close(this->pollFds[CLI::RESIZE].fd);
 }
@@ -116,7 +116,7 @@ void CLI::start(void)
 			this->handleException(err);
 		}
 	}
-	LOG_INFO(LogContext::INTERFACE, "CLI stopped");
+	LOG_INFO(LogContext::CLI, "CLI stopped");
 }
 
 void CLI::handleResize(void)
@@ -127,7 +127,7 @@ void CLI::handleResize(void)
 	struct winsize termSize;
 	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
 	{
-		LOG_WARN(LogContext::INTERFACE, "Couldn't fetch terminal size, resize failed");
+		LOG_WARN(LogContext::CLI, "Couldn't fetch terminal size, resize failed");
 		return;
 	}
 
@@ -159,7 +159,7 @@ void CLI::handleException(ErrorData const& error)
 		if (width < Config::MIN_WIDTH_CLI) width = Config::MIN_WIDTH_CLI;
 
 		std::cout << std::format("\033[8;{};{}t", height, width) << std::endl;
-		LOG_WARN(LogContext::INTERFACE, std::format("Window too small, triggering resize to h: {}, w: {}", height, width));
+		LOG_WARN(LogContext::CLI, std::format("Window too small, triggering resize to h: {}, w: {}", height, width));
 		return;
 	}
 	UI::handleException(error);
@@ -196,6 +196,7 @@ void CLI::showResponse(Message const& response) noexcept
 {
 	GameWindow* gameWin = dynamic_cast<GameWindow*>(this->gameWin.get());
 	assert(gameWin != nullptr and "current window doesn't support handling a response");
+	assert(!this->commandQueue.empty() and "no command in queue");
 
 	gameWin->appendResponse(response, this->commandQueue.front().getCommandType());
 	if (this->phase == GamePhase::GAME)
@@ -216,6 +217,7 @@ void CLI::showError(Message const& error) noexcept
 {
 	GameWindow* gameWin = dynamic_cast<GameWindow*>(this->gameWin.get());
 	assert(gameWin != nullptr and "current window doesn't support handling an event");
+	assert(!this->commandQueue.empty() and "no command in queue");
 
 	gameWin->appendError(error, this->commandQueue.front().getCommandType());
 	if (this->phase == GamePhase::GAME)

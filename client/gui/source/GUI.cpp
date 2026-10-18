@@ -56,7 +56,7 @@ GUI::GUI(int32_t height, int32_t width) : UI()
 
 	this->errorWin = std::make_unique<ErrorWindow>(height, width, this);
 
-	LOG_INFO(LogContext::INTERFACE, "Done setup GUI");
+	LOG_INFO(LogContext::GUI, "Done setup GUI");
 }
 
 GUI::~GUI(void) noexcept

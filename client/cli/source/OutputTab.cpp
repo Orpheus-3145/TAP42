@@ -1,8 +1,8 @@
 #include "OutputTab.hpp"
 #include "Exceptions.hpp"
 #include "Logger.hpp"
-#include <sstream>
 
+#include <sstream>
 #include <cassert>
 
 

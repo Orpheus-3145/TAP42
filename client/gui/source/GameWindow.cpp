@@ -58,7 +58,7 @@ void GameWindow::draw(void)
 	this->cmdPanel->focusPrompt();
 	QMainWindow::show();		// NB this should not be here
 
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing game window, size h: {}, w: {}", this->height(), this->width()));
+	LOG_DEBUG(LogContext::GUI, std::format("Showing game window, size h: {}, w: {}", this->height(), this->width()));
 }
 
 void GameWindow::appendResponse(Message const& response, CommandType cmdType)

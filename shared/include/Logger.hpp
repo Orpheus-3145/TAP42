@@ -24,6 +24,8 @@ enum class LogContext : uint32_t
 	GAME_CLIENT		= 1 << 1,
 	INTERFACE		= 1 << 2,
 	INPUT_OUTPUT	= 1 << 3,
+	CLI				= 1 << 4,
+	GUI				= 1 << 5,
 };
 
 constexpr bool operator==(LogContext a, LogContext b) noexcept
@@ -82,7 +84,7 @@ class Logger		// Singleton
 		void warn(LogContext context, const std::string& message) noexcept;
 		void error(LogContext context, const std::string& message) noexcept;
 
-		static constexpr LogContext ALL_ENTRIES = LogContext::HTTP_CLIENT | LogContext::GAME_CLIENT | LogContext::INTERFACE | LogContext::INPUT_OUTPUT;
+		static constexpr LogContext ALL_ENTRIES = LogContext::HTTP_CLIENT | LogContext::GAME_CLIENT | LogContext::INTERFACE | LogContext::INPUT_OUTPUT | LogContext::CLI | LogContext::GUI;
 
 		static std::string to_string(LogLevel const& context) noexcept;
 		static std::string to_string(LogContext const& context) noexcept;
