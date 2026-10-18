@@ -6,6 +6,10 @@
 
 #include <string>
 #include <QCompleter>
+#include <QLabel>
+#include <QFrame>
+#include <QHBoxLayout>
+#include <QVBoxLayout>
 
 
 Panel::Panel(

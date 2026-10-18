@@ -18,7 +18,7 @@ class QtWindow : public QMainWindow
     Q_OBJECT
 
 	public:
-		QtWindow(int32_t height, int32_t width, UI* engine, QWidget *parent = nullptr);
+		QtWindow(UI* engine);
 
 		QtWindow(QtWindow const& other) = delete;
 		QtWindow& operator=(QtWindow const& other) = delete;

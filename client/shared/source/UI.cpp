@@ -15,6 +15,7 @@ std::string toString(GamePhase phase)
 		case GamePhase::PLAYER_CREATE:	return "character creation";
 		case GamePhase::GAME:			return "game";
 		case GamePhase::ERROR:			return "error";
+		case GamePhase::ND:				return "unset";
 		default:						return "";
 	}
 }
@@ -93,10 +94,7 @@ void UI::start(void)
 	this->keepAlive = true;
 	this->clientHTTP->startWorker();
 	// add an artifacted command whose response is gonna be the handshake from server
-	// this->commandQueue.push(Message(toString(CommandType::WAIT_HANDSHAKE)));
-
-	this->shakeHands();
-	this->switchWindow(GamePhase::GAME);
+	this->commandQueue.push(Message(toString(CommandType::WAIT_HANDSHAKE)));
 }
 
 void UI::stop(void) noexcept

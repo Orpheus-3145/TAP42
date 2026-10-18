@@ -2,17 +2,18 @@
 #include "UI.hpp"
 #include "GUI.hpp"
 
-#include <chrono>
-#include <QStringList>
+#include <cassert>
+#include <QWidget>
+#include <QHBoxLayout>
 
 
 void GameWindow::draw(void)
 {
-	this->setWindowTitle("Game");
+	this->resize(GameWindow::WIDTH, GameWindow::HEIGHT);
 
 	QWidget* central = new QWidget(this);
 	central->setObjectName("central");
-	central->setStyleSheet("QWidget#central { background: #0f0f18; border: 1px solid #1f5fa8; }");
+	central->setStyleSheet(std::format("QWidget#central {{ background: #0f0f18; border: 1px solid {}; }}", BLUE_COLOR).data());
 	this->setCentralWidget(central);
 
 	this->playerPanel = new Panel("", BLUE_COLOR, false, false, false, central);
@@ -24,6 +25,7 @@ void GameWindow::draw(void)
 
 	this->worldPanel = new Panel("World events", YELLOW_COLOR, false, true, false, central);
 	this->cmdPanel = new Panel("User Events", CYAN_COLOR, true, true, true, central, CMD_HINTS);
+	this->cmdPanel->focusPrompt();
 	this->chatPanel = new Panel("Chat", GREEN_COLOR, true, true, true, central, CHAT_CMD_HINTS);
 
 	QVBoxLayout* left = new QVBoxLayout();
@@ -55,10 +57,7 @@ void GameWindow::draw(void)
 		[this] (QString const& text) { emit commandEntered(text.toStdString()); }
 	);
 
-	this->cmdPanel->focusPrompt();
-	QMainWindow::show();		// NB this should not be here
-
-	LOG_DEBUG(LogContext::GUI, std::format("Showing game window, size h: {}, w: {}", this->height(), this->width()));
+	LOG_DEBUG(LogContext::GUI, std::format("Showing game window, size w: {}, h: {}", GameWindow::WIDTH, GameWindow::HEIGHT));
 }
 
 void GameWindow::appendResponse(Message const& response, CommandType cmdType)

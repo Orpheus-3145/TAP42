@@ -9,7 +9,7 @@ static int32_t argc = 1;
 static char arg0[] = "tap-gui-client";
 static char* argv[] = { arg0, nullptr };
 
-GUI::GUI(int32_t height, int32_t width) : UI()
+GUI::GUI(void) : UI()
 {
 	this->app = std::make_unique<QApplication>(argc, argv);
 
@@ -30,7 +30,8 @@ GUI::GUI(int32_t height, int32_t width) : UI()
 		&GUI::writeToServer
 	);
 
-	this->loginWin = std::make_unique<LoginWindow>(height, width, this);
+	this->loginWin = std::make_unique<LoginWindow>(this);
+	this->loginWin->draw();
 	QObject::connect(
 		loginWin.get(),
 		&LoginWindow::commandEntered,
@@ -38,7 +39,8 @@ GUI::GUI(int32_t height, int32_t width) : UI()
 		&GUI::handleCommand
 	);
 
-	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(height, width, this);
+	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(this);
+	this->loginWin->draw();
 	QObject::connect(
 		newPlayerWin.get(),
 		&PlayerCreateWindow::commandEntered,
@@ -46,7 +48,7 @@ GUI::GUI(int32_t height, int32_t width) : UI()
 		&GUI::handleCommand
 	);
 
-	this->gameWin = std::make_unique<GameWindow>(height, width, this);
+	this->gameWin = std::make_unique<GameWindow>(this);
 	QObject::connect(
 		gameWin.get(),
 		&GameWindow::commandEntered,
@@ -54,7 +56,7 @@ GUI::GUI(int32_t height, int32_t width) : UI()
 		&GUI::handleCommand
 	);
 
-	this->errorWin = std::make_unique<ErrorWindow>(height, width, this);
+	this->errorWin = std::make_unique<ErrorWindow>(this);
 
 	LOG_INFO(LogContext::GUI, "Done setup GUI");
 }
@@ -97,11 +99,11 @@ void GUI::switchWindow(std::optional<GamePhase> newPhase)
 	{
 		case GamePhase::LOGIN:			this->currentWindow = this->loginWin.get(); break;
 		case GamePhase::PLAYER_CREATE:	this->currentWindow = this->newPlayerWin.get(); break;
-		case GamePhase::GAME:			this->currentWindow = this->gameWin.get(); break;
-		case GamePhase::ERROR:			this->currentWindow = this->errorWin.get(); break;
+		case GamePhase::GAME:			this->currentWindow = this->gameWin.get(); this->gameWin->draw(); break;		// NB handle re-creation of window
+		case GamePhase::ERROR:			this->currentWindow = this->errorWin.get(); this->errorWin->draw(); break;
 		default:						assert(false and "phase not mapped to any window");
 	}
-	this->currentWindow->draw();
+	this->currentWindow->show();
 }
 
 void GUI::writeToServer(void)
@@ -172,5 +174,5 @@ void GUI::showError(Message const& error) noexcept
 
 std::unique_ptr<UI> uiFactory(void)
 {
-	return std::make_unique<GUI>(Config::HEIGHT_GUI, Config::WIDTH_GUI);
+	return std::make_unique<GUI>();
 }

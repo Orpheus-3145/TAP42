@@ -2,15 +2,6 @@
 
 #include <vector>
 
-#include <QWidget>
-#include <QHBoxLayout>
-#include <QVBoxLayout>
-#include <QPlainTextEdit>
-#include <QLabel>
-#include <QSplitter>
-#include <QFont>
-#include <QSocketNotifier>
-
 #include "QtWindow.hpp"
 #include "Panel.hpp"
 #include "Message.hpp"
@@ -32,6 +23,9 @@ class GameWindow : public QtWindow
 		void appendError(Message const& error, CommandType cmdType);
 
 	private:
+		static constexpr int32_t WIDTH = 1100;
+		static constexpr int32_t HEIGHT = 800;
+
 		Panel* playerPanel{nullptr};
 		Panel* worldPanel{nullptr};
 		Panel* cmdPanel{nullptr};

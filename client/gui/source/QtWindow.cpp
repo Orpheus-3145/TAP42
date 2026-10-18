@@ -1,18 +1,23 @@
 #include "QtWindow.hpp"
-#include "Logger.hpp"
-#include "UI.hpp"
 
 #include <cassert>
-#include <format>
+#include <QShortcut>
+#include <QKeySequence>
 
 
-QtWindow::QtWindow(int32_t height, int32_t width, UI* engine, QWidget *parent) : 
-	QMainWindow(parent),
+QtWindow::QtWindow(UI* engine) : 
+	QMainWindow(nullptr),
 	engine{engine}
 {
 	assert(this->engine != nullptr and "null pointer for engine instance received");
 
-	this->resize(width, height);
+	this->setWindowFlag(Qt::WindowCloseButtonHint, false);
+	QShortcut *escShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
+	QObject::connect(
+		escShortcut,
+		&QShortcut::activated,
+		this,
+		[this]() { this->engine->stop(); });
 }
 
 QtWindow::~QtWindow(void) noexcept

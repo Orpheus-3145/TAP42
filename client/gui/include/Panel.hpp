@@ -2,14 +2,10 @@
 
 #include <string>
 #include <optional>
-#include <QFrame>
-#include <QHBoxLayout>
-#include <QLabel>
-#include <QLineEdit>
 #include <QPlainTextEdit>
+#include <QLineEdit>
 #include <QStringList>
 #include <QString>
-#include <QVBoxLayout>
 
 
 class Panel : public QFrame

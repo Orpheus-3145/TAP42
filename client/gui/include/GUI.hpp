@@ -25,7 +25,7 @@ class GUI : public QObject, public UI
 	Q_OBJECT
 
 	public:
-		GUI(int32_t height, int32_t width);
+		GUI(void);
 
 		GUI(GUI const& other) noexcept = delete;
 		GUI& operator=(GUI const& other) noexcept = delete;

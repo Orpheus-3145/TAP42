@@ -20,7 +20,4 @@ struct Config
 
 	static constexpr int32_t MIN_WIDTH_CLI = 151;
 	static constexpr int32_t MIN_HEIGHT_CLI = 32;
-
-	static constexpr int32_t WIDTH_GUI = 1100;
-	static constexpr int32_t HEIGHT_GUI = 800;
 };
