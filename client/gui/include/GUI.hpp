@@ -58,5 +58,5 @@ class GUI : public QObject, public UI
 		std::unique_ptr<GameWindow>			gameWin;
 		std::unique_ptr<ErrorWindow>		errorWin;
 
-		Window* currentWindow{nullptr};
+		QtWindow* currentWindow{nullptr};
 };

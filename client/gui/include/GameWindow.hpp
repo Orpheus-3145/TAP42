@@ -11,17 +11,17 @@
 #include <QFont>
 #include <QSocketNotifier>
 
-#include "Window.hpp"
+#include "QtWindow.hpp"
 #include "Panel.hpp"
 #include "Message.hpp"
 
 
-class GameWindow : public Window
+class GameWindow : public QtWindow
 {
 	Q_OBJECT
 
 	public:
-		using Window::Window;
+		using QtWindow::QtWindow;
 
 		~GameWindow(void) noexcept {}
 

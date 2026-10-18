@@ -6,7 +6,7 @@
 #include <cassert>
 
 
-OutputTab::OutputTab(std::string const& title, int32_t borderChar, int32_t colorPair, Window* parent) :
+OutputTab::OutputTab(std::string const& title, int32_t borderChar, int32_t colorPair, NcWindow* parent) :
 	BasicTab(borderChar, colorPair, parent),
 	title{title}
 {

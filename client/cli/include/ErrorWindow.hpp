@@ -4,14 +4,14 @@
 #include <string>
 #include <functional>
 
-#include "Window.hpp"
+#include "NcWindow.hpp"
 #include "UI.hpp"
 
 
-class ErrorWindow : public Window
+class ErrorWindow : public NcWindow
 {
 	public:
-		using Window::Window;
+		using NcWindow::NcWindow;
 
 		ErrorWindow(UI* engine);
 

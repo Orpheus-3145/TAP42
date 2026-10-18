@@ -9,7 +9,7 @@
 #include <chrono>
 
 #include "BasicTab.hpp"
-#include "Window.hpp"
+#include "NcWindow.hpp"
 
 
 enum class TextAlign : uint32_t
@@ -52,7 +52,7 @@ class OutputTab : public virtual BasicTab
 	public:
 		using BasicTab::BasicTab;
 
-		OutputTab(std::string const& title = "", int32_t borderChar = -1, int32_t colorPair = -1, Window* parent = nullptr);
+		OutputTab(std::string const& title = "", int32_t borderChar = -1, int32_t colorPair = -1, NcWindow* parent = nullptr);
 
 		OutputTab(OutputTab&& other) noexcept;
 		OutputTab& operator=(OutputTab&& other) = delete;

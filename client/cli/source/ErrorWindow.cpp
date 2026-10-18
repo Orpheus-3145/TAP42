@@ -9,7 +9,7 @@
 #include <format>
 
 
-ErrorWindow::ErrorWindow(UI* engine) : Window(engine)
+ErrorWindow::ErrorWindow(UI* engine) : NcWindow(engine)
 {
 	this->tabs[ErrorWindow::FRAME] = std::make_unique<BasicTab>(-1, RED_COLOR, this);
 	this->tabs[ErrorWindow::INFO] = std::make_unique<OutputTab>("ERROR", 0, RED_COLOR, this);
@@ -78,7 +78,7 @@ void ErrorWindow::draw(int32_t height, int32_t width)
 
 void ErrorWindow::clear(void) noexcept
 {
-	Window::clear();
+	NcWindow::clear();
 
 	this->tabs.erase(ErrorWindow::ACTION1);
 	this->tabs.erase(ErrorWindow::ACTION2);

@@ -2,15 +2,15 @@
 
 #include <cstdint>
 
-#include "Window.hpp"
+#include "QtWindow.hpp"
 
 
-class LoginWindow : public Window
+class LoginWindow : public QtWindow
 {
     Q_OBJECT
 
 	public:
-		using Window::Window;
+		using QtWindow::QtWindow;
 
 		~LoginWindow(void) noexcept {}
 

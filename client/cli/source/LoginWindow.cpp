@@ -11,7 +11,7 @@
 
 
 LoginWindow::LoginWindow(int32_t commandFd, UI* engine) :
-	Window(engine),
+	NcWindow(engine),
 	commandFd{commandFd}
 {
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding username");

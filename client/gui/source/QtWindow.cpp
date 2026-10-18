@@ -1,4 +1,4 @@
-#include "Window.hpp"
+#include "QtWindow.hpp"
 #include "Logger.hpp"
 #include "UI.hpp"
 
@@ -6,7 +6,7 @@
 #include <format>
 
 
-Window::Window(int32_t height, int32_t width, UI* engine, QWidget *parent) : 
+QtWindow::QtWindow(int32_t height, int32_t width, UI* engine, QWidget *parent) : 
 	QMainWindow(parent),
 	engine{engine}
 {
@@ -15,6 +15,6 @@ Window::Window(int32_t height, int32_t width, UI* engine, QWidget *parent) :
 	this->resize(width, height);
 }
 
-Window::~Window(void) noexcept
+QtWindow::~QtWindow(void) noexcept
 {
 }

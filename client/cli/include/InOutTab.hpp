@@ -6,7 +6,7 @@
 
 #include "InputTab.hpp"
 #include "OutputTab.hpp"
-#include "Window.hpp"
+#include "NcWindow.hpp"
 
 
 class InOutTab : public InputTab, public OutputTab
@@ -19,7 +19,7 @@ class InOutTab : public InputTab, public OutputTab
 			std::string const& title = "",
 			int32_t borderChar = -1,
 			int32_t colorPair = -1,
-			Window* parent = nullptr
+			NcWindow* parent = nullptr
 		);
 
 		InOutTab(InOutTab const& other) noexcept = delete;

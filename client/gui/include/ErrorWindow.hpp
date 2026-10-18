@@ -4,16 +4,16 @@
 #include <string>
 #include <functional>
 
-#include "Window.hpp"
+#include "QtWindow.hpp"
 #include "UI.hpp"
 
 
-class ErrorWindow : public Window
+class ErrorWindow : public QtWindow
 {
     Q_OBJECT
 
 	public:
-		using Window::Window;
+		using QtWindow::QtWindow;
 
 		~ErrorWindow(void) noexcept {}
 
