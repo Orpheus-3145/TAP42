@@ -90,7 +90,7 @@ std::string	Message::toStringError(void) const
 {
 	assert(this->type == MessageType::ERROR and "wrong type to stringify");
 
-	return this->data["info"].as_string();
+	return this->data.as_string();
 }
 
 CommandType	Message::getCommandType(void) const noexcept
@@ -217,17 +217,17 @@ void Message::parseError(std::string const& error)
 
 	std::istringstream	iss(error);
 	uint16_t			errCode;
-	std::string			errName, errInfo;
+	std::string			err, errName, errInfo;
 
-	if (!(iss >> errCode >> errName))
+	if (!(iss >> err >> errCode >> errName))
 		throw AppException(ErrorCode::BAD_MESSAGE, "Incomplete error: " + error);
 	this->subType.errType = getError(errCode);
 
 	std::getline(iss >> std::ws, errInfo);
-	if (errInfo.empty() == true)
-		throw AppException(ErrorCode::BAD_MESSAGE, "Missing error info: " + error);
-
-	this->storeJson(std::format("\"{}\"", errInfo));
+	if (errInfo.empty() == false)
+		this->storeJson(std::format("\"{}\"", errInfo));
+	else
+		this->storeJson(std::format("\"{}\"", errName));
 }
 
 void Message::storeJson(std::string const& jsonStr)

@@ -107,8 +107,7 @@ void UI::switchWindow(std::optional<GamePhase> newPhase)
 		(newPhase.value() != GamePhase::ERROR))		// this is because technically there could a disconnection before login
 		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE);
 
-	if ((newPhase.value() == GamePhase::LOGIN) or
-		(newPhase.value() == GamePhase::PLAYER_CREATE))
+	if ((newPhase.value() == GamePhase::LOGIN) or (newPhase.value() == GamePhase::PLAYER_CREATE))
 		this->username = "";
 
 	if (newPhase.value() == GamePhase::ERROR)	// save this phase to restore it when the error has been solved
@@ -116,17 +115,22 @@ void UI::switchWindow(std::optional<GamePhase> newPhase)
 	else if (this->phase != GamePhase::ERROR)	// careful not to overwrite the state in case of double error
 		this->lastPhase = GamePhase::ND;
 
+	if (newPhase.value() == GamePhase::ERROR)				// error win: keep listening server data but stop talking
+		this->stopTalking();
+	else if (this->toServerSize > 0UL)						// if recovering from error and there's data left, start talking
+		this->startTalking();
+
 	this->phase = newPhase.value();
 }
 
-ssize_t UI::writeToServer(void)
+void UI::writeToServer(void)
 {
 	if (this->connEstablished == false)
 		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE, "Tried to send data without handshake");
 
 	if (this->toServerSize == 0UL)		// if buffer is empty send the next command in queue
 	{
-		assert(this->commandQueue.empty() == false and "Received POLLOUT event with an empty command queue");
+		assert(this->commandQueue.empty() == false and "Received write event with an empty command queue");
 		std::string nextCommand = this->commandQueue.front().getRawMessage();
 		::memcpy(this->toServerBuffer, nextCommand.data(), nextCommand.size());
 		this->toServerSize = nextCommand.size();
@@ -143,13 +147,14 @@ ssize_t UI::writeToServer(void)
 		this->toServerSize -= n;
 		if (this->toServerSize > 0UL)		// move the remaining data to send at the beginning of the buffer
 			::memmove(this->toServerBuffer, this->toServerBuffer + n, this->toServerSize);
+		else
+			this->stopTalking();
 	}
 	else
 		LOG_WARN(LogContext::INTERFACE, "Client socket buffer is busy, try again later");
-	return n;
 }
 
-ssize_t UI::readFromServer(void)
+void UI::readFromServer(void)
 {
 	ssize_t n = ioUtils::readNonBlock(this->gameClientSockets.first, this->toGameBuffer + this->toGameSize, Config::BUFF_SIZE - this->toGameSize);
 	if (n < 0L)
@@ -161,10 +166,11 @@ ssize_t UI::readFromServer(void)
 
 		this->toGameSize += n;
 		this->splitIntoMessages();
+		if (this->commandQueue.empty() == false)
+			this->startTalking();
 	}
 	else
 		LOG_WARN(LogContext::INTERFACE, "Client socket buffer is full, send data to UI and empty it");
-	return n;
 }
 
 void UI::splitIntoMessages(void)
@@ -222,8 +228,8 @@ void UI::dispatchMessage(std::string const& msg)
 			throw AppException(ErrorCode::SERVER_DISCONNECTED);
 		else if (this->commandQueue.empty() == false)
 		{
-			this->commandQueue.pop();
 			this->errorDispatcher.at(this->phase)(*message);
+			this->commandQueue.pop();
 		}
 		else
 			LOG_ERROR(LogContext::INTERFACE, std::format("Got error without any pending command: '{}' - discarded", message->getRawMessage()));
@@ -241,17 +247,23 @@ void UI::shakeHands(void) noexcept
 
 	if (this->phase == GamePhase::ND)				// fresh new conn
 		this->switchWindow(GamePhase::LOGIN);
-	else if (this->phase == GamePhase::ERROR)		// disconnected, restore previous session
+	else if ((this->phase == GamePhase::ERROR))		// disconnected, restore previous session
 	{
-		// forward the previously used username to server
-		std::string loginCommand = std::format("{} {}", toString(CommandType::CONNECT), this->username);
-		this->commandQueue.push(Message(loginCommand));
+		if (this->username.empty() == false)
+		{
+			// forward the previously used username to server
+			std::string loginCommand = std::format("{} {}", toString(CommandType::CONNECT), this->username);
+			this->commandQueue.push(Message(loginCommand));
+			this->startTalking();
+		}
+		else	// no username, disconnection happened during login/char creation switch back to that window
+			this->switchWindow();
 	}
 }
 
 void UI::handleException(ErrorData const& error)
 {
-	LOG_ERROR(LogContext::INTERFACE, std::format("Error: ", mapError(error)));
+	LOG_ERROR(LogContext::INTERFACE, std::format("Error: {}", mapError(error)));
 
 	if (error.code == ErrorCode::SERVER_DISCONNECTED)
 	{
@@ -289,4 +301,9 @@ void UI::handleCommand(std::string const& input)
 
 	this->commandQueue.push(Message(command));
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Command '{}' added to queue", command));
+
+	// if queue's empty send this command, otherwise there's
+	// one being already handled, so wait before sending it
+	if (this->commandQueue.size() == 1UL)
+		this->startTalking();
 }

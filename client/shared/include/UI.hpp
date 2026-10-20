@@ -84,8 +84,8 @@ class UI
 		std::string const& getUsername(void) const noexcept { return this->username; }
 
 	protected:
-		virtual ssize_t writeToServer(void);
-		virtual ssize_t readFromServer(void);
+		virtual void writeToServer(void);
+		virtual void readFromServer(void);
 
 		void splitIntoMessages(void);
 		void dispatchMessage(std::string const& message);
@@ -98,6 +98,9 @@ class UI
 		virtual void showResponse(Message const& response) noexcept = 0;
 		virtual void showEvent(Message const& event) noexcept = 0;
 		virtual void showError(Message const& error) noexcept = 0;
+
+		virtual void startTalking(void) = 0;
+		virtual void stopTalking(void) = 0;
 
 		ioUtils::SocketPair			gameClientSockets;
 		std::unique_ptr<ClientHTTP>	clientHTTP;

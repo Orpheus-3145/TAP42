@@ -86,9 +86,9 @@ void GameWindow::appendError(Message const& error, CommandType cmdType)
 	std::string commandStr = toString(cmdType), errorStr = error.toStringError();
 
 	if (std::find(CMD_HINTS.begin(), CMD_HINTS.end(), commandStr) != CMD_HINTS.end())
-		this->cmdPanel->appendInput(errorStr);
+		this->cmdPanel->appendInput(errorStr, QT_RED_COLOR);
 	else if (std::find(CHAT_CMD_HINTS.begin(), CHAT_CMD_HINTS.end(), commandStr) != CHAT_CMD_HINTS.end())
-		this->chatPanel->appendInput(errorStr);
+		this->chatPanel->appendInput(errorStr, QT_RED_COLOR);
 	else
 		assert(false and "error doesn't belong to any panel");
 }

@@ -271,9 +271,7 @@ class CLI : public UI
 		void handleResize(void);
 		void handlePollError(void);
 
-		ssize_t writeToServer(void) override;
-		ssize_t readFromServer(void) override;
-		void	handleCommand(std::string const& input) override;
+		void handleCommand(std::string const& input) override;
 
 		void shakeHands(void) noexcept override;
 		void handleException(ErrorData const& error) override;
@@ -281,6 +279,9 @@ class CLI : public UI
 		void showResponse(Message const& response) noexcept override;
 		void showEvent(Message const& event) noexcept override;
 		void showError(Message const& error) noexcept override;
+
+		void startTalking(void) override { this->pollFds[CLI::CLIENT].events |= POLLOUT; }
+		void stopTalking(void) override { this->pollFds[CLI::CLIENT].events = POLLIN; }
 
 		static constexpr size_t POLL_SIZE = 4UL;
 		static constexpr size_t CLIENT = 0UL;

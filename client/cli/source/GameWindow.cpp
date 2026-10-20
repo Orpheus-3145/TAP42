@@ -85,6 +85,9 @@ void GameWindow::draw(int32_t height, int32_t width)
 
 void GameWindow::appendResponse(Message const& response, CommandType cmdType)
 {
+	if ((cmdType == CommandType::GROUP_CHAT) or (cmdType == CommandType::ROOM_CHAT) or (cmdType == CommandType::GLOBAL_CHAT))
+		return;
+
 	InOutTab*	tab = nullptr;
 	std::string strCommand = toString(cmdType);
 	int32_t		colorText = -1;

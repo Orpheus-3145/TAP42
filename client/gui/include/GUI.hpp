@@ -39,17 +39,18 @@ class GUI : public QObject, public UI
 		void switchWindow(std::optional<GamePhase> newPhase = std::nullopt) override;
 
 	private slots:
-		ssize_t writeToServer(void) override;
-		ssize_t readFromServer(void) override;
-		void	handleCommand(std::string const& input) override;
+		void writeToServer(void) override;
+		void readFromServer(void) override;
 
 	private:
-		void shakeHands(void) noexcept override;
 		void handleException(ErrorData const& error) noexcept override;
 
 		void showResponse(Message const& response) noexcept override;
 		void showEvent(Message const& event) noexcept override;
 		void showError(Message const& error) noexcept override;
+
+		void startTalking(void) override { this->writeClientNotifier->setEnabled(true); }
+		void stopTalking(void) override { this->writeClientNotifier->setEnabled(false); }
 
 		std::unique_ptr<QApplication>		app;
 		std::unique_ptr<QSocketNotifier>	readClientNotifier, writeClientNotifier;

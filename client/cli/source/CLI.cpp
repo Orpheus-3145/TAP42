@@ -170,34 +170,12 @@ void CLI::handlePollError(void)
 	}
 }
 
-ssize_t CLI::writeToServer(void)
-{
-	ssize_t n = UI::writeToServer();
-
-	if (this->toServerSize == 0UL)
-		this->pollFds[CLI::CLIENT].events = POLLIN;		// written everything, just listen while waiting for server response
-
-	return n;
-}
-
-ssize_t CLI::readFromServer(void)
-{
-	ssize_t n = UI::readFromServer();
-
-	if (this->commandQueue.empty() == false)		// there's another command queued up, send it
-		this->pollFds[CLI::CLIENT].events |= POLLOUT;
-
-	return n;
-}
-
 void CLI::shakeHands(void) noexcept
 {
 	UI::shakeHands();
 
 	::flushinp();		// flush what might have been typed between window creation and handshake
 	this->pollFds[CLI::STDIN].events = POLLIN;
-	if (this->phase == GamePhase::ERROR)
-		this->pollFds[CLI::CLIENT].events |= POLLOUT;
 }
 
 void CLI::handleException(ErrorData const& error)
@@ -242,11 +220,6 @@ void CLI::handleCommand(std::string const& input)
 		throw e;
 	}
 
-	// if queue's empty send this command, otherwise there's
-	// one being already handled, so wait before sending it
-	if (this->commandQueue.empty() == true)
-		this->pollFds[CLI::CLIENT].events |= POLLOUT;
-
 	UI::handleCommand(std::string(buffer, n));
 }
 
@@ -285,11 +258,6 @@ void CLI::showError(Message const& error) noexcept
 void CLI::switchWindow(std::optional<GamePhase> newPhase)
 {
 	UI::switchWindow(newPhase);
-
-	if (this->phase == GamePhase::ERROR)				// error win: keep listening server data but stop talking
-		this->pollFds[CLI::CLIENT].events = POLLIN;
-	else if (this->toServerSize > 0UL)						// if recovering from error and there's data left, start talking
-		this->pollFds[CLI::CLIENT].events |= POLLOUT;
 
 	if (this->currentWindow and (this->phase != GamePhase::ERROR))
 		this->currentWindow->clear();

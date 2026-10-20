@@ -22,7 +22,7 @@ GUI::GUI(void) : UI()
 	);
 
 	this->writeClientNotifier = std::make_unique<QSocketNotifier>(this->gameClientSockets.first, QSocketNotifier::Write, nullptr);
-	this->writeClientNotifier->setEnabled(false);
+	this->stopTalking();
 	QObject::connect(
 		this->writeClientNotifier.get(),
 		&QSocketNotifier::activated,
@@ -33,27 +33,27 @@ GUI::GUI(void) : UI()
 	this->loginWin = std::make_unique<LoginWindow>(this);
 	this->loginWin->draw();
 	QObject::connect(
-		loginWin.get(),
+		this->loginWin.get(),
 		&LoginWindow::commandEntered,
 		this,
-		&GUI::handleCommand
+		[this](std::string const& cmd) { this->handleCommand(cmd); }
 	);
 
 	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(this);
 	this->newPlayerWin->draw();
 	QObject::connect(
-		newPlayerWin.get(),
+		this->newPlayerWin.get(),
 		&PlayerCreateWindow::commandEntered,
 		this,
-		&GUI::handleCommand
+		[this](std::string const& cmd) { this->handleCommand(cmd); }
 	);
 
 	this->gameWin = std::make_unique<GameWindow>(this);
 	QObject::connect(
-		gameWin.get(),
+		this->gameWin.get(),
 		&GameWindow::commandEntered,
 		this,
-		&GUI::handleCommand
+		[this](std::string const& cmd) { this->handleCommand(cmd); }
 	);
 
 	this->errorWin = std::make_unique<ErrorWindow>(this);
@@ -65,7 +65,7 @@ GUI::GUI(void) : UI()
 GUI::~GUI(void) noexcept
 {
 	this->readClientNotifier->setEnabled(false);
-	this->writeClientNotifier->setEnabled(false);
+	this->stopTalking();
 
 	// destroy manually to be sure to kill the app last
 	this->readClientNotifier.reset();
@@ -93,11 +93,6 @@ void GUI::switchWindow(std::optional<GamePhase> newPhase)
 {
 	UI::switchWindow(newPhase);
 
-	if (this->phase == GamePhase::ERROR)				// error win: keep listening server data but stop talking
-		this->writeClientNotifier->setEnabled(false);
-	else if (this->toServerSize > 0UL)					// if recovering from error and there's data left, start talking
-		this->writeClientNotifier->setEnabled(true);
-
 	if (this->currentWindow)
 		this->currentWindow->close();
 
@@ -116,46 +111,30 @@ void GUI::switchWindow(std::optional<GamePhase> newPhase)
 	this->currentWindow->show();
 }
 
-ssize_t GUI::writeToServer(void)
+void GUI::writeToServer(void)
 {
-	ssize_t n = -1L;
 	try
 	{
-		n = UI::writeToServer();
-		if (this->toServerSize == 0UL)
-			this->writeClientNotifier->setEnabled(false);
+		UI::writeToServer();
 	}
 	catch (AppException const& e)
 	{
 		ErrorData err = e.getError();
 		this->handleException(err);
 	}
-	return n;
 }
 
-ssize_t GUI::readFromServer(void)
+void GUI::readFromServer(void)
 {
-	ssize_t n = -1L;
 	try
 	{
-		n = UI::readFromServer();
-		if (this->commandQueue.empty() == false)
-			this->writeClientNotifier->setEnabled(true);
+		UI::readFromServer();
 	}
 	catch (AppException const& e)
 	{
 		ErrorData err = e.getError();
 		this->handleException(err);
 	}
-	return n;
-}
-
-void GUI::shakeHands(void) noexcept
-{
-	UI::shakeHands();
-
-	if (this->phase == GamePhase::ERROR)
-		this->writeClientNotifier->setEnabled(true);
 }
 
 void GUI::handleException(ErrorData const& error) noexcept
@@ -168,14 +147,6 @@ void GUI::handleException(ErrorData const& error) noexcept
 		this->errorWin->adaptWinToError(error);
 
 	this->switchWindow(GamePhase::ERROR);
-}
-
-void GUI::handleCommand(std::string const& input)
-{
-	if (this->commandQueue.empty() == true)
-		this->writeClientNotifier->setEnabled(true);
-
-	UI::handleCommand(input);
 }
 
 void GUI::showResponse(Message const& response) noexcept
