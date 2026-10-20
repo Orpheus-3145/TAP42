@@ -30,11 +30,11 @@ std::string	Message::toStringResponse(CommandType command) const
 	{
 		case CommandType::LOOK: 			return std::format("Looking around:\n{}", this->data.toString());
 		case CommandType::MOVE: 			return std::format("Moved to room {}", this->data["room"]["name"].as_string());
-		case CommandType::WHO: 				return std::format("{} players in the room: {}", this->data["server"].as_string(), this->data["room"].toString());
+		case CommandType::WHO: 				return std::format("{} players in the room: {}", this->data["server"].as_string(), this->data["room"].toString());	// (last one) array data
 		case CommandType::TAKE: 			return std::format("Taken item {}", this->data["taken"].as_string());
 		case CommandType::DROP: 			return std::format("Dropped item {}", this->data["dropped"].as_string());
 		case CommandType::INVENTORY: 		return std::format("Inventory:\n{}", this->data.toString());	// array data
-		case CommandType::TALK: 			return std::format("{} says: '{}", this->data["npc"].as_string(), this->data["dialogue"].as_string());
+		case CommandType::TALK: 			return std::format("{} says: '{}'", this->data["npc"].as_string(), this->data["dialogue"].as_string());
 		case CommandType::ATTACK: 			return std::format("Attacked:\n{}", this->data.toString());
 		case CommandType::STATUS: 			return std::format("Current status:\n{}", this->data.toString());
 		case CommandType::QUEST: 			return std::format("Info quest: '{}'", this->data.toString());

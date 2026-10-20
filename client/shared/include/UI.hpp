@@ -80,8 +80,10 @@ class UI
 
 		virtual void start(void);
 		virtual void stop(void) noexcept;
-		virtual void switchWindow(std::optional<GamePhase> newPhase = std::nullopt);
-		std::string const& getUsername(void) const noexcept { return this->username; }
+		virtual void switchWindow(std::optional<GamePhase> newPhase = std::nullopt) = 0;
+
+		void				updatePhase(std::optional<GamePhase> newPhase = std::nullopt);
+		std::string const&	getUsername(void) const noexcept { return this->username; }
 
 	protected:
 		virtual void writeToServer(void);
@@ -99,8 +101,10 @@ class UI
 		virtual void showEvent(Message const& event) noexcept = 0;
 		virtual void showError(Message const& error) noexcept = 0;
 
-		virtual void startTalking(void) = 0;
-		virtual void stopTalking(void) = 0;
+		virtual void startSpeaking(void) = 0;
+		virtual void stopSpeaking(void) = 0;
+
+		void setupDispatchers(void);
 
 		ioUtils::SocketPair			gameClientSockets;
 		std::unique_ptr<ClientHTTP>	clientHTTP;

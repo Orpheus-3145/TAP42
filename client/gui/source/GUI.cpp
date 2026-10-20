@@ -22,7 +22,7 @@ GUI::GUI(void) : UI()
 	);
 
 	this->writeClientNotifier = std::make_unique<QSocketNotifier>(this->gameClientSockets.first, QSocketNotifier::Write, nullptr);
-	this->stopTalking();
+	this->stopSpeaking();
 	QObject::connect(
 		this->writeClientNotifier.get(),
 		&QSocketNotifier::activated,
@@ -65,7 +65,7 @@ GUI::GUI(void) : UI()
 GUI::~GUI(void) noexcept
 {
 	this->readClientNotifier->setEnabled(false);
-	this->stopTalking();
+	this->stopSpeaking();
 
 	// destroy manually to be sure to kill the app last
 	this->readClientNotifier.reset();
@@ -75,6 +75,8 @@ GUI::~GUI(void) noexcept
 	this->newPlayerWin.reset();
 	this->gameWin.reset();
 	this->errorWin.reset();
+	this->app.reset();
+	LOG_DEBUG(LogContext::GUI, "Cleaned Qt data");
 }
 
 void GUI::start(void)
@@ -87,11 +89,12 @@ void GUI::stop(void) noexcept
 {
 	UI::stop();
 	this->app->quit();
+	LOG_DEBUG(LogContext::GUI, "GUI stopped");
 }
 
 void GUI::switchWindow(std::optional<GamePhase> newPhase)
 {
-	UI::switchWindow(newPhase);
+	UI::updatePhase(newPhase);
 
 	if (this->currentWindow)
 		this->currentWindow->close();
@@ -139,14 +142,12 @@ void GUI::readFromServer(void)
 
 void GUI::handleException(ErrorData const& error) noexcept
 {
-	UI::handleException(error);
-
 	if (this->phase == GamePhase::ERROR)
 		this->errorWin->adaptWinToError({ErrorCode::UI_DOUBLE_ERROR, mapError(error)});
 	else
 		this->errorWin->adaptWinToError(error);
 
-	this->switchWindow(GamePhase::ERROR);
+	UI::handleException(error);
 }
 
 void GUI::showResponse(Message const& response) noexcept
@@ -154,11 +155,13 @@ void GUI::showResponse(Message const& response) noexcept
 	assert(!this->commandQueue.empty() and "no command in queue");
 
 	this->gameWin->appendResponse(response, this->commandQueue.front().getCommandType());
+	LOG_DEBUG(LogContext::GUI, std::format("Got response: '{}'", response.getRawMessage()));
 }
 
 void GUI::showEvent(Message const& event) noexcept
 {
 	this->gameWin->appendEvent(event);
+	LOG_DEBUG(LogContext::GUI, std::format("Got event: '{}'", event.getRawMessage()));
 }
 
 void GUI::showError(Message const& error) noexcept
@@ -166,6 +169,7 @@ void GUI::showError(Message const& error) noexcept
 	assert(!this->commandQueue.empty() and "no command in queue");
 
 	this->gameWin->appendError(error, this->commandQueue.front().getCommandType());
+	LOG_DEBUG(LogContext::GUI, std::format("Got error: '{}'", error.getRawMessage()));
 }
 
 

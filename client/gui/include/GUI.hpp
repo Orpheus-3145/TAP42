@@ -49,8 +49,8 @@ class GUI : public QObject, public UI
 		void showEvent(Message const& event) noexcept override;
 		void showError(Message const& error) noexcept override;
 
-		void startTalking(void) override { this->writeClientNotifier->setEnabled(true); }
-		void stopTalking(void) override { this->writeClientNotifier->setEnabled(false); }
+		void startSpeaking(void) override { this->writeClientNotifier->setEnabled(true); }
+		void stopSpeaking(void) override { this->writeClientNotifier->setEnabled(false); }
 
 		std::unique_ptr<QApplication>		app;
 		std::unique_ptr<QSocketNotifier>	readClientNotifier, writeClientNotifier;

@@ -24,6 +24,8 @@ GameWindow::GameWindow(int32_t commandFd, UI* engine) :
 	this->tabsToSkip.insert(GameWindow::FRAME);
 	this->tabsToSkip.insert(GameWindow::INFO);
 	this->switchActiveTab(GameWindow::CMD);
+
+	LOG_DEBUG(LogContext::CLI, "Created game ncurses window");
 }
 
 void GameWindow::draw(int32_t height, int32_t width)
@@ -79,8 +81,6 @@ void GameWindow::draw(int32_t height, int32_t width)
 	);
 
 	this->updateContentWindow();
-
-	LOG_DEBUG(LogContext::CLI, std::format("Showing game window size h: {}, w: {}", height, width));
 }
 
 void GameWindow::appendResponse(Message const& response, CommandType cmdType)

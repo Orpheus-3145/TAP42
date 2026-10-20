@@ -16,6 +16,8 @@ ErrorWindow::ErrorWindow(UI* engine) : NcWindow(engine)
 
 	this->tabsToSkip.insert(ErrorWindow::FRAME);
 	this->tabsToSkip.insert(ErrorWindow::INFO);
+
+	LOG_DEBUG(LogContext::CLI, "Created error ncurses window");
 }
 
 void ErrorWindow::draw(int32_t height, int32_t width)
@@ -72,8 +74,6 @@ void ErrorWindow::draw(int32_t height, int32_t width)
 	}
 
 	this->updateContentWindow();
-
-	LOG_DEBUG(LogContext::CLI, std::format("Showing error window, size h: {}, w: {}", this->height, this->width));
 }
 
 void ErrorWindow::clear(void) noexcept
