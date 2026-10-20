@@ -153,7 +153,7 @@ void UI::splitIntoMessages(void)
 		std::string msg = std::string(this->toGameBuffer, lenMsg);
 
 		this->toGameSize -= lenMsg + 1UL;
-		::memmove(this->toGameBuffer, this->toGameBuffer + lenMsg + 1UL, lenMsg + 1UL);
+		::memmove(this->toGameBuffer, this->toGameBuffer + lenMsg + 1UL, this->toGameSize);
 		if (lenMsg == 0L)
 			continue;
 

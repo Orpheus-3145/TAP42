@@ -67,9 +67,9 @@ std::string	Message::toStringEvent(void) const
 	{
 		case EventType::PRESENCE_ENTER:				return std::format("{} entered the room", this->data.as_string());
 		case EventType::PRESENCE_LEAVE:				return std::format("{} left the room", this->data.as_string());
-		case EventType::ROOM_CHAT:					return std::format("[room - {}] {}", this->data["player"].as_string(), this->data["text"].as_string());
-		case EventType::GROUP_CHAT:					return std::format("[group - {}] {}", this->data["player"].as_string(), this->data["text"].as_string());
-		case EventType::GLOBAL_CHAT:				return std::format("[global - {}] {}", this->data["player"].as_string(), this->data["text"].as_string());
+		case EventType::ROOM_CHAT:					return std::format("[room]   {} says: {}", this->data["player"].as_string(), this->data["text"].as_string());
+		case EventType::GROUP_CHAT:					return std::format("[group]  {} says: {}", this->data["player"].as_string(), this->data["text"].as_string());
+		case EventType::GLOBAL_CHAT:				return std::format("[global] {} says: {}", this->data["player"].as_string(), this->data["text"].as_string());
 		case EventType::GROUP_JOIN:					return std::format("{} has joined {}", this->data["player"].as_string(), this->data["group"].as_string());
 		case EventType::GROUP_LEAVE:				return std::format("{} has left {}", this->data["player"].as_string(), this->data["group"].as_string());
 		case EventType::GROUP_INVITE:				return std::format("{} has been invited to join {}", this->data["player"].as_string(), this->data["group"].as_string());
