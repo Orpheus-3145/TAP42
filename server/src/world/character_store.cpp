@@ -9,7 +9,7 @@
 #include <unordered_map>
 
 #include "logging/logger.hpp"
-#include "world/json.hpp"
+#include "JsonParser.hpp"
 
 namespace character_store {
 
