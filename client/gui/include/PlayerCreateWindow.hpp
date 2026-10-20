@@ -13,9 +13,9 @@ class PlayerCreateWindow : public QtWindow
 	public:
 		using QtWindow::QtWindow;
 
-		~PlayerCreateWindow(void) noexcept {}
+		PlayerCreateWindow(UI* engine);
 
-		void draw(void) override;
+		~PlayerCreateWindow(void) noexcept {}
 
 	private:
 		static constexpr int32_t HEIGHT = 230;

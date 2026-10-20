@@ -59,6 +59,15 @@ void UI::stop(void) noexcept
 	this->clientHTTP->stopWorker();
 }
 
+void UI::switchWindow(std::optional<GamePhase> newPhase)
+{
+	this->updatePhase(newPhase);
+
+	// fetch character basic data when session starts
+	if (this->phase == GamePhase::GAME)
+		this->commandQueue.push(Message("PROFILE"));
+}
+
 void UI::updatePhase(std::optional<GamePhase> newPhase)
 {
 	// without argument switch to
@@ -74,17 +83,14 @@ void UI::updatePhase(std::optional<GamePhase> newPhase)
 		(newPhase.value() != GamePhase::ERROR))		// this is because technically there could a disconnection before login
 		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE);
 
-	if ((newPhase.value() == GamePhase::LOGIN) or (newPhase.value() == GamePhase::PLAYER_CREATE))
-		this->username = "";
-
-	if (newPhase.value() == GamePhase::ERROR)	// save this phase to restore it when the error has been solved
+	if (newPhase.value() == GamePhase::ERROR)		// save this phase to restore it when the error has been solved
 		this->lastPhase = this->phase;
-	else if (this->phase != GamePhase::ERROR)	// careful not to overwrite the state in case of double error
+	else if (this->phase != GamePhase::ERROR)		// careful not to overwrite the state in case of double error
 		this->lastPhase = GamePhase::ND;
 
-	if (newPhase.value() == GamePhase::ERROR)				// error win: keep listening server data but stop talking
+	if (newPhase.value() == GamePhase::ERROR)		// error win: keep listening server data but stop talking
 		this->stopSpeaking();
-	else if (this->toServerSize > 0UL)						// if recovering from error and there's data left, start talking
+	else if (this->toServerSize > 0UL)				// if recovering from error and there's data left, start talking
 		this->startSpeaking();
 
 	this->phase = newPhase.value();
@@ -217,10 +223,10 @@ void UI::shakeHands(void) noexcept
 		this->switchWindow(GamePhase::LOGIN);
 	else if ((this->phase == GamePhase::ERROR))		// disconnected, restore previous session
 	{
-		if (this->username.empty() == false)
+		if (this->info.username.empty() == false)
 		{
 			// forward the previously used username to server
-			std::string loginCommand = std::format("{} {}", toString(CommandType::CONNECT), this->username);
+			std::string loginCommand = std::format("{} {}", toString(CommandType::CONNECT), this->info.username);
 			this->commandQueue.push(Message(loginCommand));
 			this->startSpeaking();
 		}
@@ -254,16 +260,14 @@ void UI::handleCommand(std::string const& input)
 		if (this->commandQueue.empty() == false)	// to avoid sending multiple requests for connections
 			this->commandQueue.pop();
 
-		this->username = input;
-		command = std::format("{} {}", toString(CommandType::CONNECT), this->username);
+		command = std::format("{} {}", toString(CommandType::CONNECT), input);
 	}
 	else if (this->phase == GamePhase::PLAYER_CREATE)
 	{
 		if (this->commandQueue.empty() == false)	// to avoid sending multiple requests for connections
 			this->commandQueue.pop();
 
-		this->username = input;
-		command = std::format("{} {}", toString(CommandType::CREATE_PLAYER), this->username);
+		command = std::format("{} {}", toString(CommandType::CREATE_PLAYER), input);
 	}
 	else
 		command = input;
@@ -282,7 +286,10 @@ void UI::setupDispatchers(void)
 	this->responseDispatcher[GamePhase::ND] = 			 [this] (Message const& m) { (void) m;/* NB validate */ this->shakeHands(); };
 	this->responseDispatcher[GamePhase::LOGIN] =		 [this] (Message const& m) { (void) m;/* NB validate */ this->switchWindow(GamePhase::GAME); };
 	this->responseDispatcher[GamePhase::PLAYER_CREATE] = [this] (Message const& m) { (void) m;/* NB validate */ this->switchWindow(GamePhase::GAME); };
-	this->responseDispatcher[GamePhase::GAME] =			 [this] (Message const& m) { this->showResponse(m); };
+	this->responseDispatcher[GamePhase::GAME] =			 [this] (Message const& m) {
+		
+		this->showResponse(m);
+	};
 	this->responseDispatcher[GamePhase::ERROR] =		 [this] (Message const& m) {
 		if (this->commandQueue.front().getCommandType() == CommandType::WAIT_HANDSHAKE)
 			this->shakeHands();

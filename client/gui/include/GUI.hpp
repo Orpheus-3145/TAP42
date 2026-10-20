@@ -19,6 +19,7 @@ static constexpr char const* QT_RED_COLOR = "#ff0000";
 static constexpr char const* QT_GREEN_COLOR = "#1fa870";
 static constexpr char const* QT_YELLOW_COLOR = "#b87333";
 static constexpr char const* QT_CYAN_COLOR = "#1fa3b8";
+static constexpr char const* QT_WHITE_COLOR = "#ffffff";
 
 class GUI : public QObject, public UI
 {

@@ -61,6 +61,14 @@ static std::vector<std::string> CHAT_CMD_HINTS
 	"QUIT"
 };
 
+struct PlayerInfo
+{
+	std::string username;
+	uint32_t	hp;
+	std::string group;
+	std::string location;
+};
+
 class UI
 {
 	using MessageDispatcher = std::unordered_map<GamePhase,std::function<void(Message const&)>>;
@@ -80,10 +88,7 @@ class UI
 
 		virtual void start(void);
 		virtual void stop(void) noexcept;
-		virtual void switchWindow(std::optional<GamePhase> newPhase = std::nullopt) = 0;
-
-		void				updatePhase(std::optional<GamePhase> newPhase = std::nullopt);
-		std::string const&	getUsername(void) const noexcept { return this->username; }
+		virtual void switchWindow(std::optional<GamePhase> newPhase = std::nullopt);
 
 	protected:
 		virtual void writeToServer(void);
@@ -105,6 +110,7 @@ class UI
 		virtual void stopSpeaking(void) = 0;
 
 		void setupDispatchers(void);
+		void updatePhase(std::optional<GamePhase> newPhase = std::nullopt);
 
 		ioUtils::SocketPair			gameClientSockets;
 		std::unique_ptr<ClientHTTP>	clientHTTP;
@@ -115,7 +121,7 @@ class UI
 		MessageDispatcher eventDispatcher;
 		MessageDispatcher errorDispatcher;
 
-		std::string username;
+		PlayerInfo	info;
 
 		bool		connEstablished{false};
 		GamePhase	phase{GamePhase::ND}, lastPhase{GamePhase::ND};

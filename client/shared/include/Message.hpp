@@ -47,7 +47,6 @@ class Message
 		bool isError(void) const noexcept { return this->type == MessageType::ERROR; }
 		bool isEvent(void) const noexcept { return this->type == MessageType::EVENT; }
 
-		std::string const&	getRawMessage(void) const noexcept { return this->raw; }
 		std::string			toStringCommand(void) const noexcept;
 		std::string			toStringResponse(CommandType command) const;
 		std::string			toStringEvent(void) const;
@@ -56,6 +55,8 @@ class Message
 		CommandType			getCommandType(void) const noexcept;
 		EventType			getEventType(void) const noexcept;
 		ErrorType			getErrorType(void) const noexcept;
+		std::string const&	getRawMessage(void) const noexcept { return this->raw; }
+		JsonValue const&	getJsonData(void) const noexcept { return this->data; }
 
 	private:
 		void parse(std::string const& message);

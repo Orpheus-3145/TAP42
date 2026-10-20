@@ -31,7 +31,6 @@ GUI::GUI(void) : UI()
 	);
 
 	this->loginWin = std::make_unique<LoginWindow>(this);
-	this->loginWin->draw();
 	QObject::connect(
 		this->loginWin.get(),
 		&LoginWindow::commandEntered,
@@ -40,7 +39,6 @@ GUI::GUI(void) : UI()
 	);
 
 	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(this);
-	this->newPlayerWin->draw();
 	QObject::connect(
 		this->newPlayerWin.get(),
 		&PlayerCreateWindow::commandEntered,
@@ -57,7 +55,6 @@ GUI::GUI(void) : UI()
 	);
 
 	this->errorWin = std::make_unique<ErrorWindow>(this);
-	this->errorWin->draw();
 
 	LOG_INFO(LogContext::GUI, "Done setup GUI");
 }
@@ -94,7 +91,7 @@ void GUI::stop(void) noexcept
 
 void GUI::switchWindow(std::optional<GamePhase> newPhase)
 {
-	UI::updatePhase(newPhase);
+	UI::switchWindow(newPhase);
 
 	if (this->currentWindow)
 		this->currentWindow->close();
@@ -103,12 +100,10 @@ void GUI::switchWindow(std::optional<GamePhase> newPhase)
 	{
 		case GamePhase::LOGIN:			this->currentWindow = this->loginWin.get(); break;
 		case GamePhase::PLAYER_CREATE:	this->currentWindow = this->newPlayerWin.get(); break;
-		case GamePhase::GAME:			this->currentWindow = this->gameWin.get(); this->gameWin->draw(); break;
+		case GamePhase::GAME:			this->currentWindow = this->gameWin.get(); break;
 		case GamePhase::ERROR:			this->currentWindow = this->errorWin.get(); break;
 		default:						assert(false and "phase not mapped to any window");
 	}
-	QRect area = QGuiApplication::primaryScreen()->availableGeometry();
-	this->currentWindow->move(area.center() - this->currentWindow->rect().center());
 
 	this->currentWindow->setEnabled(true);
 	this->currentWindow->show();
@@ -154,7 +149,45 @@ void GUI::showResponse(Message const& response) noexcept
 {
 	assert(!this->commandQueue.empty() and "no command in queue");
 
-	this->gameWin->appendResponse(response, this->commandQueue.front().getCommandType());
+	CommandType currentCmd = this->commandQueue.front().getCommandType();
+	if (currentCmd == CommandType::PROFILE)
+	{
+		this->info.username = response.getJsonData()["name"].as_string();
+		this->info.hp = response.getJsonData()["hp"].as_int();
+		this->info.group = response.getJsonData()["group"].as_string();
+		this->info.location = response.getJsonData()["room"].as_string();
+		this->gameWin->updatePlayerPanel(this->info);
+	}
+	else
+	{
+		if (currentCmd == CommandType::MOVE)
+		{
+			this->info.location = response.getJsonData()["room"].as_string();
+			this->gameWin->updatePlayerPanel(this->info);
+		}
+		else if (currentCmd == CommandType::ATTACK)
+		{
+			this->info.hp = response.getJsonData()["player_hp"].as_int();
+			this->gameWin->updatePlayerPanel(this->info);
+		}
+		else if (currentCmd == CommandType::GROUP_CREATE)
+		{
+			this->info.group = response.getJsonData()["created"].as_string();
+			this->gameWin->updatePlayerPanel(this->info);
+		}
+		else if (currentCmd == CommandType::GROUP_JOIN)
+		{
+			this->info.group = response.getJsonData()["joined"].as_string();
+			this->gameWin->updatePlayerPanel(this->info);
+		}
+		else if (currentCmd == CommandType::GROUP_LEAVE)
+		{
+			this->info.group = "";
+			this->gameWin->updatePlayerPanel(this->info);
+		}
+		this->gameWin->appendResponse(response, currentCmd);
+	}
+
 	LOG_DEBUG(LogContext::GUI, std::format("Got response: '{}'", response.getRawMessage()));
 }
 

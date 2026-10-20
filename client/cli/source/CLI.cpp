@@ -134,7 +134,7 @@ void CLI::stop(void) noexcept
 
 void CLI::switchWindow(std::optional<GamePhase> newPhase)
 {
-	UI::updatePhase(newPhase);
+	UI::switchWindow(newPhase);
 
 	if (this->currentWindow and (this->phase != GamePhase::ERROR))
 		this->currentWindow->clear();
@@ -242,38 +242,69 @@ void CLI::handleCommand(std::string const& input)
 
 void CLI::showResponse(Message const& response) noexcept
 {
-	GameWindow* gameWin = dynamic_cast<GameWindow*>(this->gameWin.get());
-	assert(gameWin != nullptr and "current window doesn't support handling a response");
 	assert(!this->commandQueue.empty() and "no command in queue");
 
-	gameWin->appendResponse(response, this->commandQueue.front().getCommandType());
+	CommandType currentCmd = this->commandQueue.front().getCommandType();
+	if (currentCmd == CommandType::PROFILE)
+	{
+		this->info.username = response.getJsonData()["name"].as_string();
+		this->info.hp = response.getJsonData()["hp"].as_int();
+		this->info.group = response.getJsonData()["group"].as_string();
+		this->info.location = response.getJsonData()["room"].as_string();
+		this->gameWin->updatePlayerPanel(this->info);
+	}
+	else
+	{
+		if (currentCmd == CommandType::MOVE)
+		{
+			this->info.location = response.getJsonData()["room"].as_string();
+			this->gameWin->updatePlayerPanel(this->info);
+		}
+		else if (currentCmd == CommandType::ATTACK)
+		{
+			this->info.hp = response.getJsonData()["player_hp"].as_int();
+			this->gameWin->updatePlayerPanel(this->info);
+		}
+		else if (currentCmd == CommandType::GROUP_CREATE)
+		{
+			this->info.group = response.getJsonData()["created"].as_string();
+			this->gameWin->updatePlayerPanel(this->info);
+		}
+		else if (currentCmd == CommandType::GROUP_JOIN)
+		{
+			this->info.group = response.getJsonData()["joined"].as_string();
+			this->gameWin->updatePlayerPanel(this->info);
+		}
+		else if (currentCmd == CommandType::GROUP_LEAVE)
+		{
+			this->info.group = "";
+			this->gameWin->updatePlayerPanel(this->info);
+		}
+		this->gameWin->appendResponse(response, currentCmd);
+	}
+
 	if (this->phase == GamePhase::GAME)
-		gameWin->updateContentWindow();
+		this->gameWin->updateContentWindow();
 
 	LOG_DEBUG(LogContext::CLI, std::format("Got response: '{}'", response.getRawMessage()));
 }
 
 void CLI::showEvent(Message const& event) noexcept
 {
-	GameWindow* gameWin = dynamic_cast<GameWindow*>(this->gameWin.get());
-	assert(gameWin != nullptr and "current window doesn't support handling an event");
-
-	gameWin->appendEvent(event);
+	this->gameWin->appendEvent(event);
 	if (this->phase == GamePhase::GAME)
-		gameWin->updateContentWindow();
+		this->gameWin->updateContentWindow();
 
 	LOG_DEBUG(LogContext::CLI, std::format("Got event: '{}'", event.getRawMessage()));
 }
 
 void CLI::showError(Message const& error) noexcept
 {
-	GameWindow* gameWin = dynamic_cast<GameWindow*>(this->gameWin.get());
-	assert(gameWin != nullptr and "current window doesn't support handling an event");
 	assert(!this->commandQueue.empty() and "no command in queue");
 
-	gameWin->appendError(error, this->commandQueue.front().getCommandType());
+	this->gameWin->appendError(error, this->commandQueue.front().getCommandType());
 	if (this->phase == GamePhase::GAME)
-		gameWin->updateContentWindow();
+		this->gameWin->updateContentWindow();
 
 	LOG_DEBUG(LogContext::CLI, std::format("Got error: '{}'", error.getRawMessage()));
 }

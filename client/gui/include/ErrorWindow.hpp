@@ -18,9 +18,9 @@ class ErrorWindow : public QtWindow
 	public:
 		using QtWindow::QtWindow;
 
-		~ErrorWindow(void) noexcept {}
+		ErrorWindow(UI* engine);
 
-		void draw(void) override;
+		~ErrorWindow(void) noexcept {}
 
 		void adaptWinToError(ErrorData const& error) noexcept;
 		void setAction1(std::string const& actionName, std::function<void()> action);
@@ -30,6 +30,6 @@ class ErrorWindow : public QtWindow
 		static constexpr int32_t HEIGHT = 230;
 		static constexpr int32_t WIDTH = 250;
 
-		QLabel		*info{nullptr};
-		QHBoxLayout	*btnContainer{nullptr};
+		std::unique_ptr<QLabel>			info;
+		std::unique_ptr<QHBoxLayout>	btnContainer;
 };

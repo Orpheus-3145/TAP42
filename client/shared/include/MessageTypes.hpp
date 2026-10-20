@@ -30,10 +30,11 @@ enum class CommandType : uint16_t
 	GLOBAL_CHAT,
 	USE,			// custom
 	WAIT_HANDSHAKE,	// custom
-	CREATE_PLAYER	// custom
+	CREATE_PLAYER,	// custom
+	PROFILE			// custom
 };
 
-static constexpr std::array<const char*, 23> commands
+static constexpr std::array<const char*, 24> commands
 {
 	"CONNECT",
 	"LOOK",
@@ -57,7 +58,8 @@ static constexpr std::array<const char*, 23> commands
 	"CHAT GLOBAL",
 	"USE",
 	"WAIT HANDSHAKE",
-	"CREATE PLAYER"
+	"CREATE PLAYER",
+	"PROFILE"
 };
 
 std::string	toString(CommandType cmd);

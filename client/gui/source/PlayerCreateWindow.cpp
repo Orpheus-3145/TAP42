@@ -15,7 +15,7 @@
 #include <QProxyStyle>
 
 
-void PlayerCreateWindow::draw(void)
+PlayerCreateWindow::PlayerCreateWindow(UI* engine) : QtWindow(engine)
 {
 	this->setObjectName("playerCreate");
 	this->setFixedSize(PlayerCreateWindow::WIDTH, PlayerCreateWindow::HEIGHT);
@@ -101,5 +101,5 @@ void PlayerCreateWindow::draw(void)
 		[this] { this->engine->switchWindow(GamePhase::LOGIN); }
 	);
 
-	LOG_DEBUG(LogContext::GUI, std::format("Showing player create window, size h: {}, w: {}", PlayerCreateWindow::HEIGHT, PlayerCreateWindow::WIDTH));
+	LOG_DEBUG(LogContext::GUI, std::format("Created plyer create Qt window, size h: {}, w: {}", PlayerCreateWindow::HEIGHT, PlayerCreateWindow::WIDTH));
 }
