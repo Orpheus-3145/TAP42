@@ -12,9 +12,14 @@
 #include <sys/signalfd.h>
 
 
-CLI::CLI(void) : UI()
+CLI::CLI(void) :
+	UI(),
+	commandPipe{ioUtils::createPipe()}
 {
-	this->pollFds.resize(CLI::POLL_SIZE);
+	this->pollFds[CLI::CLIENT].fd = this->gameClientSockets.first;
+	this->pollFds[CLI::CLIENT].events = POLLIN;
+	this->pollFds[CLI::CMD].fd = this->commandPipe.out;	// to send a full command to client
+	this->pollFds[CLI::CMD].events = POLLIN;
 	this->pollFds[CLI::RESIZE].fd = ioUtils::createSignalRedirectFd(SIGWINCH);	// redirected signal resize to this fd
 	this->pollFds[CLI::RESIZE].events = POLLIN;
 	this->pollFds[CLI::STDIN].fd = STDIN_FILENO;		// to handle any user input
@@ -35,7 +40,7 @@ CLI::CLI(void) : UI()
 			this->width = Config::MIN_WIDTH_CLI;
 
 		std::cout << std::format("\033[8;{};{}t", this->height, this->width) << std::endl;
-		LOG_WARN(LogContext::INTERFACE, std::format("Window too small, triggering resize to h: {}, w: {}", this->height, this->width));
+		LOG_WARN(LogContext::CLI, std::format("Window too small, triggering resize to h: {}, w: {}", this->height, this->width));
 	}
 
 	::initscr();		// NB check if those functions fail
@@ -43,15 +48,15 @@ CLI::CLI(void) : UI()
 	::noecho();
 	curs_set(1);
 	if (::has_colors() == false)
-		LOG_WARN(LogContext::INTERFACE, "Colors not supported");
+		LOG_WARN(LogContext::CLI, "Colors not supported");
 	else
 	{
 		::start_color();
-		::init_pair(BLUE_COLOR, COLOR_BLUE, COLOR_BLACK);
-		::init_pair(RED_COLOR, COLOR_RED, COLOR_BLACK);
-		::init_pair(GREEN_COLOR, COLOR_GREEN, COLOR_BLACK);
-		::init_pair(YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
-		::init_pair(CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
+		::init_pair(NC_BLUE_COLOR, COLOR_BLUE, COLOR_BLACK);
+		::init_pair(NC_RED_COLOR, COLOR_RED, COLOR_BLACK);
+		::init_pair(NC_GREEN_COLOR, COLOR_GREEN, COLOR_BLACK);
+		::init_pair(NC_YELLOW_COLOR, COLOR_YELLOW, COLOR_BLACK);
+		::init_pair(NC_CYAN_COLOR, COLOR_CYAN, COLOR_BLACK);
 	}
 
 	this->loginWin = std::make_unique<LoginWindow>(this->commandPipe.in, this);
@@ -59,7 +64,7 @@ CLI::CLI(void) : UI()
 	this->gameWin = std::make_unique<GameWindow>(this->commandPipe.in, this);
 	this->errorWin = std::make_unique<ErrorWindow>(this);
 
-	LOG_INFO(LogContext::INTERFACE, "Done setup CLI");
+	LOG_INFO(LogContext::CLI, "Done setup CLI");
 }
 
 CLI::~CLI(void) noexcept
@@ -72,15 +77,17 @@ CLI::~CLI(void) noexcept
 	this->errorWin.reset();
 
 	::endwin();
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Cleaned Ncurses data"));
+	LOG_DEBUG(LogContext::CLI, std::format("Cleaned Ncurses data"));
 
 	ioUtils::close(this->pollFds[CLI::RESIZE].fd);
+	ioUtils::closePipe(this->commandPipe);
 }
 
 void CLI::start(void)
 {
 	UI::start();
 
+	this->keepAlive = true;
 	while (this->keepAlive == true)
 	{
 		try
@@ -102,7 +109,7 @@ void CLI::start(void)
 				this->handlePollError();
 			// read command from UI (and forward it to server)
 			if (this->pollFds[CLI::CMD].revents & POLLIN)
-				this->handleCommand();
+				this->handleCommand("");
 			// resize window
 			if (this->pollFds[CLI::RESIZE].revents & POLLIN)
 				this->handleResize();
@@ -116,7 +123,13 @@ void CLI::start(void)
 			this->handleException(err);
 		}
 	}
-	LOG_INFO(LogContext::INTERFACE, "CLI stopped");
+	LOG_INFO(LogContext::CLI, "CLI stopped");
+}
+
+void CLI::stop(void) noexcept
+{
+	UI::stop();
+	this->keepAlive = false;
 }
 
 void CLI::handleResize(void)
@@ -127,7 +140,7 @@ void CLI::handleResize(void)
 	struct winsize termSize;
 	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &termSize) == -1)
 	{
-		LOG_WARN(LogContext::INTERFACE, "Couldn't fetch terminal size, resize failed");
+		LOG_WARN(LogContext::CLI, "Couldn't fetch terminal size, resize failed");
 		return;
 	}
 
@@ -139,6 +152,24 @@ void CLI::handleResize(void)
 		this->currentWindow->resize(this->height, this->width);
 }
 
+void CLI::handlePollError(void)
+{
+	if (this->pollFds[CLIENT].revents & POLLHUP)
+		throw AppException(ErrorCode::CLIENT_DISCONNECTED);
+	else if (this->pollFds[CLIENT].revents & POLLNVAL)
+		throw AppException(ErrorCode::IO_POLL_FAILED, "invalid socket (POLLNVAL)");
+	else if (this->pollFds[CLIENT].revents & POLLERR)	// something actually went wrong with poll
+	{
+		int32_t sockErr = 0;
+		socklen_t len = sizeof(sockErr);
+	
+		if (ioUtils::getsockopt(this->gameClientSockets.first, SOL_SOCKET, SO_ERROR, &sockErr, &len) < 0)
+			throw AppException(ErrorCode::IO_POLL_FAILED, std::format("getsockopt failed during POLLERR: {}", ::strerror(errno)));
+		else if (sockErr != 0)
+			throw AppException(ErrorCode::IO_POLL_FAILED, ::strerror(sockErr));
+	}
+}
+
 void CLI::shakeHands(void) noexcept
 {
 	UI::shakeHands();
@@ -147,7 +178,7 @@ void CLI::shakeHands(void) noexcept
 	this->pollFds[CLI::STDIN].events = POLLIN;
 }
 
-void CLI::handleException(ErrorData& error)
+void CLI::handleException(ErrorData const& error)
 {
 	if (error.code == ErrorCode::UI_INVALID_SIZE)		// trigger a resize
 	{
@@ -159,27 +190,44 @@ void CLI::handleException(ErrorData& error)
 		if (width < Config::MIN_WIDTH_CLI) width = Config::MIN_WIDTH_CLI;
 
 		std::cout << std::format("\033[8;{};{}t", height, width) << std::endl;
-		LOG_WARN(LogContext::INTERFACE, std::format("Window too small, triggering resize to h: {}, w: {}", height, width));
+		LOG_WARN(LogContext::CLI, std::format("Window too small, triggering resize to h: {}, w: {}", height, width));
 		return;
 	}
 	UI::handleException(error);
 
 	if (this->phase == GamePhase::ERROR)
+		this->errorWin->adaptWinToError({ErrorCode::UI_DOUBLE_ERROR, mapError(error)});		// NB check this
+	else
+		this->errorWin->adaptWinToError(error);
+
+	this->switchWindow(GamePhase::ERROR);
+}
+
+void CLI::handleCommand(std::string const& input)
+{
+	(void) input;
+	char buffer[Config::CMD_BUFFER_SIZE];
+	ssize_t n = 0L;
+
+	try
 	{
-		// if there's another error happening already just print message and
-		// stop session
-		error.info = mapError(error);
-		error.code = ErrorCode::UI_DOUBLE_ERROR;
+		n = ioUtils::read(this->pollFds[CLI::CMD].fd, buffer, Config::CMD_BUFFER_SIZE);
+	}
+	catch(AppException& e)
+	{
+		if (e.getError().code == ErrorCode::IO_READ_FAILED)
+			e.getError().info += ", couldn't read command";
+		throw e;
 	}
 
-	this->errorWin->adaptWinToError(error);
-	this->switchWindow(GamePhase::ERROR);
+	UI::handleCommand(std::string(buffer, n));
 }
 
 void CLI::showResponse(Message const& response) noexcept
 {
 	GameWindow* gameWin = dynamic_cast<GameWindow*>(this->gameWin.get());
 	assert(gameWin != nullptr and "current window doesn't support handling a response");
+	assert(!this->commandQueue.empty() and "no command in queue");
 
 	gameWin->appendResponse(response, this->commandQueue.front().getCommandType());
 	if (this->phase == GamePhase::GAME)
@@ -200,6 +248,7 @@ void CLI::showError(Message const& error) noexcept
 {
 	GameWindow* gameWin = dynamic_cast<GameWindow*>(this->gameWin.get());
 	assert(gameWin != nullptr and "current window doesn't support handling an event");
+	assert(!this->commandQueue.empty() and "no command in queue");
 
 	gameWin->appendError(error, this->commandQueue.front().getCommandType());
 	if (this->phase == GamePhase::GAME)
@@ -223,6 +272,7 @@ void CLI::switchWindow(std::optional<GamePhase> newPhase)
 	}
 	this->currentWindow->draw(this->height, this->width);
 }
+
 
 std::unique_ptr<UI> uiFactory()
 {

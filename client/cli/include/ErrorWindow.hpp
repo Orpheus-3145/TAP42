@@ -4,14 +4,14 @@
 #include <string>
 #include <functional>
 
-#include "Window.hpp"
+#include "NcWindow.hpp"
 #include "UI.hpp"
 
 
-class ErrorWindow : public Window
+class ErrorWindow : public NcWindow
 {
 	public:
-		using Window::Window;
+		using NcWindow::NcWindow;
 
 		ErrorWindow(UI* engine);
 
@@ -20,7 +20,7 @@ class ErrorWindow : public Window
 		void draw(int32_t height, int32_t width) override;
 		void clear(void) noexcept override;
 
-		void adaptWinToError(ErrorData& error) noexcept;
+		void adaptWinToError(ErrorData const& error) noexcept;
 		void setAction1(std::string const& actionName, std::function<void()> action);
 		void setAction2(std::string const& actionName, std::function<void()> action);
 

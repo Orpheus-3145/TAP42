@@ -1,7 +1,7 @@
 CXX := g++
-CXXFLAGS := -std=c++20 -Wall -Wextra -Wpedantic -Isrc -I../shared/include
-SRC := $(wildcard src/*.cpp src/*/*.cpp ../shared/source/*.cpp)
-OBJ := $(SRC:.cpp=.o)
+CXXFLAGS := -std=c++20 -Wall -Wextra -Wpedantic -Isrc -I../client/shared/include
+SRC := $(wildcard src/*.cpp src/*/*.cpp)
+OBJ := $(SRC:.cpp=.o) src/world/JsonParser.o
 TARGET := tap-server
 
 ifeq ($(OS),Windows_NT)
@@ -14,10 +14,13 @@ endif
 
 all: $(TARGET)
 
-$(TARGET): $(OBJ)
+$(TARGET): $(OBJ) src/world/JsonParser.o
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJ) $(LDLIBS)
 
 %.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+src/world/JsonParser.o: ../client/shared/source/JsonParser.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 deps:

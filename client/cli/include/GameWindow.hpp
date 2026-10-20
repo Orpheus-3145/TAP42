@@ -5,43 +5,14 @@
 #include <cstdint>
 #include <vector>
 
-#include "Window.hpp"
+#include "NcWindow.hpp"
 #include "Message.hpp"
 
 
-static std::vector<std::string> CMD_HINTS
-{
-	"LOOK",
-	"MOVE",
-	"WHO",
-	"TAKE",
-	"DROP",
-	"INVENTORY",
-	"TALK",
-	"ATTACK",
-	"STATUS",
-	"QUEST",
-	"QUESTS",
-	"QUIT",
-	"USE"
-};
-
-static std::vector<std::string> CHAT_CMD_HINTS
-{
-	"GROUP CREATE",
-	"GROUP INVITE",
-	"GROUP JOIN",
-	"GROUP LEAVE",
-	"CHAT GROUP",
-	"CHAT ROOM",
-	"CHAT GLOBAL",
-	"QUIT"
-};
-
-class GameWindow : public Window
+class GameWindow : public NcWindow
 {
 	public:
-		using Window::Window;
+		using NcWindow::NcWindow;
 
 		GameWindow(int32_t commandFd, UI* engine);
 

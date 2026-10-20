@@ -12,17 +12,17 @@
 class BasicTab;
 class UI;
 
-class Window
+class NcWindow
 {
 	public:
-		Window(UI* engine) noexcept;
+		NcWindow(UI* engine) noexcept;
 
-		Window(Window const& other) = delete;
-		Window& operator=(Window const& other) = delete;
-		Window(Window&& other) = delete;
-		Window& operator=(Window&& other) = delete;
+		NcWindow(NcWindow const& other) = delete;
+		NcWindow& operator=(NcWindow const& other) = delete;
+		NcWindow(NcWindow&& other) = delete;
+		NcWindow& operator=(NcWindow&& other) = delete;
 
-		virtual ~Window(void) noexcept;
+		virtual ~NcWindow(void) noexcept;
 
 		virtual void draw(int32_t height, int32_t width) = 0;
 		virtual void resize(int32_t height, int32_t width);

@@ -6,7 +6,7 @@
 #include <functional>
 
 #include "BasicTab.hpp"
-#include "Window.hpp"
+#include "NcWindow.hpp"
 
 
 class ButtonTab :  public BasicTab
@@ -14,7 +14,7 @@ class ButtonTab :  public BasicTab
 	public:
 		using BasicTab::BasicTab;
 
-		ButtonTab(std::string const& content, std::function<void()> action, int32_t colorPair = -1, Window* parent = nullptr);
+		ButtonTab(std::string const& content, std::function<void()> action, int32_t colorPair = -1, NcWindow* parent = nullptr);
 
 		ButtonTab(ButtonTab&& other) noexcept;
 		ButtonTab& operator=(ButtonTab&& other) = delete;

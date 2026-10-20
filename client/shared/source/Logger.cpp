@@ -30,6 +30,8 @@ std::ostream& operator<<(std::ostream& os, LogContext context) noexcept
 		case LogContext::GAME_CLIENT: os << "GAME_CLIENT"; break;
 		case LogContext::INTERFACE: os << "INTERFACE"; break;
 		case LogContext::INPUT_OUTPUT: os << "INPUT_OUTPUT"; break;
+		case LogContext::CLI: os << "CLI"; break;
+		case LogContext::GUI: os << "GUI"; break;
 	}
 	return os;
 }

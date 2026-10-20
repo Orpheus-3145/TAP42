@@ -9,7 +9,7 @@
 
 #include "Config.hpp"
 #include "BasicTab.hpp"
-#include "Window.hpp"
+#include "NcWindow.hpp"
 
 
 class InputTab : public virtual BasicTab
@@ -23,7 +23,7 @@ class InputTab : public virtual BasicTab
 			std::string const& prompt = "<?> ",
 			int32_t colorPair = -1,
 			int32_t borderChar = -1,
-			Window* parent = nullptr
+			NcWindow* parent = nullptr
 		);
 
 		InputTab(InputTab&& other) noexcept;

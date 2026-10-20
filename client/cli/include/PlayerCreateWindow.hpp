@@ -2,13 +2,13 @@
 
 #include <cstdint>
 
-#include "Window.hpp"
+#include "NcWindow.hpp"
 
 
-class PlayerCreateWindow : public Window
+class PlayerCreateWindow : public NcWindow
 {
 	public:
-		using Window::Window;
+		using NcWindow::NcWindow;
 
 		PlayerCreateWindow(int32_t commandFd, UI* engine);
 

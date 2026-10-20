@@ -1,4 +1,4 @@
-#include "Window.hpp"
+#include "NcWindow.hpp"
 #include "BasicTab.hpp"
 #include "Logger.hpp"
 #include "UI.hpp"
@@ -7,23 +7,23 @@
 #include <format>
 
 
-Window::Window(UI* engine) noexcept : engine{engine}
+NcWindow::NcWindow(UI* engine) noexcept : engine{engine}
 {
 	assert(engine != nullptr and "Null pointer for engine instance received");
 }
 
-Window::~Window(void) noexcept
+NcWindow::~NcWindow(void) noexcept
 {
 }
 
-void Window::clear(void) noexcept
+void NcWindow::clear(void) noexcept
 {
 	for (auto const& [_, tab] : this->tabs)
 		tab->clear();
 	this->refresh();
 }
 
-void Window::updateContentWindow(void) noexcept
+void NcWindow::updateContentWindow(void) noexcept
 {
 	for (auto const& [_, tab] : this->tabs)
 		tab->updateContent();
@@ -31,13 +31,13 @@ void Window::updateContentWindow(void) noexcept
 	this->refresh();
 }
 
-void Window::handleUserInput(void)
+void NcWindow::handleUserInput(void)
 {
 	this->getActiveTab()->handleUserInput();
 	this->refresh();
 }
 
-void Window::switchActiveTab(int32_t index)
+void NcWindow::switchActiveTab(int32_t index)
 {
 	if (this->tabs.empty() == true)
 		return;
@@ -58,7 +58,7 @@ void Window::switchActiveTab(int32_t index)
 	this->getActiveTab()->activate();
 }
 
-void Window::resize(int32_t height, int32_t width)
+void NcWindow::resize(int32_t height, int32_t width)
 {
 	this->clear();
 	this->draw(height, width);
@@ -66,5 +66,5 @@ void Window::resize(int32_t height, int32_t width)
 	// because resize is not handled by ncurses there might be some garbage to read, flush it
 	::flushinp();
 
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Window resized to h: {}, w: {}", this->height, this->width));
+	LOG_DEBUG(LogContext::CLI, std::format("Window resized to h: {}, w: {}", this->height, this->width));
 }

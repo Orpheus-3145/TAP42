@@ -1,32 +1,25 @@
 #pragma once
 
 #include <cstdint>
+#include <QLineEdit>
 
-#include "Window.hpp"
+#include "QtWindow.hpp"
 
 
-class LoginWindow : public Window
+class LoginWindow : public QtWindow
 {
     Q_OBJECT
 
 	public:
-		using Window::Window;
-
-		LoginWindow(QWidget *parent, int32_t height, int32_t width, UI* engine);
+		using QtWindow::QtWindow;
 
 		~LoginWindow(void) noexcept {}
 
-	// signals:
-	// 	void commandEntered(const QString &command);
-
-	// private slots:
-	// 	void onPromptSubmitted();
+		void draw(void) override;
 
 	private:
-		void draw(int32_t height, int32_t width) override;
+		static constexpr int32_t HEIGHT = 230;
+		static constexpr int32_t WIDTH = 250;
 
-		// QPlainTextEdit *inputLog;
-		// QLineEdit      *promptField;
-		// QPlainTextEdit *responsesLog;
-		// QPlainTextEdit *eventsLog;
+		QLineEdit* inputUsername{nullptr};
 };

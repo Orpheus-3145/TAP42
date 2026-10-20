@@ -12,7 +12,7 @@ InOutTab::InOutTab(
 	std::string const& title,
 	int32_t borderChar,
 	int32_t colorPair,
-	Window* parent
+	NcWindow* parent
 ) :
 	BasicTab(borderChar, colorPair, parent),
 	InputTab(forwardInputFd, hints, prompt, borderChar, colorPair, parent),
@@ -158,7 +158,7 @@ void InOutTab::terminateCommand(void)
 	try
 	{
 		Message testParse(command);
-		// check if input is a command and if such command belongs to this tab
+		// check 1. if input is a command and 2. if such command belongs to this tab
 		if ((testParse.isCommand() == false) or
 			std::find(this->hints.begin(), this->hints.end(), toString(testParse.getCommandType())) == this->hints.end())
 			badCommand = true;
@@ -178,7 +178,7 @@ void InOutTab::terminateCommand(void)
 	if (badCommand == false)
 		ioUtils::write(this->forwardInputFd, this->commandBuffer, this->bufferSize);
 	else
-		this->appendContent("Invalid command", TextAlign::LEFT, COLOR_PAIR(RED_COLOR) | A_BOLD);
+		this->appendContent("Invalid command", TextAlign::LEFT, COLOR_PAIR(NC_RED_COLOR) | A_BOLD);
 
 	this->bufferSize = 0UL;
 	// show last input

@@ -9,51 +9,72 @@ static int32_t argc = 1;
 static char arg0[] = "tap-gui-client";
 static char* argv[] = { arg0, nullptr };
 
-GUI::GUI(int32_t height, int32_t width) : UI()
+GUI::GUI(void) : UI()
 {
 	this->app = std::make_unique<QApplication>(argc, argv);
 
-	this->loginWin = std::make_unique<LoginWindow>(nullptr, height, width, this);
-	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(nullptr, height, width, this);
-	this->gameWin = std::make_unique<GameWindow>(nullptr, height, width, this);
-	this->errorWin = std::make_unique<ErrorWindow>(nullptr, height, width, this);
+	this->readClientNotifier = std::make_unique<QSocketNotifier>(this->gameClientSockets.first, QSocketNotifier::Read, nullptr);
+	QObject::connect(
+		this->readClientNotifier.get(),
+		&QSocketNotifier::activated,
+		this,
+		&GUI::readFromServer
+	);
 
-	// when user sends a command from the UI
+	this->writeClientNotifier = std::make_unique<QSocketNotifier>(this->gameClientSockets.first, QSocketNotifier::Write, nullptr);
+	this->stopTalking();
+	QObject::connect(
+		this->writeClientNotifier.get(),
+		&QSocketNotifier::activated,
+		this,
+		&GUI::writeToServer
+	);
+
+	this->loginWin = std::make_unique<LoginWindow>(this);
+	this->loginWin->draw();
+	QObject::connect(
+		this->loginWin.get(),
+		&LoginWindow::commandEntered,
+		this,
+		[this](std::string const& cmd) { this->handleCommand(cmd); }
+	);
+
+	this->newPlayerWin = std::make_unique<PlayerCreateWindow>(this);
+	this->newPlayerWin->draw();
+	QObject::connect(
+		this->newPlayerWin.get(),
+		&PlayerCreateWindow::commandEntered,
+		this,
+		[this](std::string const& cmd) { this->handleCommand(cmd); }
+	);
+
+	this->gameWin = std::make_unique<GameWindow>(this);
 	QObject::connect(
 		this->gameWin.get(),
 		&GameWindow::commandEntered,
-	    this,
-		[this](const QString &cmd) {
-			std::string cmdStr = cmd.toStdString();
-			this->toServerSize = cmdStr.size();
-			::memcpy(this->toServerBuffer, cmdStr.data(), this->toServerSize);
-			this->writeToServer();
-		}
+		this,
+		[this](std::string const& cmd) { this->handleCommand(cmd); }
 	);
 
-	// server data: responses, events
-	this->readFromServerNotifier = std::make_unique<QSocketNotifier>(this->pollFds[GUI::CLIENT], QSocketNotifier::Read, nullptr);
-	QObject::connect(
-		this->readFromServerNotifier.get(),
-		&QSocketNotifier::activated,
-	    this,
-		[this]() {
-			this->readFromServer();
-		}
-	);
+	this->errorWin = std::make_unique<ErrorWindow>(this);
+	this->errorWin->draw();
 
-    this->gameWin->show();
-	LOG_INFO(LogContext::INTERFACE, "Done setup GUI");
+	LOG_INFO(LogContext::GUI, "Done setup GUI");
 }
 
 GUI::~GUI(void) noexcept
 {
-	if (this->readFromServerNotifier)
-		this->readFromServerNotifier->setEnabled(false);
+	this->readClientNotifier->setEnabled(false);
+	this->stopTalking();
 
 	// destroy manually to be sure to kill the app last
+	this->readClientNotifier.reset();
+	this->writeClientNotifier.reset();
+
+	this->loginWin.reset();
+	this->newPlayerWin.reset();
 	this->gameWin.reset();
-	this->app.reset();
+	this->errorWin.reset();
 }
 
 void GUI::start(void)
@@ -72,37 +93,83 @@ void GUI::switchWindow(std::optional<GamePhase> newPhase)
 {
 	UI::switchWindow(newPhase);
 
+	if (this->currentWindow)
+		this->currentWindow->close();
+
 	switch (this->phase)
 	{
 		case GamePhase::LOGIN:			this->currentWindow = this->loginWin.get(); break;
 		case GamePhase::PLAYER_CREATE:	this->currentWindow = this->newPlayerWin.get(); break;
-		case GamePhase::GAME:			this->currentWindow = this->gameWin.get(); break;
+		case GamePhase::GAME:			this->currentWindow = this->gameWin.get(); this->gameWin->draw(); break;
 		case GamePhase::ERROR:			this->currentWindow = this->errorWin.get(); break;
 		default:						assert(false and "phase not mapped to any window");
 	}
+	QRect area = QGuiApplication::primaryScreen()->availableGeometry();
+	this->currentWindow->move(area.center() - this->currentWindow->rect().center());
+
+	this->currentWindow->setEnabled(true);
 	this->currentWindow->show();
+}
+
+void GUI::writeToServer(void)
+{
+	try
+	{
+		UI::writeToServer();
+	}
+	catch (AppException const& e)
+	{
+		ErrorData err = e.getError();
+		this->handleException(err);
+	}
+}
+
+void GUI::readFromServer(void)
+{
+	try
+	{
+		UI::readFromServer();
+	}
+	catch (AppException const& e)
+	{
+		ErrorData err = e.getError();
+		this->handleException(err);
+	}
+}
+
+void GUI::handleException(ErrorData const& error) noexcept
+{
+	UI::handleException(error);
+
+	if (this->phase == GamePhase::ERROR)
+		this->errorWin->adaptWinToError({ErrorCode::UI_DOUBLE_ERROR, mapError(error)});
+	else
+		this->errorWin->adaptWinToError(error);
+
+	this->switchWindow(GamePhase::ERROR);
 }
 
 void GUI::showResponse(Message const& response) noexcept
 {
+	assert(!this->commandQueue.empty() and "no command in queue");
+
 	this->gameWin->appendResponse(response, this->commandQueue.front().getCommandType());
-	// this->gameWin->appendResponse(QString::fromStdString(response.));
 }
 
 void GUI::showEvent(Message const& event) noexcept
 {
 	this->gameWin->appendEvent(event);
-	// this->gameWin->appendEvent(QString::fromStdString(event.));
 }
 
 void GUI::showError(Message const& error) noexcept
 {
-	this->gameWin->appendResponse(error, this->commandQueue.front().getCommandType());
-	// this->gameWin->appendResponse(QString::fromStdString(error));
+	assert(!this->commandQueue.empty() and "no command in queue");
+
+	this->gameWin->appendError(error, this->commandQueue.front().getCommandType());
 }
 
 
 std::unique_ptr<UI> uiFactory(void)
 {
-	return std::make_unique<GUI>(Config::HEIGHT_GUI, Config::WIDTH_GUI);
+	return std::make_unique<GUI>();
 }

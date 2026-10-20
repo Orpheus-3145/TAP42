@@ -8,18 +8,18 @@
 
 
 GameWindow::GameWindow(int32_t commandFd, UI* engine) :
-	Window(engine),
+	NcWindow(engine),
 	commandFd{commandFd}
 {
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding commands");
 
-	this->tabs[GameWindow::FRAME] = std::make_unique<BasicTab>(0, BLUE_COLOR, this);
+	this->tabs[GameWindow::FRAME] = std::make_unique<BasicTab>(0, NC_BLUE_COLOR, this);
 
-	this->tabs[GameWindow::CMD] = std::make_unique<InOutTab>(this->commandFd, CMD_HINTS, Config::PROMPT, "User Events", 0, CYAN_COLOR, this);
-	this->tabs[GameWindow::CHAT] = std::make_unique<InOutTab>(this->commandFd, CHAT_CMD_HINTS, Config::PROMPT, "Chat", 0, GREEN_COLOR, this);
+	this->tabs[GameWindow::CMD] = std::make_unique<InOutTab>(this->commandFd, CMD_HINTS, Config::PROMPT, "User Events", 0, NC_CYAN_COLOR, this);
+	this->tabs[GameWindow::CHAT] = std::make_unique<InOutTab>(this->commandFd, CHAT_CMD_HINTS, Config::PROMPT, "Chat", 0, NC_GREEN_COLOR, this);
 
-	this->tabs[GameWindow::INFO] = std::make_unique<OutputTab>(0, BLUE_COLOR, this);
-	this->tabs[GameWindow::WORLD] = std::make_unique<OutputTab>("World events", 0, YELLOW_COLOR, this);
+	this->tabs[GameWindow::INFO] = std::make_unique<OutputTab>(0, NC_BLUE_COLOR, this);
+	this->tabs[GameWindow::WORLD] = std::make_unique<OutputTab>("World events", 0, NC_YELLOW_COLOR, this);
 
 	this->tabsToSkip.insert(GameWindow::FRAME);
 	this->tabsToSkip.insert(GameWindow::INFO);
@@ -80,11 +80,14 @@ void GameWindow::draw(int32_t height, int32_t width)
 
 	this->updateContentWindow();
 
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing game window size h: {}, w: {}", height, width));
+	LOG_DEBUG(LogContext::CLI, std::format("Showing game window size h: {}, w: {}", height, width));
 }
 
 void GameWindow::appendResponse(Message const& response, CommandType cmdType)
 {
+	if ((cmdType == CommandType::GROUP_CHAT) or (cmdType == CommandType::ROOM_CHAT) or (cmdType == CommandType::GLOBAL_CHAT))
+		return;
+
 	InOutTab*	tab = nullptr;
 	std::string strCommand = toString(cmdType);
 	int32_t		colorText = -1;
@@ -93,12 +96,12 @@ void GameWindow::appendResponse(Message const& response, CommandType cmdType)
 	if (std::find(CMD_HINTS.begin(), CMD_HINTS.end(), strCommand) != CMD_HINTS.end())
 	{
 		tab = dynamic_cast<InOutTab*>(this->tabs.at(GameWindow::CMD).get());
-		colorText = CYAN_COLOR;
+		colorText = NC_CYAN_COLOR;
 	}
 	else if (std::find(CHAT_CMD_HINTS.begin(), CHAT_CMD_HINTS.end(), strCommand) != CHAT_CMD_HINTS.end())
 	{
 		tab = dynamic_cast<InOutTab*>(this->tabs.at(GameWindow::CHAT).get());
-		colorText = GREEN_COLOR;
+		colorText = NC_GREEN_COLOR;
 	}
 	else
 		assert(false and "command not found in hints");
@@ -114,7 +117,7 @@ void GameWindow::appendEvent(Message const& event)
 	assert(tab != nullptr and "current tab doesn't support appending content");
 
 	std::string content = event.toStringEvent();
-	tab->appendContent(content, TextAlign::LEFT, COLOR_PAIR(YELLOW_COLOR) | A_BOLD);
+	tab->appendContent(content, TextAlign::LEFT, COLOR_PAIR(NC_YELLOW_COLOR) | A_BOLD);
 }
 
 void GameWindow::appendError(Message const& error, CommandType cmdType)
@@ -132,5 +135,5 @@ void GameWindow::appendError(Message const& error, CommandType cmdType)
 	assert(tab != nullptr and "current tab doesn't support appending content");
 
 	std::string content = error.toStringError();
-	tab->appendContent(content, TextAlign::LEFT, COLOR_PAIR(RED_COLOR) | A_BOLD);
+	tab->appendContent(content, TextAlign::LEFT, COLOR_PAIR(NC_RED_COLOR) | A_BOLD);
 }

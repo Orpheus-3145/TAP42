@@ -2,13 +2,13 @@
 
 #include <cstdint>
 
-#include "Window.hpp"
+#include "NcWindow.hpp"
 
 
-class LoginWindow : public Window
+class LoginWindow : public NcWindow
 {
 	public:
-		using Window::Window;
+		using NcWindow::NcWindow;
 
 		LoginWindow(int32_t commandFd, UI* engine);
 

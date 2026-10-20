@@ -32,6 +32,35 @@ std::string toString(GamePhase phase);
 
 std::ostream& operator<<(std::ostream& out, GamePhase phase);
 
+static std::vector<std::string> CMD_HINTS
+{
+	"LOOK",
+	"MOVE",
+	"WHO",
+	"TAKE",
+	"DROP",
+	"INVENTORY",
+	"TALK",
+	"ATTACK",
+	"STATUS",
+	"QUEST",
+	"QUESTS",
+	"QUIT",
+	"USE"
+};
+
+static std::vector<std::string> CHAT_CMD_HINTS
+{
+	"GROUP CREATE",
+	"GROUP INVITE",
+	"GROUP JOIN",
+	"GROUP LEAVE",
+	"CHAT GROUP",
+	"CHAT ROOM",
+	"CHAT GLOBAL",
+	"QUIT"
+};
+
 class UI
 {
 	using MessageDispatcher = std::unordered_map<GamePhase,std::function<void(Message const&)>>;
@@ -55,29 +84,25 @@ class UI
 		std::string const& getUsername(void) const noexcept { return this->username; }
 
 	protected:
-		void writeToServer(void);
-		void readFromServer(void);
+		virtual void writeToServer(void);
+		virtual void readFromServer(void);
+
 		void splitIntoMessages(void);
 		void dispatchMessage(std::string const& message);
-		
-		void handlePollError(void);
-		void handleCommand(void);
+
+		virtual void handleCommand(std::string const& input);
 
 		virtual void shakeHands(void) noexcept;
-		virtual void handleException(ErrorData& error);
+		virtual void handleException(ErrorData const& error);
 
 		virtual void showResponse(Message const& response) noexcept = 0;
 		virtual void showEvent(Message const& event) noexcept = 0;
 		virtual void showError(Message const& error) noexcept = 0;
 
-		static constexpr size_t POLL_SIZE = 2UL;
-		static constexpr size_t CLIENT = 0UL;
-		static constexpr size_t CMD = 1UL;
+		virtual void startTalking(void) = 0;
+		virtual void stopTalking(void) = 0;
 
-		std::vector<struct pollfd>	pollFds;
 		ioUtils::SocketPair			gameClientSockets;
-		ioUtils::Pipe				commandPipe;
-
 		std::unique_ptr<ClientHTTP>	clientHTTP;
 
 		std::queue<Message> commandQueue;
@@ -88,12 +113,7 @@ class UI
 
 		std::string username;
 
-		bool	keepAlive{false};
-		bool	connEstablished{false};
-
-		int32_t height{0};
-		int32_t width{0};
-
+		bool		connEstablished{false};
 		GamePhase	phase{GamePhase::ND}, lastPhase{GamePhase::ND};
 
 		size_t	toServerSize{0UL};

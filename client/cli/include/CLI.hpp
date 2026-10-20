@@ -249,11 +249,11 @@
 // ===========================================================================================================================================================================
 
 
-static constexpr int32_t BLUE_COLOR = 1;
-static constexpr int32_t RED_COLOR = 2;
-static constexpr int32_t GREEN_COLOR = 3;
-static constexpr int32_t YELLOW_COLOR = 4;
-static constexpr int32_t CYAN_COLOR = 5;
+static constexpr int32_t NC_BLUE_COLOR = 1;
+static constexpr int32_t NC_RED_COLOR = 2;
+static constexpr int32_t NC_GREEN_COLOR = 3;
+static constexpr int32_t NC_YELLOW_COLOR = 4;
+static constexpr int32_t NC_CYAN_COLOR = 5;
 
 class CLI : public UI
 {
@@ -264,26 +264,43 @@ class CLI : public UI
 		virtual ~CLI(void) noexcept override;
 
 		void start(void) override;
+		void stop(void) noexcept override;
+		void switchWindow(std::optional<GamePhase> newPhase = std::nullopt) override;
 
 	private:
 		void handleResize(void);
+		void handlePollError(void);
+
+		void handleCommand(std::string const& input) override;
 
 		void shakeHands(void) noexcept override;
-		void switchWindow(std::optional<GamePhase> newPhase = std::nullopt) override;
-		void handleException(ErrorData& error) override;
+		void handleException(ErrorData const& error) override;
 	
 		void showResponse(Message const& response) noexcept override;
 		void showEvent(Message const& event) noexcept override;
 		void showError(Message const& error) noexcept override;
 
+		void startTalking(void) override { this->pollFds[CLI::CLIENT].events |= POLLOUT; }
+		void stopTalking(void) override { this->pollFds[CLI::CLIENT].events = POLLIN; }
+
 		static constexpr size_t POLL_SIZE = 4UL;
+		static constexpr size_t CLIENT = 0UL;
+		static constexpr size_t CMD = 1UL;
 		static constexpr size_t RESIZE = 2UL;
 		static constexpr size_t STDIN = 3UL;
+
+		std::array<struct pollfd,CLI::POLL_SIZE>	pollFds;
+		ioUtils::Pipe								commandPipe;
+
+		bool	keepAlive{false};
+
+		int32_t height{0};
+		int32_t width{0};
 
 		std::unique_ptr<LoginWindow>		loginWin;
 		std::unique_ptr<PlayerCreateWindow>	newPlayerWin;
 		std::unique_ptr<GameWindow>			gameWin;
 		std::unique_ptr<ErrorWindow>		errorWin;
 
-		Window* currentWindow{nullptr};
+		NcWindow* currentWindow{nullptr};
 };

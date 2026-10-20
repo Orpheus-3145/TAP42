@@ -9,10 +9,10 @@
 #include <format>
 
 
-ErrorWindow::ErrorWindow(UI* engine) : Window(engine)
+ErrorWindow::ErrorWindow(UI* engine) : NcWindow(engine)
 {
-	this->tabs[ErrorWindow::FRAME] = std::make_unique<BasicTab>(-1, RED_COLOR, this);
-	this->tabs[ErrorWindow::INFO] = std::make_unique<OutputTab>("ERROR", 0, RED_COLOR, this);
+	this->tabs[ErrorWindow::FRAME] = std::make_unique<BasicTab>(-1, NC_RED_COLOR, this);
+	this->tabs[ErrorWindow::INFO] = std::make_unique<OutputTab>("ERROR", 0, NC_RED_COLOR, this);
 
 	this->tabsToSkip.insert(ErrorWindow::FRAME);
 	this->tabsToSkip.insert(ErrorWindow::INFO);
@@ -73,12 +73,12 @@ void ErrorWindow::draw(int32_t height, int32_t width)
 
 	this->updateContentWindow();
 
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing error window, size h: {}, w: {}", this->height, this->width));
+	LOG_DEBUG(LogContext::CLI, std::format("Showing error window, size h: {}, w: {}", this->height, this->width));
 }
 
 void ErrorWindow::clear(void) noexcept
 {
-	Window::clear();
+	NcWindow::clear();
 
 	this->tabs.erase(ErrorWindow::ACTION1);
 	this->tabs.erase(ErrorWindow::ACTION2);
@@ -90,7 +90,7 @@ void ErrorWindow::clear(void) noexcept
 	this->activeTabIndex = 0;
 }
 
-void ErrorWindow::adaptWinToError(ErrorData& error) noexcept
+void ErrorWindow::adaptWinToError(ErrorData const& error) noexcept
 {
 	this->clear();
 
@@ -105,7 +105,7 @@ void ErrorWindow::adaptWinToError(ErrorData& error) noexcept
 	{
 		case ErrorCode::UI_USERNAME_NOT_EXISTS:
 			this->setAction1("RETRY", [this] { this->engine->switchWindow(GamePhase::LOGIN); });
-			this->setAction2("CREATE NEW", [this] { this->engine->switchWindow(GamePhase::PLAYER_CREATE);	});
+			this->setAction2("CREATE NEW", [this] { this->engine->switchWindow(GamePhase::PLAYER_CREATE); });
 			break;
 
 		case ErrorCode::UI_USERNAME_IN_USE:

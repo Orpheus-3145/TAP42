@@ -11,14 +11,14 @@
 
 
 PlayerCreateWindow::PlayerCreateWindow(int32_t commandFd, UI* engine) :
-	Window(engine),
+	NcWindow(engine),
 	commandFd{commandFd}
 {
 	assert(this->commandFd != -1 and "Invalid fd provided for forwarding username");
 
-	this->tabs[PlayerCreateWindow::FRAME] = std::make_unique<BasicTab>(-1, GREEN_COLOR, this);
-	this->tabs[PlayerCreateWindow::INFO] = std::make_unique<OutputTab>(0, GREEN_COLOR, this);
-	this->tabs[PlayerCreateWindow::USERNAME] = std::make_unique<InputTab>(this->commandFd, std::vector<std::string>(), Config::PROMPT, 0, GREEN_COLOR, this);
+	this->tabs[PlayerCreateWindow::FRAME] = std::make_unique<BasicTab>(-1, NC_GREEN_COLOR, this);
+	this->tabs[PlayerCreateWindow::INFO] = std::make_unique<OutputTab>(0, NC_GREEN_COLOR, this);
+	this->tabs[PlayerCreateWindow::USERNAME] = std::make_unique<InputTab>(this->commandFd, std::vector<std::string>(), Config::PROMPT, 0, NC_GREEN_COLOR, this);
 	this->tabs[PlayerCreateWindow::BACK] = std::make_unique<ButtonTab>(
 		"LOGIN",
 		[this]
@@ -26,9 +26,9 @@ PlayerCreateWindow::PlayerCreateWindow(int32_t commandFd, UI* engine) :
 			this->switchActiveTab(PlayerCreateWindow::USERNAME);
 			this->engine->switchWindow(GamePhase::LOGIN);
 		},
-		BLUE_COLOR,
+		NC_BLUE_COLOR,
 		this);
-	this->tabs[PlayerCreateWindow::CLOSE] = std::make_unique<ButtonTab>("CLOSE", [this] { this->engine->stop(); }, RED_COLOR, this);
+	this->tabs[PlayerCreateWindow::CLOSE] = std::make_unique<ButtonTab>("CLOSE", [this] { this->engine->stop(); }, NC_RED_COLOR, this);
 
 	this->tabsToSkip.insert(PlayerCreateWindow::FRAME);
 	this->tabsToSkip.insert(PlayerCreateWindow::INFO);
@@ -96,5 +96,5 @@ void PlayerCreateWindow::draw(int32_t height, int32_t width)
 
 	this->updateContentWindow();
 
-	LOG_DEBUG(LogContext::INTERFACE, std::format("Showing create player window, size h: {}, w: {}", this->height, this->width));
+	LOG_DEBUG(LogContext::CLI, std::format("Showing create player window, size h: {}, w: {}", this->height, this->width));
 }

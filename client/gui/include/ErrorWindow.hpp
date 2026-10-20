@@ -3,35 +3,33 @@
 #include <cstdint>
 #include <string>
 #include <functional>
+#include <QLabel>
+#include <QHBoxLayout>
 
-#include "Window.hpp"
+#include "QtWindow.hpp"
 #include "UI.hpp"
+#include "Exceptions.hpp"
 
 
-class ErrorWindow : public Window
+class ErrorWindow : public QtWindow
 {
     Q_OBJECT
 
 	public:
-		using Window::Window;
-
-		ErrorWindow(QWidget *parent, int32_t height, int32_t width, UI* engine) :
-			Window(parent, height, width, engine) {}
+		using QtWindow::QtWindow;
 
 		~ErrorWindow(void) noexcept {}
 
-	// signals:
-	// 	void commandEntered(const QString &command);
+		void draw(void) override;
 
-	// private slots:
-	// 	void onPromptSubmitted();
+		void adaptWinToError(ErrorData const& error) noexcept;
+		void setAction1(std::string const& actionName, std::function<void()> action);
+		void setAction2(std::string const& actionName, std::function<void()> action);
 
 	private:
-		void draw(int32_t height, int32_t width) override;
+		static constexpr int32_t HEIGHT = 230;
+		static constexpr int32_t WIDTH = 250;
 
-		// QPlainTextEdit *inputLog;
-		// QLineEdit      *promptField;
-		// QPlainTextEdit *responsesLog;
-		// QPlainTextEdit *eventsLog;
+		QLabel		*info{nullptr};
+		QHBoxLayout	*btnContainer{nullptr};
 };
-

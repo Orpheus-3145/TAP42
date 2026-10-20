@@ -52,6 +52,7 @@ class AppException : public std::runtime_error {
 			errData{ErrorData{code, info}} {}
 
 		ErrorData const& getError(void) const noexcept { return this->errData; }
+		ErrorData& getError(void) noexcept { return this->errData; }
 
 	private:
 		ErrorData errData;
