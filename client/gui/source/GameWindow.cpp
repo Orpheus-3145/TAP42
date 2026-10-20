@@ -90,7 +90,7 @@ void GameWindow::appendError(Message const& error, CommandType cmdType)
 		toUpdate = this->chatPanel.get();
 	assert(toUpdate and "error doesn't belong to any panel");
 
-	toUpdate->appendInput(errorStr);
+	toUpdate->appendInput(errorStr, QT_RED_COLOR);
 }
 
 void GameWindow::updatePlayerPanel(PlayerInfo const& data)

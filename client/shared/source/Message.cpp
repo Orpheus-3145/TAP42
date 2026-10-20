@@ -37,7 +37,7 @@ std::string	Message::toStringResponse(CommandType command) const
 		case CommandType::TALK: 			return std::format("{} says: '{}'", this->data["npc"].as_string(), this->data["dialogue"].as_string());
 		case CommandType::ATTACK: 			return std::format("Attacked:\n{}", this->data.toString());
 		case CommandType::STATUS: 			return std::format("Current status:\n{}", this->data.toString());
-		case CommandType::QUEST: 			return std::format("Info quest: '{}'", this->data.toString());
+		case CommandType::QUEST: 			return this->data.toString();
 		case CommandType::QUESTS: 			return std::format("Quest log:\n{}", this->data.toString());	// array data
 		case CommandType::GROUP_CREATE: 	return std::format("Group {} created", this->data["created"].as_string());
 		case CommandType::GROUP_INVITE: 	return std::format("Invited {} to join group", this->data["invited"].as_string());
