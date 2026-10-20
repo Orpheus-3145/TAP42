@@ -29,8 +29,8 @@ std::string	Message::toStringResponse(CommandType command) const
 	switch (command)
 	{
 		case CommandType::LOOK: 			return std::format("Looking around:\n{}", this->data.toString());
-		case CommandType::MOVE: 			return std::format("Moved to room {}", this->data["room"]["name"].as_string());
-		case CommandType::WHO: 				return std::format("{} players in the room: {}", this->data["server"].as_string(), this->data["room"].toString());	// (last one) array data
+		case CommandType::MOVE: 			return std::format("Moved to {}", this->data["room"]["name"].as_string());
+		case CommandType::WHO: 				return std::format("{} players:\n{}", this->data["server"].as_int(), this->data["room"].toString());	// (last one) array data
 		case CommandType::TAKE: 			return std::format("Taken item {}", this->data["taken"].as_string());
 		case CommandType::DROP: 			return std::format("Dropped item {}", this->data["dropped"].as_string());
 		case CommandType::INVENTORY: 		return std::format("Inventory:\n{}", this->data.toString());	// array data
