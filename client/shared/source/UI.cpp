@@ -307,7 +307,7 @@ void UI::setupDispatchers(void)
 
 	this->errorDispatcher[GamePhase::ND] = 			  [this] (Message const& m) { LOG_WARN(LogContext::INTERFACE, std::format("Got unexpected error before handshake: '{}' - discarded", m.getRawMessage())); };
 	this->errorDispatcher[GamePhase::LOGIN] =		  [this] (Message const& m) {
-		if (m.getErrorType() == ErrorType::NOT_FOUND)
+		if (m.getErrorType() == ErrorType::CHARACTER_NOT_FOUND)
 			throw AppException(ErrorCode::UI_USERNAME_NOT_EXISTS);
 		else
 			throw AppException(ErrorCode::SERVER_ERROR, m.toStringError());

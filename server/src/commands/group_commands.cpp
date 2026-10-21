@@ -22,7 +22,7 @@ void cmd_group_create(const std::shared_ptr<Session>& session, const std::vector
     {
         std::lock_guard<std::mutex> lock(world.mutex);
         if (!world.player_group[session->player_id].empty()) {
-            response = "ERR 402 ALREADY_IN_GROUP already in a group";
+            response = "ERR 402 ALREADY_IN_GROUP";
         } else {
             std::string requested_id = args.size() > 1 ? args[1] : session->player_id;
             if (world.groups.count(requested_id) > 0) {
@@ -31,7 +31,7 @@ void cmd_group_create(const std::shared_ptr<Session>& session, const std::vector
                 group_id = requested_id;
                 world.player_group[session->player_id] = group_id;
                 world.groups[group_id] = {session->player_id};
-                response = "OK group=" + group_id;
+                response = "OK {\"created\":\"" + group_id + "\"}";
             }
         }
     }
@@ -61,12 +61,11 @@ void cmd_group_invite(const std::shared_ptr<Session>& session, const std::vector
         } else {
             group_id = world.player_group[session->player_id];
             if (group_id.empty()) {
-                group_id = session->player_id; // the group takes its founder's id
-                world.player_group[session->player_id] = group_id;
-                world.groups[group_id] = {session->player_id};
+                response = "ERR 401 NOT_IN_GROUP";
+            } else {
+                world.pending_invites.emplace(target, group_id);
+                response = "OK {\"invited\":\"" + target + "\"}";
             }
-            world.pending_invites[target] = session->player_id;
-            response = "OK {\"invited\":\"" + target + "\"}";
         }
     }
     send_line(*session, response);
@@ -74,7 +73,8 @@ void cmd_group_invite(const std::shared_ptr<Session>& session, const std::vector
         auto target_session = SessionRegistry::instance().get(target);
         if (target_session) {
             send_line(*target_session, "EVT GROUP INVITE " +
-                          ("{\"player\":\"" + session->player_id + "\"," +
+                          ("{\"inviter\":\"" + session->player_id + "\"," +
+                           "\"invited\":\"" + target + "\"," +
                            "\"group\":\"" + group_id + "\"}"));
         }
         log_info("group_invite", {{"inviter", session->player_id}, {"invited", target}, {"group", group_id}});
@@ -83,32 +83,39 @@ void cmd_group_invite(const std::shared_ptr<Session>& session, const std::vector
 
 void cmd_group_accept(const std::shared_ptr<Session>& session, const std::vector<std::string>& args) {
     if (args.size() < 2) {
-        send_line(*session, "ERR 200 BAD_MESSAGE GROUP ACCEPT requires the inviter's name");
+        send_line(*session, "ERR 200 BAD_MESSAGE GROUP ACCEPT requires the group's name");
         return;
     }
-    std::string inviter = args[1];
+    std::string groupToJoin = args[1];
 
     auto& world = World::instance();
     std::string response, group_id;
     {
         std::lock_guard<std::mutex> lock(world.mutex);
-        auto it = world.pending_invites.find(session->player_id);
-        if (it == world.pending_invites.end() || it->second != inviter) {
-            response = "ERR 200 BAD_MESSAGE no pending invite from " + inviter;
+        auto rangeInvites = world.pending_invites.equal_range(session->player_id);
+        if (rangeInvites.first == world.pending_invites.end()) {
+            response = "ERR 200 BAD_MESSAGE no pending invite for " + session->player_id;
         } else {
-            group_id = world.player_group[inviter];
-            if (group_id.empty()) {
-                response = "ERR 500 INTERNAL inviter is no longer in a group";
-            } else {
+            // there might be multiple invites to the same person
+            // to different groups, find the one; specific to the group to join
+            for (; rangeInvites.first != rangeInvites.second; rangeInvites.first++)
+            {
+                if (rangeInvites.first->second != groupToJoin)
+                    continue;
+
                 // Must leave any previous group BEFORE joining the new one:
                 // otherwise they'd stay registered as a member of both,
                 // receiving CHAT GROUP from the group they just left too.
+                group_id = rangeInvites.first->second;
                 leave_group_locked(session->player_id);
                 world.groups[group_id].push_back(session->player_id);
                 world.player_group[session->player_id] = group_id;
-                world.pending_invites.erase(it);
+                world.pending_invites.erase(rangeInvites.first);
                 response = "OK {\"joined\":\"" + group_id + "\"}";
+                break;
             }
+            if (rangeInvites.first == rangeInvites.second)
+                response = "ERR 500 INTERNAL no invite from group " + groupToJoin;
         }
     }
     send_line(*session, response);

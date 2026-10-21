@@ -80,18 +80,35 @@ std::string	Message::toStringEvent(void) const
 		case EventType::ROOM_COMBAT_DEATH_PLAYER:	return std::format("NPC {} slained {}", this->data["npc"].as_string(), this->data["player"].as_string());
 		case EventType::ROOM_ITEM_USE:				return std::format("{} used {}", this->data["player"].as_string(), this->data["item"].as_string());
 		case EventType::ROOM_QUEST_COMPLETE:		return std::format("{} completed {}", this->data["player"].as_string(), this->data["quest"].as_string());
-		default:
-			assert(false and "event not mapped for print");
-			return "";
+		default:									assert(false and "event not mapped for print");
 	}
-
 }
 
 std::string	Message::toStringError(void) const
 {
 	assert(this->type == MessageType::ERROR and "wrong type to stringify");
 
-	return this->data.as_string();
+	switch (this->getErrorType())
+	{
+		case ErrorType::NOT_CONNECTED:			return "Couldn't run command, player not connected";
+		case ErrorType::BAD_MESSAGE:			return std::format("Bad Message: {}", this->data.as_string());
+		case ErrorType::NAME_IN_USE:			return this->data.as_string();
+		case ErrorType::NO_EXIT:				return this->data.as_string();
+		case ErrorType::NOT_IN_GROUP:			return "Not in a group";
+		case ErrorType::ALREADY_IN_GROUP:		return "Already in a group";
+		case ErrorType::ITEM_NOT_FOUND:			return std::format("Item {} not found", this->data.as_string());
+		case ErrorType::ITEM_NOT_IN_INVENTORY:	return std::format("Item {} not in inventory", this->data.as_string());
+		case ErrorType::NPC_NOT_FOUND:			return std::format("NPC {} not found", this->data.as_string());
+		case ErrorType::QUEST_NOT_FOUND:		return std::format("Quest {} not existing", this->data.as_string());
+		case ErrorType::CHARACTER_NOT_FOUND:	return std::format("Player {} not found", this->data.as_string());
+		case ErrorType::NPC_NOT_HOSTILE:		return std::format("NPC {} not hostile", this->data.as_string());
+		case ErrorType::NO_QUEST_AVAILABLE:		return std::format("No quest found in room {}", this->data.as_string());
+		case ErrorType::DEAD:					return this->data.as_string();
+		case ErrorType::INTERNAL:				return this->data.as_string();
+		case ErrorType::CONNECTION_FAILED:		return "Server disconnected";
+		case ErrorType::SEND_FAILED:			return "Sending failed";
+		default:								assert(false and "error not mapped");
+	}
 }
 
 CommandType	Message::getCommandType(void) const noexcept
@@ -198,7 +215,7 @@ void Message::parseEvent(std::string const& event)
 	{
 		std::string eventTypeStr = visibility + " " + type;
 		if (eventExists(eventTypeStr) == false)
-			throw AppException(ErrorCode::BAD_MESSAGE, "Unknown event: " + eventTypeStr);
+			throw AppException(ErrorCode::BAD_MESSAGE, "Unknown event: " + event);
 		this->subType.eventType = getEvent(eventTypeStr);
 
 		std::getline(iss >> std::ws, data);
@@ -222,7 +239,9 @@ void Message::parseError(std::string const& error)
 
 	if (!(iss >> err >> errCode >> errName))
 		throw AppException(ErrorCode::BAD_MESSAGE, "Incomplete error: " + error);
-	this->subType.errType = getError(errCode);
+	if (errorExists(errName) == false)
+		throw AppException(ErrorCode::BAD_MESSAGE, "Unknown error: " + error);
+	this->subType.errType = getError(errName);
 
 	std::getline(iss >> std::ws, errInfo);
 	if (errInfo.empty() == false)

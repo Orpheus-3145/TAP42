@@ -69,25 +69,47 @@ bool eventExists(std::string const& event) noexcept
 }
 
 
-std::string toString(ErrorType e)
+std::string toString(ErrorType error)
 {
-    switch (e)
-	{
-		case ErrorType::BAD_MESSAGE:			return "BAD_MESSAGE";
-		case ErrorType::NAME_IN_USE:			return "NAME_IN_USE";
-		case ErrorType::NO_EXIT:				return "NO_EXIT";
-		case ErrorType::NOT_IN_GROUP:			return "NOT_IN_GROUP";
-		case ErrorType::ALREADY_IN_GROUP:		return "ALREADY_IN_GROUP";
-		case ErrorType::NOT_FOUND:				return "ITEM_NOT_FOUND";
-		case ErrorType::NPC_NOT_HOSTILE:		return "NPC_NOT_HOSTILE";
-		case ErrorType::NO_QUEST_AVAILABLE:		return "NO_QUEST_AVAILABLE";
-		case ErrorType::CONNECTION_FAILED:		return "CONNECTION_FAILED";
-		case ErrorType::SEND_FAILED:			return "SEND_FAILED";
-		default:								throw AppException(ErrorCode::BAD_MESSAGE, std::format("Unknown enum value: {}", static_cast<uint32_t>(e)));
-    }
+	assert(static_cast<size_t>(error) < errors.size() and "error not mapped");
+
+	return errors[static_cast<size_t>(error)];
 }
 
-ErrorType getError(uint32_t code)
+ErrorType getError(std::string const& error) noexcept
 {
-	return static_cast<ErrorType>(code);
+	auto it = std::find(errors.begin(), errors.end(), error);
+	assert(it != errors.end() and "error doesn't exist");
+
+	return static_cast<ErrorType>(std::distance(errors.begin(), it));
+}
+
+uint32_t getErrorCode(ErrorType error)
+{
+	switch (error)
+	{
+		case ErrorType::NOT_CONNECTED:			return 102U;
+		case ErrorType::BAD_MESSAGE:			return 200U;
+		case ErrorType::NAME_IN_USE:			return 201U;
+		case ErrorType::NO_EXIT:				return 301U;
+		case ErrorType::NOT_IN_GROUP:			return 401U;
+		case ErrorType::ALREADY_IN_GROUP:		return 402U;
+		case ErrorType::ITEM_NOT_FOUND:
+		case ErrorType::ITEM_NOT_IN_INVENTORY:
+		case ErrorType::NPC_NOT_FOUND:
+		case ErrorType::QUEST_NOT_FOUND:
+		case ErrorType::CHARACTER_NOT_FOUND:	return 404U;
+		case ErrorType::NPC_NOT_HOSTILE:		return 405U;
+		case ErrorType::NO_QUEST_AVAILABLE:		return 406U;
+		case ErrorType::DEAD:					return 409U;
+		case ErrorType::INTERNAL:				return 500U;
+		case ErrorType::CONNECTION_FAILED:		return 900U;
+		case ErrorType::SEND_FAILED:			return 901U;
+		default:								assert(false and "error not mapped");
+	}
+}
+
+bool errorExists(std::string const& error) noexcept
+{
+	return std::find(errors.begin(), errors.end(), error) != errors.end();
 }
