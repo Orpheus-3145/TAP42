@@ -10,9 +10,16 @@
     "loc.inn_hall": {
       "name": "Inn Hall",
       "description": "A warm common room, tables scattered around a crackling hearth. The bartender wipes down the counter.",
-      "exits": { "west": "loc.start", "north": "loc.inn_corridor", "down": "loc.basement" },
+      "exits": { "west": "loc.start", "north": "loc.inn_corridor", "down": "loc.basement", "up": "loc.inn_attic" },
       "items": [],
       "npcs": ["npc.bartender"]
+    },
+    "loc.inn_attic": {
+      "name": "Inn Attic",
+      "description": "A low-beamed attic under the roof, dust hanging in the slanted light from a single round window.",
+      "exits": { "down": "loc.inn_hall" },
+      "items": [],
+      "npcs": []
     },
     "loc.inn_corridor": {
       "name": "Inn Corridor",

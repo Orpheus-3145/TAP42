@@ -95,6 +95,7 @@ void cmd_create_character(const std::shared_ptr<Session>& session, const std::ve
         response = "OK " + character_info_json(created);
     }
     send_line(*session, response);
+    if (created_ok) broadcast_stats();
 }
 
 // CONNECT is login: the name has to already exist as a saved character.
@@ -153,6 +154,7 @@ void cmd_connect(const std::shared_ptr<Session>& session, const std::vector<std:
         log_info("player_connected", {{"player", name}, {"ip", session->peer_ip}});
     }
     send_line(*session, response);
+    if (connected_ok) broadcast_stats();
 }
 
 void cmd_look(const std::shared_ptr<Session>& session) {
@@ -400,4 +402,5 @@ void handle_disconnect(std::shared_ptr<Session> session) {
     if (!group_id.empty()) {
         broadcast_to_group(group_id, session->player_id, "EVT GROUP LEAVE " + session->player_id);
     }
+    if (had_state) broadcast_stats();
 }

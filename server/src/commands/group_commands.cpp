@@ -14,7 +14,9 @@ namespace {
 // naming someone to invite in the same breath. GROUP INVITE still auto-creates
 // on first use too (kept for backward compatibility) - CREATE is just a second
 // way to reach the same "I now have an empty group" state.
-void cmd_group_create(const std::shared_ptr<Session>& session) {
+// An optional name (GROUP CREATE <name>) picks the group id; without one it
+// falls back to the founder's own id, same as before.
+void cmd_group_create(const std::shared_ptr<Session>& session, const std::vector<std::string>& args) {
     auto& world = World::instance();
     std::string response, group_id;
     {
@@ -22,10 +24,15 @@ void cmd_group_create(const std::shared_ptr<Session>& session) {
         if (!world.player_group[session->player_id].empty()) {
             response = "ERR 402 ALREADY_IN_GROUP already in a group";
         } else {
-            group_id = session->player_id; // the group takes its founder's id
-            world.player_group[session->player_id] = group_id;
-            world.groups[group_id] = {session->player_id};
-            response = "OK group=" + group_id;
+            std::string requested_id = args.size() > 1 ? args[1] : session->player_id;
+            if (world.groups.count(requested_id) > 0) {
+                response = "ERR 201 NAME_IN_USE group name already taken";
+            } else {
+                group_id = requested_id;
+                world.player_group[session->player_id] = group_id;
+                world.groups[group_id] = {session->player_id};
+                response = "OK group=" + group_id;
+            }
         }
     }
     send_line(*session, response);
@@ -153,7 +160,7 @@ void cmd_group(const std::shared_ptr<Session>& session, const std::vector<std::s
         return;
     }
     if (args[0] == "CREATE") {
-        cmd_group_create(session);
+        cmd_group_create(session, args);
     } else if (args[0] == "INVITE") {
         cmd_group_invite(session, args);
     } else if (args[0] == "ACCEPT" || args[0] == "JOIN") {

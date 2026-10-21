@@ -22,6 +22,11 @@ void broadcast_to_room(const std::string& room_id, const std::string& except_pla
 void broadcast_to_group(const std::string& group_id, const std::string& except_player,
                          const std::string& message);
 
+// Sends an updated EVT STATS to every connected session (RFC42TAP §6.2.4).
+// Call this after any change to the number of connected players (a
+// successful CONNECT/CREATE_CHARACTER, or a disconnect).
+void broadcast_stats();
+
 // Precondition: the caller must already hold world.mutex.
 std::string serialize_room_locked(const Room& room);
 

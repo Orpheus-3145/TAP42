@@ -24,14 +24,14 @@ src/world/JsonParser.o: ../client/shared/source/JsonParser.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 deps:
-	@echo "Nessuna dipendenza esterna richiesta: solo la standard library."
-	@echo "Il world data (data/world.json) e' caricato con un parser JSON scritto ad hoc (src/world/json.*)."
+	@echo "No external dependency required: standard library only."
+	@echo "World data (data/world.json) is loaded with a hand-written JSON parser (src/world/json.*)."
 
 run: all
 	./$(TARGET)
 
 lint:
-	@command -v cppcheck > /dev/null 2>&1 && cppcheck --enable=warning,style --std=c++17 --quiet --error-exitcode=1 --suppressions-list=.cppcheck-suppressions -Isrc src || echo "cppcheck non trovato, salto il lint"
+	@command -v cppcheck > /dev/null 2>&1 && cppcheck --enable=warning,style --std=c++17 --quiet --error-exitcode=1 --suppressions-list=.cppcheck-suppressions -Isrc src || echo "cppcheck not found, skipping lint"
 
 clean:
 	rm -f $(OBJ) $(TARGET)
