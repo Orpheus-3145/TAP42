@@ -85,6 +85,7 @@ della RFC che riusa 404 per più condizioni con testo diverso).
 | 301 | `NO_EXIT` | direzione non valida da questa stanza |
 | 401 | `NOT_IN_GROUP` | CHAT GROUP inviato senza far parte di un gruppo |
 | 402 | `ALREADY_IN_GROUP` | GROUP CREATE mandato mentre si è già in un gruppo |
+| 201 | `NAME_IN_USE` | nome di gruppo scelto (GROUP CREATE \<nome\>) già in uso da un altro gruppo |
 | 404 | `ITEM_NOT_FOUND` | item non presente nella stanza (TAKE) |
 | 404 | `ITEM_NOT_IN_INVENTORY` | item non in inventario (DROP, USE) |
 | 404 | `NPC_NOT_FOUND` | NPC non presente nella stanza (TALK, ATTACK, USE) |
@@ -355,9 +356,10 @@ S: OK {"room":["alice","bob"],"server":5}
 
 ### GROUP
 ```
-C: GROUP CREATE
+C: GROUP CREATE [nome]
 S: OK group=<group_id>
 S: ERR 402 ALREADY_IN_GROUP ...  # sei già in un gruppo
+S: ERR 201 NAME_IN_USE ...       # il nome scelto è già usato da un altro gruppo
 
 C: GROUP INVITE <player>
 S: OK {"invited":"<player>"}
@@ -382,13 +384,17 @@ EVT GROUP JOIN {"player":"...","group":"..."}
 EVT GROUP LEAVE {"player":"...","group":"..."}
 ```
 **Design choice**: un solo invito pendente per invitato (un nuovo INVITE
-sovrascrive il precedente). Il group id coincide con il nome di chi lo ha
-fondato (chi manda il primo INVITE, o chi manda GROUP CREATE). Alla
-disconnessione un player viene rimosso automaticamente dal proprio gruppo
-(con relativo `EVT GROUP LEAVE`). `GROUP CREATE` è stato aggiunto perché
-la RFC lo elenca esplicitamente come comando a sé; prima esisteva solo la
-creazione implicita al primo INVITE, che resta invariata per compatibilità
-— sono due modi per arrivare allo stesso stato, non uno sostituisce l'altro.
+sovrascrive il precedente). Il group id è il nome scelto in `GROUP CREATE
+<nome>`, se fornito; altrimenti (o se il gruppo nasce implicitamente dal
+primo INVITE) coincide con il nome di chi lo ha fondato — stesso
+comportamento di prima, solo esteso. Un nome di gruppo, come un nome
+personaggio, è univoco solo mentre il gruppo esiste: una volta sciolto
+(ultimo membro che se ne va) torna disponibile. Alla disconnessione un
+player viene rimosso automaticamente dal proprio gruppo (con relativo
+`EVT GROUP LEAVE`). `GROUP CREATE` è stato aggiunto perché la RFC lo
+elenca esplicitamente come comando a sé; prima esisteva solo la creazione
+implicita al primo INVITE, che resta invariata per compatibilità — sono
+due modi per arrivare allo stesso stato, non uno sostituisce l'altro.
 
 ### QUIT
 ```
@@ -398,6 +404,18 @@ S: OK bye
 EVT ROOM PRESENCE_LEAVE <player>
 EVT GROUP LEAVE {"player":"...","group":"..."}   # se il player era in un gruppo
 ```
+
+### STATS — evento broadcast
+```
+EVT STATS {"count":<n>}
+```
+Richiesto dalla RFC42TAP §6.2.4 (`EVT STATS players=<n>`, qui come payload
+JSON per coerenza con il resto del protocollo). Non è la risposta a un
+comando: il server lo manda a **tutte** le sessioni connesse ogni volta che
+il numero di giocatori online cambia — un CONNECT o CREATE_CHARACTER
+riuscito, o una disconnessione. Il conteggio è quello delle sessioni
+registrate (`SessionRegistry`), cioè personaggi effettivamente online, non
+semplici connessioni TCP in attesa di login.
 
 ## 5. Convenzioni sui payload JSON
 
