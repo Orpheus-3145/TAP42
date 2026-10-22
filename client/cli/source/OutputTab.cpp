@@ -4,6 +4,7 @@
 
 #include <sstream>
 #include <cassert>
+#include <format>
 
 
 OutputTab::OutputTab(std::string const& title, int32_t borderChar, int32_t colorPair, NcWindow* parent) :
@@ -18,7 +19,7 @@ OutputTab::OutputTab(OutputTab&& other) noexcept :
 	BasicTab(std::move(other)),
 	titleWin{other.titleWin},
 	divLineWin{other.divLineWin},
-	outputWin{other.titleWin},
+	outputWin{other.outputWin},
 	title{std::move(other.title)},
 	state{std::move(other.state)},
 	topLineScroll{other.topLineScroll}
@@ -180,6 +181,13 @@ void OutputTab::appendContent(std::string const& newContent, TextAlign align, ui
 	if (saveTimestamp)
 		this->hasTimeStamp = true;
 
+	// era in fondo prima di aggiungere?
+	int32_t maxVerticalSpace = 0, _;
+	(void)_;
+	if (this->outputWin != nullptr)
+		getmaxyx(this->outputWin, maxVerticalSpace, _);
+	bool const wasAtBottom = (this->topLineScroll + maxVerticalSpace >= this->state.size());
+
 	if (newContent.find('\n') != std::string::npos)
 	{
 		std::stringstream ss(newContent);
@@ -196,12 +204,14 @@ void OutputTab::appendContent(std::string const& newContent, TextAlign align, ui
 	if (this->outputWin == nullptr)
 		return;
 
-	int32_t maxVerticalSpace, _;
-	(void)_;
-	getmaxyx(this->outputWin, maxVerticalSpace, _);
-
-	if (static_cast<int32_t>(this->state.size()) > maxVerticalSpace)
-		this->topLineScroll += static_cast<int32_t>(this->state.size()) - maxVerticalSpace;
+	// segui il fondo solo se l'utente non ha scrollato verso l'alto
+	if (wasAtBottom)
+	{
+		size_t const size = this->state.size();
+		this->topLineScroll = (size > static_cast<size_t>(maxVerticalSpace))
+			? size - maxVerticalSpace
+			: 0UL;
+	}
 }
 
 void OutputTab::updateContent(void) const noexcept
@@ -211,7 +221,9 @@ void OutputTab::updateContent(void) const noexcept
 	(void)_;
 	getmaxyx(this->outputWin, newMaxheight, _);
 
-	int32_t nLinesToPrint = std::min(newMaxheight, static_cast<int32_t>(this->state.size() - this->topLineScroll));
+	size_t const remaining = (this->state.size() > this->topLineScroll) ? this->state.size() - this->topLineScroll : 0UL;
+	int32_t nLinesToPrint = std::min<int32_t>(newMaxheight, static_cast<int32_t>(remaining));
+
 	for (int32_t i = 0; i < nLinesToPrint; i++)
 		this->printLine(this->state[this->topLineScroll + i]);
 }
@@ -275,8 +287,7 @@ void OutputTab::scrollContentDown(void) noexcept
 	(void)_;
 	getmaxyx(this->outputWin, maxVerticalSpace, _);
 
-	if ((maxVerticalSpace >= static_cast<int32_t>(this->state.size())) or
-		(this->topLineScroll + maxVerticalSpace == this->state.size()))
+	if (this->topLineScroll + maxVerticalSpace >= this->state.size())
 		return;
 
 	::wscrl(this->outputWin, 1);
