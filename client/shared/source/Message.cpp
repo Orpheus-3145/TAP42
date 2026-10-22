@@ -28,17 +28,17 @@ std::string	Message::toStringResponse(CommandType command) const
 
 	switch (command)
 	{
-		case CommandType::LOOK: 			return std::format("Looking around:\n{}", this->data.toString());
+		case CommandType::LOOK: 			return this->data.toString();
 		case CommandType::MOVE: 			return std::format("Moved to {}", this->data["room"].as_string());
 		case CommandType::WHO: 				return std::format("{} players:\n{}", this->data["server"].as_int(), this->data["room"].toString());	// (last one) array data
 		case CommandType::TAKE: 			return std::format("Taken item {}", this->data["taken"].as_string());
 		case CommandType::DROP: 			return std::format("Dropped item {}", this->data["dropped"].as_string());
-		case CommandType::INVENTORY: 		return std::format("Inventory:\n{}", this->data.toString());	// array data
+		case CommandType::INVENTORY: 		return this->data.toString();
 		case CommandType::TALK: 			return std::format("{} says: '{}'", this->data["npc"].as_string(), this->data["dialogue"].as_string());
 		case CommandType::ATTACK: 			return std::format("Attacked:\n{}", this->data.toString());
 		case CommandType::STATUS: 			return std::format("Current status:\n{}", this->data.toString());
 		case CommandType::QUEST: 			return this->data.toString();
-		case CommandType::QUESTS: 			return std::format("Quest log:\n{}", this->data.toString());	// array data
+		case CommandType::QUESTS: 			return this->data.toString();
 		case CommandType::GROUP_CREATE: 	return std::format("Group {} created", this->data["created"].as_string());
 		case CommandType::GROUP_INVITE: 	return std::format("Invited {} to join group", this->data["invited"].as_string());
 		case CommandType::GROUP_JOIN: 		return std::format("Joined {}", this->data["joined"].as_string());
@@ -76,8 +76,8 @@ std::string	Message::toStringEvent(void) const
 		case EventType::GROUP_INVITE:				return std::format("{} has invited {} to join {}", this->data["inviter"].as_string(), this->data["invited"].as_string(), this->data["group"].as_string());
 		case EventType::STATS:						return std::format("Player count {}", this->data.as_int());
 		case EventType::ROOM_COMBAT:				return std::format("{} attacked {}", this->data["player"].as_string(), this->data["npc"].as_string());
-		case EventType::ROOM_COMBAT_DEATH_NPC:		return std::format("{} slained NPC {}", this->data["player"].as_string(), this->data["npc"].as_string());
-		case EventType::ROOM_COMBAT_DEATH_PLAYER:	return std::format("NPC {} slained {}", this->data["npc"].as_string(), this->data["player"].as_string());
+		case EventType::ROOM_COMBAT_DEATH_NPC:		return std::format("{} slained {}", this->data["player"].as_string(), this->data["npc"].as_string());
+		case EventType::ROOM_COMBAT_DEATH_PLAYER:	return std::format("{} slained {}", this->data["npc"].as_string(), this->data["player"].as_string());
 		case EventType::ROOM_ITEM_USE:				return std::format("{} used {}", this->data["player"].as_string(), this->data["item"].as_string());
 		case EventType::ROOM_QUEST_COMPLETE:		return std::format("{} completed {}", this->data["player"].as_string(), this->data["quest"].as_string());
 		default:									assert(false and "event not mapped for print");

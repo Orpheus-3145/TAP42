@@ -283,13 +283,10 @@ void UI::handleCommand(std::string const& input)
 
 void UI::setupDispatchers(void)
 {
-	this->responseDispatcher[GamePhase::ND] = 			 [this] (Message const& m) { (void) m;/* NB validate */ this->shakeHands(); };
-	this->responseDispatcher[GamePhase::LOGIN] =		 [this] (Message const& m) { (void) m;/* NB validate */ this->switchWindow(GamePhase::GAME); };
-	this->responseDispatcher[GamePhase::PLAYER_CREATE] = [this] (Message const& m) { (void) m;/* NB validate */ this->switchWindow(GamePhase::GAME); };
-	this->responseDispatcher[GamePhase::GAME] =			 [this] (Message const& m) {
-		
-		this->showResponse(m);
-	};
+	this->responseDispatcher[GamePhase::ND] = 			 [this] (Message const& m) { if (m.getRawMessage() == HAND_SHAKE) this->shakeHands(); };
+	this->responseDispatcher[GamePhase::LOGIN] =		 [this] (Message const& m) { if (m.getRawMessage() == OK_CONNECTED) this->switchWindow(GamePhase::GAME); };
+	this->responseDispatcher[GamePhase::PLAYER_CREATE] = [this] (Message const& m) { if (m.getRawMessage() == OK_CONNECTED) this->switchWindow(GamePhase::GAME); };
+	this->responseDispatcher[GamePhase::GAME] =			 [this] (Message const& m) { this->showResponse(m);	};
 	this->responseDispatcher[GamePhase::ERROR] =		 [this] (Message const& m) {
 		if (this->commandQueue.front().getCommandType() == CommandType::WAIT_HANDSHAKE)
 			this->shakeHands();

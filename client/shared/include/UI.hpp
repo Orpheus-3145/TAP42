@@ -69,6 +69,9 @@ struct PlayerInfo
 	std::string location;
 };
 
+static constexpr const char* HAND_SHAKE = "OK hello proto=1";
+static constexpr const char* OK_CONNECTED = "OK connected";
+
 class UI
 {
 	using MessageDispatcher = std::unordered_map<GamePhase,std::function<void(Message const&)>>;
