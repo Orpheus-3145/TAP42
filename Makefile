@@ -1,14 +1,17 @@
 CLIENT_DIR        := client
 CLIENT_BUILD_DIR  := $(CLIENT_DIR)/build
 SERVER_DIR        := server
-CMAKE_ARGS        ?=
+# CMAKE_ARGS        ?=
 
 .PHONY: all configure cli gui server run-cli run-gui run-server clean fclean
 
 all: cli
 
 configure:
-	cmake -S $(CLIENT_DIR) -B $(CLIENT_BUILD_DIR) $(CMAKE_ARGS)
+	cmake -S $(CLIENT_DIR) -B $(CLIENT_BUILD_DIR)
+
+configure-debug:
+	cmake -S $(CLIENT_DIR) -B build -DENABLE_SANITIZERS=ON
 
 cli: configure
 	cmake --build $(CLIENT_BUILD_DIR) --target tap-client-cli -j
@@ -27,6 +30,12 @@ run-gui: configure
 
 run-server:
 	$(MAKE) -C $(SERVER_DIR) run
+
+run-cli-debug: configure-debug
+	cmake --build $(CLIENT_BUILD_DIR) --target run-cli
+
+run-gui-debug: configure-debug
+	cmake --build $(CLIENT_BUILD_DIR) --target run-gui
 
 clean:
 	-cmake --build $(CLIENT_BUILD_DIR) --target clean
