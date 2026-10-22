@@ -53,6 +53,7 @@ void ClientHTTP::startWorker(void) noexcept
 {
 	this->worker = std::thread(&ClientHTTP::loop, this);
 	this->keepAlive.store(true);
+	this->preStop = false;
 
 	LOG_INFO(LogContext::HTTP_CLIENT, "Started client worker");
 }
@@ -165,7 +166,7 @@ void ClientHTTP::handleDataToGame(void)
 		
 		this->serverBufferSize -= n;
 		if (this->serverBufferSize == 0UL)
-			this->pollFds[ClientHTTP::GAME].events = POLLIN;		// is done writing, no POLLOUT anymore
+			this->pollFds[ClientHTTP::GAME].events = POLLIN;	// is done writing, no POLLOUT anymore
 		else
 			::memmove(this->serverBuffer, this->serverBuffer + n, this->serverBufferSize);
 	}
@@ -207,6 +208,10 @@ void ClientHTTP::handleDataToServer(void)
 			this->pollFds[ClientHTTP::SERVER].events = POLLIN;		// is done writing, no POLLOUT anymore
 		else
 			::memmove(this->gameBuffer, this->gameBuffer + n, this->gameBufferSize);
+
+		// if 'QUIT' has been sent, activate flag to avoid to send disconnect errors to game
+		if (gameData.find(PRE_DISCONNECT_MSG) != std::string::npos)
+			this->preStop = true;
 	}
 	else
 		LOG_WARN(LogContext::HTTP_CLIENT, "Server socket buffer is busy, try writing later");
@@ -232,7 +237,7 @@ void ClientHTTP::handleGameError(void)
 
 void ClientHTTP::handleServerError(void)
 {
-	if (pollFds[ClientHTTP::SERVER].revents & (POLLHUP))			// disconnection
+	if (pollFds[ClientHTTP::SERVER].revents & (POLLHUP) and (this->preStop == false))			// disconnection
 	{
 		this->pollFds[ClientHTTP::SERVER].events = 0;		// stop sending/reading data
 
