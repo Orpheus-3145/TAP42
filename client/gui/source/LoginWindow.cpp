@@ -13,7 +13,7 @@
 #include <QProxyStyle>
 
 
-void LoginWindow::draw(void)
+LoginWindow::LoginWindow(UI* engine) : QtWindow(engine)
 {
 	this->setObjectName("login");
 	this->setFixedSize(LoginWindow::WIDTH, LoginWindow::HEIGHT);
@@ -99,5 +99,5 @@ void LoginWindow::draw(void)
 		[this] { this->engine->switchWindow(GamePhase::PLAYER_CREATE); }
 	);
 
-	LOG_DEBUG(LogContext::GUI, std::format("Showing login window, size h: {}, w: {}", LoginWindow::HEIGHT, LoginWindow::WIDTH));
+	LOG_DEBUG(LogContext::GUI, std::format("Created login Qt, size h: {}, w: {}", LoginWindow::HEIGHT, LoginWindow::WIDTH));
 }

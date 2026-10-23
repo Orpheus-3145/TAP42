@@ -30,10 +30,11 @@ enum class CommandType : uint16_t
 	GLOBAL_CHAT,
 	USE,			// custom
 	WAIT_HANDSHAKE,	// custom
-	CREATE_PLAYER	// custom
+	CREATE_PLAYER,	// custom
+	PROFILE			// custom
 };
 
-static constexpr std::array<const char*, 23> commands
+static constexpr std::array<const char*, 24> commands
 {
 	"CONNECT",
 	"LOOK",
@@ -57,13 +58,15 @@ static constexpr std::array<const char*, 23> commands
 	"CHAT GLOBAL",
 	"USE",
 	"WAIT HANDSHAKE",
-	"CREATE PLAYER"
+	"CREATE PLAYER",
+	"PROFILE"
 };
 
 std::string	toString(CommandType cmd);
 CommandType	getCommand(std::string const& cmdStr) noexcept;
 bool		commandExists(std::string const& cmd) noexcept;
 bool		commandHasArgs(CommandType type) noexcept;
+
 
 enum class EventType : uint16_t
 {
@@ -75,7 +78,7 @@ enum class EventType : uint16_t
 	GROUP_JOIN,
 	GROUP_LEAVE,
 	GROUP_INVITE,
-	STATS,						// NB not handled server-side
+	STATS,
 	ROOM_COMBAT,				// custom
 	ROOM_COMBAT_DEATH_NPC,		// custom
 	ROOM_COMBAT_DEATH_PLAYER,	// custom
@@ -105,23 +108,50 @@ std::string	toString(EventType e);
 EventType	getEvent(std::string const& event) noexcept;
 bool		eventExists(std::string const& event) noexcept;
 
+
 enum class ErrorType : uint16_t
 {
-	BAD_MESSAGE = 200U,				//	custom, badly formatted message
-	NAME_IN_USE = 201U,				//	Requested username already taken
-	NO_EXIT = 301U,					//	Invalid movement direction
-	NOT_IN_GROUP = 401U,			//	Group operation requires group membership
-	ALREADY_IN_GROUP = 402U,		//	Player already belongs to a group
-	NOT_FOUND = 404U,				//	Requested item not available in room
-	// ITEM_NOT_FOUND = 404U,		//	Requested item not available in room
-	// ITEM_NOT_IN_INVENTORY = 404U,//	Requested item not in player inventory
-	// NPC_NOT_FOUND = 404U,		//	Requested NPC not present in room
-	NPC_NOT_HOSTILE = 405U,			//	NPC cannot be attacked (not an enemy)
-	NO_QUEST_AVAILABLE = 406U,		//	NPC has no quests or quest already completed
-	CONNECTION_FAILED = 900U,		//	Connection establishment failed
-	SEND_FAILED = 901U				//	Message transmission failed
+	NOT_CONNECTED = 0,		// custom
+	BAD_MESSAGE,			// custom, badly formatted message
+	NAME_IN_USE,			// Requested username already taken
+	NO_EXIT,				// Invalid movement direction
+	NOT_IN_GROUP,			// Group operation requires group membership
+	ALREADY_IN_GROUP,		// Player already belongs to a group
+	ITEM_NOT_FOUND,			// Requested item not available in room
+	ITEM_NOT_IN_INVENTORY,	// Requested item not in player inventory
+	NPC_NOT_FOUND,			// Requested NPC not present in room
+	QUEST_NOT_FOUND,		// custom
+	CHARACTER_NOT_FOUND,	// custom
+	NPC_NOT_HOSTILE,		// NPC cannot be attacked (not an enemy)		NB not implemented server-side
+	NO_QUEST_AVAILABLE,		// NPC has no quests or quest already completed	NB not implemented server-side
+	DEAD,					// custom
+	INTERNAL,				// custom
+	CONNECTION_FAILED,		// Connection establishment failed
+	SEND_FAILED				// Message transmission failed
+};
+
+static constexpr std::array<const char*,17> errors
+{
+	"NOT_CONNECTED",
+	"BAD_MESSAGE",
+	"NAME_IN_USE",
+	"NO_EXIT",
+	"NOT_IN_GROUP",
+	"ALREADY_IN_GROUP",
+	"ITEM_NOT_FOUND",
+	"ITEM_NOT_IN_INVENTORY",
+	"NPC_NOT_FOUND",
+	"QUEST_NOT_FOUND",
+	"CHARACTER_NOT_FOUND",
+	"NPC_NOT_HOSTILE",
+	"NO_QUEST_AVAILABLE",
+	"DEAD",
+	"INTERNAL",
+	"CONNECTION_FAILED",
+	"SEND_FAILED"
 };
 
 std::string	toString(ErrorType e);
-ErrorType	getError(uint32_t code);		// NB temporary and unsafe
-inline bool	errorExists(std::string const& error) noexcept { (void) error; return true; };	// NB todo
+ErrorType	getError(std::string const& error) noexcept;
+uint32_t	getErrorCode(ErrorType error);
+bool		errorExists(std::string const& error) noexcept;

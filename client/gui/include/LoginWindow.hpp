@@ -13,9 +13,9 @@ class LoginWindow : public QtWindow
 	public:
 		using QtWindow::QtWindow;
 
-		~LoginWindow(void) noexcept {}
+		LoginWindow(UI* engine);
 
-		void draw(void) override;
+		~LoginWindow(void) noexcept {}
 
 	private:
 		static constexpr int32_t HEIGHT = 230;

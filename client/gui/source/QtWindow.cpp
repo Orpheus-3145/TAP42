@@ -3,6 +3,8 @@
 #include <cassert>
 #include <QShortcut>
 #include <QKeySequence>
+#include <QScreen>
+#include <QShowEvent>
 
 
 QtWindow::QtWindow(UI* engine) : 
@@ -17,9 +19,21 @@ QtWindow::QtWindow(UI* engine) :
 		escShortcut,
 		&QShortcut::activated,
 		this,
-		[this]() { this->engine->stop(); });
+		[this] { this->engine->stop(); });
 }
 
 QtWindow::~QtWindow(void) noexcept
 {
+}
+
+void QtWindow::showEvent(QShowEvent* event)
+{
+	QMainWindow::showEvent(event);
+
+	if (event->spontaneous())
+		return;
+
+	// center window only when show is triggerd internally
+	QRect area = this->screen()->availableGeometry();
+	this->move(area.center() - this->rect().center());
 }

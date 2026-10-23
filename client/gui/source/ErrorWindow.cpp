@@ -13,26 +13,26 @@
 #include <QPushButton>
 
 
-void ErrorWindow::draw(void)
+ErrorWindow::ErrorWindow(UI* engine) : QtWindow(engine)
 {
 	this->setObjectName("error");
 	this->setFixedSize(ErrorWindow::WIDTH, ErrorWindow::HEIGHT);
 
-	this->info = new QLabel();
+	this->info = std::make_unique<QLabel>();
+	this->btnContainer = std::make_unique<QHBoxLayout>();
+
 	this->info->setObjectName("info");
 	this->info->setAlignment(Qt::AlignCenter);
-
-	this->btnContainer = new QHBoxLayout;
 
 	QWidget*		frame = new QWidget(this);
 	QVBoxLayout*	central = new QVBoxLayout(frame);
 
 	central->setContentsMargins(16, 24, 16, 16);
-	central->addWidget(this->info);
+	central->addWidget(this->info.get());
 	central->addStretch(2);
 	central->addStretch(1);
-	central->addLayout(this->btnContainer);
-	this->setCentralWidget(frame); 
+	central->addLayout(this->btnContainer.get());
+	this->setCentralWidget(frame);
 
 	this->setStyleSheet(R"(
 		QWidget#error { background-color: #12121c; }
@@ -41,7 +41,7 @@ void ErrorWindow::draw(void)
 		QPushButton:hover { background-color: rgba(46, 204, 113, 40); }
 	)");
 
-	LOG_DEBUG(LogContext::GUI, std::format("Showing error window, size h: {}, w: {}", this->height(), this->width()));
+	LOG_DEBUG(LogContext::GUI, std::format("Created error Qt window, size h: {}, w: {}", this->height(), this->width()));
 }
 
 void ErrorWindow::adaptWinToError(ErrorData const& error) noexcept

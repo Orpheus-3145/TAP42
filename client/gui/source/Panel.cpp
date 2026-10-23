@@ -97,33 +97,38 @@ Panel::Panel(
 	}
 }
 
-void Panel::appendInput(std::string const& text, std::optional<std::string> color)
+void Panel::appendInput(std::string const& text, std::optional<std::string> color, bool addTimestamps)
 {
 	auto now = std::chrono::system_clock::now();
 	auto timestamp = std::chrono::time_point_cast<std::chrono::seconds>(now);
 
 	std::string textColor = color.has_value() ? color.value() : this->color.toStdString();
-
 	std::stringstream ss(text);
 	std::string line;
 	std::getline(ss, line, '\n');
-	if (this->showTimestamps)
-		this->printLine(std::format("[{:%H:%M:%S}]<span style='white-space: pre; color: {}'>  {}</span>", timestamp, textColor, line));
+	if (addTimestamps)
+		this->state.push_back(std::format("[{:%H:%M:%S}]<span style='white-space: pre; color: {}'>  {}</span>", timestamp, textColor, line));
+	else if (this->showTimestamps)
+		this->state.push_back(std::format("<span style='white-space: pre; color: {}'>            {}</span>", textColor, line));
 	else
-		this->printLine(std::format("<span style='white-space: pre; color: {}'>  {}</span>", textColor, line));
+		this->state.push_back(std::format("<span style='white-space: pre; color: {}'>  {}</span>", textColor, line));
+	this->log->appendHtml(QString::fromStdString(this->state.back()));
 
 	while (std::getline(ss, line, '\n'))
 	{
 		if (this->showTimestamps)
-			this->printLine(std::format("<span style='white-space: pre; color: {}'>            {}</span>", textColor, line));
+			this->state.push_back(std::format("<span style='white-space: pre; color: {}'>            {}</span>", textColor, line));
 		else
-			this->printLine(std::format("<span style='white-space: pre; color: {}'>  {}</span>", textColor, line));
+			this->state.push_back(std::format("<span style='white-space: pre; color: {}'>  {}</span>", textColor, line));
+		this->log->appendHtml(QString::fromStdString(this->state.back()));
 	}
 }
 
-void Panel::printLine(std::string const& text)
+void Panel::refresh(void)
 {
-	this->log->appendHtml(QString::fromStdString(text.data()));
+	this->clear();
+	for (std::string const& line : this->state)
+		this->log->appendHtml(QString::fromStdString(line.data()));
 }
 
 void Panel::submitCommand(void)
@@ -133,7 +138,7 @@ void Panel::submitCommand(void)
 		return;
 	this->prompt->clear();
 
-	this->appendInput(input);
+	this->appendInput(input, QT_WHITE_COLOR, true);
 	if (this->checkInput)
 	{
 		try
@@ -143,12 +148,12 @@ void Panel::submitCommand(void)
 			if ((testParse.isCommand() == false) or
 				std::find(this->hints.begin(), this->hints.end(), QString(toString(testParse.getCommandType()).data())) == this->hints.end())
 				throw AppException({ErrorCode::BAD_MESSAGE});
+
+			emit submitted(QString(input.data()));
 		}
 		catch (AppException const& e)
 		{
 			this->appendInput("Invalid command", QT_RED_COLOR);
-			return;
 		}
 	}
-	emit submitted(QString(input.data()));
 }

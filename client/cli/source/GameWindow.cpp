@@ -24,6 +24,8 @@ GameWindow::GameWindow(int32_t commandFd, UI* engine) :
 	this->tabsToSkip.insert(GameWindow::FRAME);
 	this->tabsToSkip.insert(GameWindow::INFO);
 	this->switchActiveTab(GameWindow::CMD);
+
+	LOG_DEBUG(LogContext::CLI, "Created game ncurses window");
 }
 
 void GameWindow::draw(int32_t height, int32_t width)
@@ -46,14 +48,6 @@ void GameWindow::draw(int32_t height, int32_t width)
 		1,
 		2
 	);
-
-	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(GameWindow::INFO).get());
-	assert(tab != nullptr and "current tab doesn't support appending content");
-	tab->clearContent();
-	tab->appendContent("Player: " + this->engine->getUsername(), TextAlign::LEFT, A_NORMAL, false);
-	tab->appendContent("Data: <CLASS | RACE | ...>", TextAlign::LEFT, A_NORMAL, false);
-	tab->appendContent("Currently in: <LOCATION>", TextAlign::LEFT, A_NORMAL, false);
-	tab->appendContent("<IN GROUP | NOT IN GROUP>", TextAlign::LEFT, A_NORMAL, false);
 
 	this->tabs.at(GameWindow::WORLD)->draw(
 		this->height - 6 - 2,
@@ -79,8 +73,6 @@ void GameWindow::draw(int32_t height, int32_t width)
 	);
 
 	this->updateContentWindow();
-
-	LOG_DEBUG(LogContext::CLI, std::format("Showing game window size h: {}, w: {}", height, width));
 }
 
 void GameWindow::appendResponse(Message const& response, CommandType cmdType)
@@ -108,7 +100,7 @@ void GameWindow::appendResponse(Message const& response, CommandType cmdType)
 	assert(tab != nullptr and "current tab doesn't support appending content");
 
 	std::string content = response.toStringResponse(cmdType);
-	tab->appendContent(content, TextAlign::LEFT, COLOR_PAIR(colorText) | A_BOLD);
+	tab->appendContent(content, TextAlign::LEFT, COLOR_PAIR(colorText) | A_BOLD, false);
 }
 
 void GameWindow::appendEvent(Message const& event)
@@ -135,5 +127,17 @@ void GameWindow::appendError(Message const& error, CommandType cmdType)
 	assert(tab != nullptr and "current tab doesn't support appending content");
 
 	std::string content = error.toStringError();
-	tab->appendContent(content, TextAlign::LEFT, COLOR_PAIR(NC_RED_COLOR) | A_BOLD);
+	tab->appendContent(content, TextAlign::LEFT, COLOR_PAIR(NC_RED_COLOR) | A_BOLD, false);
+}
+
+void GameWindow::updatePlayerPanel(PlayerInfo const& data)
+{
+	OutputTab* tab = dynamic_cast<OutputTab*>(this->tabs.at(GameWindow::INFO).get());
+	assert(tab != nullptr and "current tab doesn't support appending content");
+
+	tab->clearContent();
+	tab->appendContent("Player: " + data.username, TextAlign::LEFT, A_NORMAL, false);
+	tab->appendContent("HP: " + std::to_string(data.hp), TextAlign::LEFT, A_NORMAL, false);
+	tab->appendContent("Currently in: " + data.location, TextAlign::LEFT, A_NORMAL, false);
+	tab->appendContent((data.group.empty() ? "Not in group" : ("Member of: " + data.group)), TextAlign::LEFT, A_NORMAL, false);
 }

@@ -34,6 +34,8 @@ LoginWindow::LoginWindow(int32_t commandFd, UI* engine) :
 	this->tabsToSkip.insert(LoginWindow::FRAME);
 	this->tabsToSkip.insert(LoginWindow::INFO);
 	this->switchActiveTab(LoginWindow::USERNAME);
+
+	LOG_DEBUG(LogContext::CLI, "Created login ncurses window");
 }
 
 void LoginWindow::draw(int32_t height, int32_t width)
@@ -98,6 +100,4 @@ void LoginWindow::draw(int32_t height, int32_t width)
 	);
 
 	this->updateContentWindow();
-
-	LOG_DEBUG(LogContext::CLI, std::format("Showing login window, size h: {}, w: {}", this->height, this->width));
 }

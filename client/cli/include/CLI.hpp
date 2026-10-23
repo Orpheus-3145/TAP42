@@ -280,8 +280,8 @@ class CLI : public UI
 		void showEvent(Message const& event) noexcept override;
 		void showError(Message const& error) noexcept override;
 
-		void startTalking(void) override { this->pollFds[CLI::CLIENT].events |= POLLOUT; }
-		void stopTalking(void) override { this->pollFds[CLI::CLIENT].events = POLLIN; }
+		void startSpeaking(void) override { this->pollFds[CLI::CLIENT].events |= POLLOUT; }
+		void stopSpeaking(void) override { this->pollFds[CLI::CLIENT].events = POLLIN; }
 
 		static constexpr size_t POLL_SIZE = 4UL;
 		static constexpr size_t CLIENT = 0UL;

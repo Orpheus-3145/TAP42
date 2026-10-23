@@ -6,6 +6,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <map>
 #include <vector>
 
 struct Room {
@@ -100,7 +101,7 @@ public:
     // groups[group_id] = members; pending_invites[invited] = inviter.
     std::unordered_map<std::string, std::string> player_group;
     std::unordered_map<std::string, std::vector<std::string>> groups;
-    std::unordered_map<std::string, std::string> pending_invites;
+    std::multimap<std::string, std::string> pending_invites;
 
     static World& instance();
 

@@ -33,6 +33,8 @@ PlayerCreateWindow::PlayerCreateWindow(int32_t commandFd, UI* engine) :
 	this->tabsToSkip.insert(PlayerCreateWindow::FRAME);
 	this->tabsToSkip.insert(PlayerCreateWindow::INFO);
 	this->switchActiveTab(PlayerCreateWindow::USERNAME);
+
+	LOG_DEBUG(LogContext::CLI, "Created player create ncurses window");
 }
 
 void PlayerCreateWindow::draw(int32_t height, int32_t width)
@@ -95,6 +97,4 @@ void PlayerCreateWindow::draw(int32_t height, int32_t width)
 	);
 
 	this->updateContentWindow();
-
-	LOG_DEBUG(LogContext::CLI, std::format("Showing create player window, size h: {}, w: {}", this->height, this->width));
 }

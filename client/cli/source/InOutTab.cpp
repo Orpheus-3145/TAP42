@@ -162,9 +162,8 @@ void InOutTab::terminateCommand(void)
 		if ((testParse.isCommand() == false) or
 			std::find(this->hints.begin(), this->hints.end(), toString(testParse.getCommandType())) == this->hints.end())
 			badCommand = true;
-		
 	}
-	catch(AppException const& e)
+	catch (AppException const& e)
 	{
 		if (e.getError().code == ErrorCode::BAD_MESSAGE)
 			badCommand = true;
@@ -172,7 +171,7 @@ void InOutTab::terminateCommand(void)
 			throw e;
 	}
 
-	this->appendContent(command, TextAlign::LEFT, COLOR_PAIR(this->colorPair) | A_BOLD);
+	this->appendContent(command, TextAlign::LEFT, A_BOLD);
 	this->inputHistory.emplace_front(std::move(command));
 
 	if (badCommand == false)

@@ -130,7 +130,7 @@ void cmd_connect(const std::shared_ptr<Session>& session, const std::vector<std:
 
     PlayerState loaded;
     if (!character_store::load(name, loaded)) {
-        send_line(*session, "ERR 404 CHARACTER_NOT_FOUND no such character, use CREATE_CHARACTER");
+        send_line(*session, "ERR 404 CHARACTER_NOT_FOUND " + name);
         return;
     }
 
@@ -201,7 +201,7 @@ void cmd_move(const std::shared_ptr<Session>& session, const std::vector<std::st
             new_room = exit_it->second;
             player.current_room = new_room;
             session->current_room = new_room;
-            response = "OK room=" + new_room;
+            response = "OK {\"room\":\"" + new_room + "\"}";
             moved = player;
         }
     }
@@ -281,7 +281,7 @@ void cmd_chat(const std::shared_ptr<Session>& session, const std::vector<std::st
             group_id = world.player_group.count(session->player_id) ? world.player_group.at(session->player_id) : "";
         }
         if (group_id.empty()) {
-            send_line(*session, "ERR 401 NOT_IN_GROUP not in a group");
+            send_line(*session, "ERR 401 NOT_IN_GROUP");
             return;
         }
         send_line(*session, "OK");

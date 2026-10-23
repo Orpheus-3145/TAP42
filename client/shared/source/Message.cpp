@@ -28,17 +28,17 @@ std::string	Message::toStringResponse(CommandType command) const
 
 	switch (command)
 	{
-		case CommandType::LOOK: 			return std::format("Looking around:\n{}", this->data.toString());
-		case CommandType::MOVE: 			return std::format("Moved to room {}", this->data["room"]["name"].as_string());
-		case CommandType::WHO: 				return std::format("{} players in the room: {}", this->data["server"].as_string(), this->data["room"].toString());
+		case CommandType::LOOK: 			return this->data.toString();
+		case CommandType::MOVE: 			return std::format("Moved to {}", this->data["room"].as_string());
+		case CommandType::WHO: 				return std::format("{} players:\n{}", this->data["server"].as_int(), this->data["room"].toString());	// (last one) array data
 		case CommandType::TAKE: 			return std::format("Taken item {}", this->data["taken"].as_string());
 		case CommandType::DROP: 			return std::format("Dropped item {}", this->data["dropped"].as_string());
-		case CommandType::INVENTORY: 		return std::format("Inventory:\n{}", this->data.toString());	// array data
-		case CommandType::TALK: 			return std::format("{} says: '{}", this->data["npc"].as_string(), this->data["dialogue"].as_string());
+		case CommandType::INVENTORY: 		return this->data.toString();
+		case CommandType::TALK: 			return std::format("{} says: '{}'", this->data["npc"].as_string(), this->data["dialogue"].as_string());
 		case CommandType::ATTACK: 			return std::format("Attacked:\n{}", this->data.toString());
 		case CommandType::STATUS: 			return std::format("Current status:\n{}", this->data.toString());
-		case CommandType::QUEST: 			return std::format("Info quest: '{}'", this->data.toString());
-		case CommandType::QUESTS: 			return std::format("Quest log:\n{}", this->data.toString());	// array data
+		case CommandType::QUEST: 			return this->data.toString();
+		case CommandType::QUESTS: 			return this->data.toString();
 		case CommandType::GROUP_CREATE: 	return std::format("Group {} created", this->data["created"].as_string());
 		case CommandType::GROUP_INVITE: 	return std::format("Invited {} to join group", this->data["invited"].as_string());
 		case CommandType::GROUP_JOIN: 		return std::format("Joined {}", this->data["joined"].as_string());
@@ -51,7 +51,8 @@ std::string	Message::toStringResponse(CommandType command) const
 		case CommandType::ROOM_CHAT:
 		case CommandType::GLOBAL_CHAT:
 		case CommandType::WAIT_HANDSHAKE:
-		case CommandType::CREATE_PLAYER: 	return "OK";
+		case CommandType::CREATE_PLAYER:
+		case CommandType::PROFILE:			return "OK";
 
 		default:
 			assert(false and "command not mapped for response print");
@@ -67,30 +68,47 @@ std::string	Message::toStringEvent(void) const
 	{
 		case EventType::PRESENCE_ENTER:				return std::format("{} entered the room", this->data.as_string());
 		case EventType::PRESENCE_LEAVE:				return std::format("{} left the room", this->data.as_string());
-		case EventType::ROOM_CHAT:					return std::format("[room - {}] {}", this->data["player"].as_string(), this->data["text"].as_string());
-		case EventType::GROUP_CHAT:					return std::format("[group - {}] {}", this->data["player"].as_string(), this->data["text"].as_string());
-		case EventType::GLOBAL_CHAT:				return std::format("[global - {}] {}", this->data["player"].as_string(), this->data["text"].as_string());
+		case EventType::ROOM_CHAT:					return std::format("[room]   {} says: {}", this->data["player"].as_string(), this->data["text"].as_string());
+		case EventType::GROUP_CHAT:					return std::format("[group]  {} says: {}", this->data["player"].as_string(), this->data["text"].as_string());
+		case EventType::GLOBAL_CHAT:				return std::format("[global] {} says: {}", this->data["player"].as_string(), this->data["text"].as_string());
 		case EventType::GROUP_JOIN:					return std::format("{} has joined {}", this->data["player"].as_string(), this->data["group"].as_string());
 		case EventType::GROUP_LEAVE:				return std::format("{} has left {}", this->data["player"].as_string(), this->data["group"].as_string());
-		case EventType::GROUP_INVITE:				return std::format("{} has been invited to join {}", this->data["player"].as_string(), this->data["group"].as_string());
-		case EventType::STATS:						return std::format("Player count {}", this->data["count"].as_int());
+		case EventType::GROUP_INVITE:				return std::format("{} has invited {} to join {}", this->data["inviter"].as_string(), this->data["invited"].as_string(), this->data["group"].as_string());
+		case EventType::STATS:						return std::format("Player count {}", this->data.as_int());
 		case EventType::ROOM_COMBAT:				return std::format("{} attacked {}", this->data["player"].as_string(), this->data["npc"].as_string());
-		case EventType::ROOM_COMBAT_DEATH_NPC:		return std::format("{} slained NPC {}", this->data["player"].as_string(), this->data["npc"].as_string());
-		case EventType::ROOM_COMBAT_DEATH_PLAYER:	return std::format("NPC {} slained {}", this->data["npc"].as_string(), this->data["player"].as_string());
+		case EventType::ROOM_COMBAT_DEATH_NPC:		return std::format("{} slained {}", this->data["player"].as_string(), this->data["npc"].as_string());
+		case EventType::ROOM_COMBAT_DEATH_PLAYER:	return std::format("{} slained {}", this->data["npc"].as_string(), this->data["player"].as_string());
 		case EventType::ROOM_ITEM_USE:				return std::format("{} used {}", this->data["player"].as_string(), this->data["item"].as_string());
 		case EventType::ROOM_QUEST_COMPLETE:		return std::format("{} completed {}", this->data["player"].as_string(), this->data["quest"].as_string());
-		default:
-			assert(false and "event not mapped for print");
-			return "";
+		default:									assert(false and "event not mapped for print");
 	}
-
 }
 
 std::string	Message::toStringError(void) const
 {
 	assert(this->type == MessageType::ERROR and "wrong type to stringify");
 
-	return this->data.as_string();
+	switch (this->getErrorType())
+	{
+		case ErrorType::NOT_CONNECTED:			return "Couldn't run command, player not connected";
+		case ErrorType::BAD_MESSAGE:			return std::format("Bad Message: {}", this->data.as_string());
+		case ErrorType::NAME_IN_USE:			return this->data.as_string();
+		case ErrorType::NO_EXIT:				return this->data.as_string();
+		case ErrorType::NOT_IN_GROUP:			return "Not in a group";
+		case ErrorType::ALREADY_IN_GROUP:		return "Already in a group";
+		case ErrorType::ITEM_NOT_FOUND:			return std::format("Item {} not found", this->data.as_string());
+		case ErrorType::ITEM_NOT_IN_INVENTORY:	return std::format("Item {} not in inventory", this->data.as_string());
+		case ErrorType::NPC_NOT_FOUND:			return std::format("NPC {} not found", this->data.as_string());
+		case ErrorType::QUEST_NOT_FOUND:		return std::format("Quest {} not existing", this->data.as_string());
+		case ErrorType::CHARACTER_NOT_FOUND:	return std::format("Player {} not found", this->data.as_string());
+		case ErrorType::NPC_NOT_HOSTILE:		return std::format("NPC {} not hostile", this->data.as_string());
+		case ErrorType::NO_QUEST_AVAILABLE:		return std::format("No quest found in room {}", this->data.as_string());
+		case ErrorType::DEAD:					return this->data.as_string();
+		case ErrorType::INTERNAL:				return this->data.as_string();
+		case ErrorType::CONNECTION_FAILED:		return "Server disconnected";
+		case ErrorType::SEND_FAILED:			return "Sending failed";
+		default:								assert(false and "error not mapped");
+	}
 }
 
 CommandType	Message::getCommandType(void) const noexcept
@@ -197,7 +215,7 @@ void Message::parseEvent(std::string const& event)
 	{
 		std::string eventTypeStr = visibility + " " + type;
 		if (eventExists(eventTypeStr) == false)
-			throw AppException(ErrorCode::BAD_MESSAGE, "Unknown event: " + eventTypeStr);
+			throw AppException(ErrorCode::BAD_MESSAGE, "Unknown event: " + event);
 		this->subType.eventType = getEvent(eventTypeStr);
 
 		std::getline(iss >> std::ws, data);
@@ -221,7 +239,9 @@ void Message::parseError(std::string const& error)
 
 	if (!(iss >> err >> errCode >> errName))
 		throw AppException(ErrorCode::BAD_MESSAGE, "Incomplete error: " + error);
-	this->subType.errType = getError(errCode);
+	if (errorExists(errName) == false)
+		throw AppException(ErrorCode::BAD_MESSAGE, "Unknown error: " + error);
+	this->subType.errType = getError(errName);
 
 	std::getline(iss >> std::ws, errInfo);
 	if (errInfo.empty() == false)

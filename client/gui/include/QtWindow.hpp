@@ -27,11 +27,11 @@ class QtWindow : public QMainWindow
 
 		virtual ~QtWindow(void) noexcept;
 
-		virtual void draw(void) = 0;
-
 	signals:
 		void commandEntered(std::string input);
 
 	protected:
+		void showEvent(QShowEvent* event) override;		// Qt override, has nothing to do with events
+
 		UI* const	engine;
 };

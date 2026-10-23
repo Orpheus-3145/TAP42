@@ -276,7 +276,7 @@ std::string stringifyJsonArray(JsonValue const& json, std::string const& indent)
     std::string out;
     for (JsonValue const& entry : json.array_value) {
         switch (entry.type) {
-            case JsonValue::Type::Object: out += std::format("{}-\n{}", indent, stringifyJsonObject(entry, indent + "\t")); break;
+            case JsonValue::Type::Object: out += std::format("{}- {}", indent, stringifyJsonObject(entry, indent + "\t")); break;
             case JsonValue::Type::Array:  out += std::format("{}-\n{}", indent, stringifyJsonArray(entry, indent + "\t")); break;
             default:                      out += std::format("{}- {}\n", indent, scalarToString(entry)); break;
         }

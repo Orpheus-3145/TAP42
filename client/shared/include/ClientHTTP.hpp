@@ -11,6 +11,7 @@
 
 
 inline constexpr const char* ERR_SERVER_DISC = "ERR 900 CONNECTION_FAILED";
+inline constexpr const char* PRE_DISCONNECT_MSG = "QUIT";
 
 class ClientHTTP
 {
@@ -49,8 +50,9 @@ class ClientHTTP
 
 		std::string const	host;
 		uint32_t const		port;
+		bool				preStop{false};
 
-		ioUtils::Pipe	wakeupPipe{-1, -1};		// pipe for pollwakeup the worker	
+		ioUtils::Pipe	wakeupPipe{-1, -1};		// pipe for pollwakeup worker	
 		struct pollfd	pollFds[POLL_SIZE];
 
 		size_t	serverBufferSize{0UL};

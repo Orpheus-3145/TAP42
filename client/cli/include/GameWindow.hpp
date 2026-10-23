@@ -23,6 +23,7 @@ class GameWindow : public NcWindow
 		void appendResponse(Message const& response, CommandType cmdType);
 		void appendEvent(Message const& event);
 		void appendError(Message const& error, CommandType cmdType);
+		void updatePlayerPanel(PlayerInfo const& data);
 
 	protected:
 		static constexpr size_t FRAME = 0UL;

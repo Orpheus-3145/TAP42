@@ -29,41 +29,8 @@ std::ostream& operator<<(std::ostream& out, GamePhase phase)
 
 UI::UI(void) noexcept : gameClientSockets{ioUtils::createSocketPair()}
 {
-	this->responseDispatcher[GamePhase::ND] = 			 [this] (Message const& m) { (void) m; this->shakeHands(); };
-	this->responseDispatcher[GamePhase::LOGIN] =		 [this] (Message const& m) { (void) m; this->switchWindow(GamePhase::GAME); };
-	this->responseDispatcher[GamePhase::PLAYER_CREATE] = [this] (Message const& m) { (void) m; this->switchWindow(GamePhase::GAME); };
-	this->responseDispatcher[GamePhase::GAME] =			 [this] (Message const& m) { this->showResponse(m); };
-	this->responseDispatcher[GamePhase::ERROR] =		 [this] (Message const& m) {
-		if (this->commandQueue.front().getCommandType() == CommandType::WAIT_HANDSHAKE)
-			this->shakeHands();
-		else if (this->commandQueue.front().getCommandType() == CommandType::CONNECT)
-			this->switchWindow();
-		else
-			LOG_WARN(LogContext::INTERFACE, std::format("Got response while handling error: '{}' - discarded", m.getRawMessage()));
-	};
+	this->setupDispatchers();
 
-	this->eventDispatcher[GamePhase::ND] = 			  [this] (Message const& m) { LOG_WARN(LogContext::INTERFACE, std::format("Got unexpected event before handshake: '{}' - discarded", m.getRawMessage())); };
-	this->eventDispatcher[GamePhase::LOGIN] =		  [this] (Message const& m) { LOG_WARN(LogContext::INTERFACE, std::format("Got unexpected event during login: '{}' - discarded", m.getRawMessage())); };
-	this->eventDispatcher[GamePhase::PLAYER_CREATE] = [this] (Message const& m) { LOG_WARN(LogContext::INTERFACE, std::format("Got unexpected event during player creation: '{}' - discarded", m.getRawMessage())); };
-	this->eventDispatcher[GamePhase::GAME] =		  [this] (Message const& m) { this->showEvent(m); };
-	this->eventDispatcher[GamePhase::ERROR] =		  [this] (Message const& m) { LOG_WARN(LogContext::INTERFACE, std::format("Got event while handling error: '{}' - discarded", m.getRawMessage())); };		// add response to a queue, to be shown when game starts again NB
-
-	this->errorDispatcher[GamePhase::ND] = 			  [this] (Message const& m) { LOG_WARN(LogContext::INTERFACE, std::format("Got unexpected error before handshake: '{}' - discarded", m.getRawMessage())); };
-	this->errorDispatcher[GamePhase::LOGIN] =		  [this] (Message const& m) {
-		if (m.getErrorType() == ErrorType::NOT_FOUND)
-			throw AppException(ErrorCode::UI_USERNAME_NOT_EXISTS);
-		else
-			throw AppException(ErrorCode::SERVER_ERROR, m.toStringError());
-	};
-	this->errorDispatcher[GamePhase::PLAYER_CREATE] = [this] (Message const& m) {
-		if (m.getErrorType() == ErrorType::NAME_IN_USE)
-			throw AppException(ErrorCode::UI_USERNAME_IN_USE);
-		else
-			throw AppException(ErrorCode::SERVER_ERROR, m.toStringError());
-	};
-	this->errorDispatcher[GamePhase::GAME] =		  [this] (Message const& m) { this->showError(m); };
-	this->errorDispatcher[GamePhase::ERROR] =		  [this] (Message const& m) { throw AppException(ErrorCode::SERVER_ERROR, m.getRawMessage()); };
-		
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Listening to client socket: {}", this->gameClientSockets.first));
 }
 
@@ -94,6 +61,15 @@ void UI::stop(void) noexcept
 
 void UI::switchWindow(std::optional<GamePhase> newPhase)
 {
+	this->updatePhase(newPhase);
+
+	// fetch character basic data when session starts
+	if (this->phase == GamePhase::GAME)
+		this->commandQueue.push(Message("PROFILE"));
+}
+
+void UI::updatePhase(std::optional<GamePhase> newPhase)
+{
 	// without argument switch to
 	// the window shown before the error happened
 	if (newPhase.has_value() == false)
@@ -107,20 +83,18 @@ void UI::switchWindow(std::optional<GamePhase> newPhase)
 		(newPhase.value() != GamePhase::ERROR))		// this is because technically there could a disconnection before login
 		throw AppException(ErrorCode::UI_HANDSHAKE_NOT_DONE);
 
-	if ((newPhase.value() == GamePhase::LOGIN) or (newPhase.value() == GamePhase::PLAYER_CREATE))
-		this->username = "";
-
-	if (newPhase.value() == GamePhase::ERROR)	// save this phase to restore it when the error has been solved
+	if (newPhase.value() == GamePhase::ERROR)		// save this phase to restore it when the error has been solved
 		this->lastPhase = this->phase;
-	else if (this->phase != GamePhase::ERROR)	// careful not to overwrite the state in case of double error
+	else if (this->phase != GamePhase::ERROR)		// careful not to overwrite the state in case of double error
 		this->lastPhase = GamePhase::ND;
 
-	if (newPhase.value() == GamePhase::ERROR)				// error win: keep listening server data but stop talking
-		this->stopTalking();
-	else if (this->toServerSize > 0UL)						// if recovering from error and there's data left, start talking
-		this->startTalking();
+	if (newPhase.value() == GamePhase::ERROR)		// error win: keep listening server data but stop talking
+		this->stopSpeaking();
+	else if (this->toServerSize > 0UL)				// if recovering from error and there's data left, start talking
+		this->startSpeaking();
 
 	this->phase = newPhase.value();
+	LOG_DEBUG(LogContext::INTERFACE, std::format("Switching to: {} window", toString(this->phase)));
 }
 
 void UI::writeToServer(void)
@@ -148,7 +122,7 @@ void UI::writeToServer(void)
 		if (this->toServerSize > 0UL)		// move the remaining data to send at the beginning of the buffer
 			::memmove(this->toServerBuffer, this->toServerBuffer + n, this->toServerSize);
 		else
-			this->stopTalking();
+			this->stopSpeaking();
 	}
 	else
 		LOG_WARN(LogContext::INTERFACE, "Client socket buffer is busy, try again later");
@@ -167,7 +141,7 @@ void UI::readFromServer(void)
 		this->toGameSize += n;
 		this->splitIntoMessages();
 		if (this->commandQueue.empty() == false)
-			this->startTalking();
+			this->startSpeaking();
 	}
 	else
 		LOG_WARN(LogContext::INTERFACE, "Client socket buffer is full, send data to UI and empty it");
@@ -185,7 +159,7 @@ void UI::splitIntoMessages(void)
 		std::string msg = std::string(this->toGameBuffer, lenMsg);
 
 		this->toGameSize -= lenMsg + 1UL;
-		::memmove(this->toGameBuffer, this->toGameBuffer + lenMsg + 1UL, lenMsg + 1UL);
+		::memmove(this->toGameBuffer, this->toGameBuffer + lenMsg + 1UL, this->toGameSize);
 		if (lenMsg == 0L)
 			continue;
 
@@ -203,9 +177,9 @@ void UI::dispatchMessage(std::string const& msg)
 	catch (AppException const& e)
 	{
 		if (e.getError().code != ErrorCode::BAD_MESSAGE)
-		throw e;
+			throw e;
 
-		LOG_ERROR(LogContext::INTERFACE, mapError(e.getError()));
+		LOG_ERROR(LogContext::INTERFACE, std::format("Parsing error in server data: {} - discarded", mapError(e.getError())));
 		return;
 	}
 
@@ -249,12 +223,12 @@ void UI::shakeHands(void) noexcept
 		this->switchWindow(GamePhase::LOGIN);
 	else if ((this->phase == GamePhase::ERROR))		// disconnected, restore previous session
 	{
-		if (this->username.empty() == false)
+		if (this->info.username.empty() == false)
 		{
 			// forward the previously used username to server
-			std::string loginCommand = std::format("{} {}", toString(CommandType::CONNECT), this->username);
+			std::string loginCommand = std::format("{} {}", toString(CommandType::CONNECT), this->info.username);
 			this->commandQueue.push(Message(loginCommand));
-			this->startTalking();
+			this->startSpeaking();
 		}
 		else	// no username, disconnection happened during login/char creation switch back to that window
 			this->switchWindow();
@@ -275,6 +249,7 @@ void UI::handleException(ErrorData const& error)
 		this->commandQueue.push(Message(toString(CommandType::WAIT_HANDSHAKE)));
 		this->connEstablished = false;
 	}
+	this->switchWindow(GamePhase::ERROR);
 }
 
 void UI::handleCommand(std::string const& input)
@@ -285,16 +260,14 @@ void UI::handleCommand(std::string const& input)
 		if (this->commandQueue.empty() == false)	// to avoid sending multiple requests for connections
 			this->commandQueue.pop();
 
-		this->username = input;
-		command = std::format("{} {}", toString(CommandType::CONNECT), this->username);
+		command = std::format("{} {}", toString(CommandType::CONNECT), input);
 	}
 	else if (this->phase == GamePhase::PLAYER_CREATE)
 	{
 		if (this->commandQueue.empty() == false)	// to avoid sending multiple requests for connections
 			this->commandQueue.pop();
 
-		this->username = input;
-		command = std::format("{} {}", toString(CommandType::CREATE_PLAYER), this->username);
+		command = std::format("{} {}", toString(CommandType::CREATE_PLAYER), input);
 	}
 	else
 		command = input;
@@ -302,8 +275,46 @@ void UI::handleCommand(std::string const& input)
 	this->commandQueue.push(Message(command));
 	LOG_DEBUG(LogContext::INTERFACE, std::format("Command '{}' added to queue", command));
 
-	// if queue's empty send this command, otherwise there's
-	// one being already handled, so wait before sending it
+	// send this command if it's the first in queue, otherwise there's
+	// one being already handled
 	if (this->commandQueue.size() == 1UL)
-		this->startTalking();
+		this->startSpeaking();
+}
+
+void UI::setupDispatchers(void)
+{
+	this->responseDispatcher[GamePhase::ND] = 			 [this] (Message const& m) { if (m.getRawMessage() == HAND_SHAKE) this->shakeHands(); };
+	this->responseDispatcher[GamePhase::LOGIN] =		 [this] (Message const& m) { if (m.getRawMessage() == OK_CONNECTED) this->switchWindow(GamePhase::GAME); };
+	this->responseDispatcher[GamePhase::PLAYER_CREATE] = [this] (Message const& m) { if (m.getRawMessage() == OK_CONNECTED) this->switchWindow(GamePhase::GAME); };
+	this->responseDispatcher[GamePhase::GAME] =			 [this] (Message const& m) { this->showResponse(m);	};
+	this->responseDispatcher[GamePhase::ERROR] =		 [this] (Message const& m) {
+		if (this->commandQueue.front().getCommandType() == CommandType::WAIT_HANDSHAKE)
+			this->shakeHands();
+		else if (this->commandQueue.front().getCommandType() == CommandType::CONNECT)
+			this->switchWindow();
+		else
+			LOG_WARN(LogContext::INTERFACE, std::format("Got response while handling error: '{}' - discarded", m.getRawMessage()));
+	};
+
+	this->eventDispatcher[GamePhase::ND] = 			  [this] (Message const& m) { LOG_WARN(LogContext::INTERFACE, std::format("Got unexpected event before handshake: '{}' - discarded", m.getRawMessage())); };
+	this->eventDispatcher[GamePhase::LOGIN] =		  [this] (Message const& m) { LOG_WARN(LogContext::INTERFACE, std::format("Got unexpected event during login: '{}' - discarded", m.getRawMessage())); };
+	this->eventDispatcher[GamePhase::PLAYER_CREATE] = [this] (Message const& m) { LOG_WARN(LogContext::INTERFACE, std::format("Got unexpected event during player creation: '{}' - discarded", m.getRawMessage())); };
+	this->eventDispatcher[GamePhase::GAME] =		  [this] (Message const& m) { this->showEvent(m); };
+	this->eventDispatcher[GamePhase::ERROR] =		  [this] (Message const& m) { LOG_WARN(LogContext::INTERFACE, std::format("Got event while handling error: '{}' - discarded", m.getRawMessage())); };		// add response to a queue, to be shown when game starts again NB
+
+	this->errorDispatcher[GamePhase::ND] = 			  [this] (Message const& m) { LOG_WARN(LogContext::INTERFACE, std::format("Got unexpected error before handshake: '{}' - discarded", m.getRawMessage())); };
+	this->errorDispatcher[GamePhase::LOGIN] =		  [this] (Message const& m) {
+		if (m.getErrorType() == ErrorType::CHARACTER_NOT_FOUND)
+			throw AppException(ErrorCode::UI_USERNAME_NOT_EXISTS);
+		else
+			throw AppException(ErrorCode::SERVER_ERROR, m.toStringError());
+	};
+	this->errorDispatcher[GamePhase::PLAYER_CREATE] = [this] (Message const& m) {
+		if (m.getErrorType() == ErrorType::NAME_IN_USE)
+			throw AppException(ErrorCode::UI_USERNAME_IN_USE);
+		else
+			throw AppException(ErrorCode::SERVER_ERROR, m.toStringError());
+	};
+	this->errorDispatcher[GamePhase::GAME] =		  [this] (Message const& m) { this->showError(m); };
+	this->errorDispatcher[GamePhase::ERROR] =		  [this] (Message const& m) { throw AppException(ErrorCode::SERVER_ERROR, m.getRawMessage()); };
 }
