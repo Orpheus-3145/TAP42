@@ -104,7 +104,7 @@ RFC itself does with `ITEM_NOT_FOUND`/`ITEM_NOT_IN_INVENTORY`/`NPC_NOT_FOUND`.
 ### CREATE_CHARACTER — non-RFC extension
 ```
 C: CREATE_CHARACTER <name> <race> [special_attributes...]
-S: OK {"name":"...","race":"...","special_attributes":"...","room":"loc.start","hp":100,"max_hp":100,"inventory":[]}
+S: OK connected
 S: ERR 200 BAD_MESSAGE ...
 S: ERR 201 NAME_IN_USE ...
 S: ERR 201 NAME_IN_USE ...   # session already connected to another character
@@ -114,6 +114,12 @@ step. `name` and `race` are a single token each; `special_attributes` is
 free-form, can contain spaces, takes the rest of the line. Only `name`
 is required: `race` and `special_attributes` can both be missing, they
 simply stay empty strings until the client collects them.
+
+The success response is the same literal `OK connected` that CONNECT
+uses (not a JSON blob): the client already fetches the full profile via
+PROFILE right after switching to the game window, regardless of whether
+it got there through CONNECT or CREATE_CHARACTER, so there was no reason
+for the two to answer differently.
 
 `race` and `special_attributes` are fixed fields (the slot always exists)
 but free-valued: the player writes whatever they want, the server saves
@@ -158,10 +164,11 @@ C: PROFILE
 S: OK {"name":"...","race":"...","special_attributes":"...","room":"...","hp":...,"max_hp":...,"inventory":[...]}
 S: ERR 102 NOT_CONNECTED ...
 ```
-Returns the exact same JSON block that CREATE_CHARACTER gives at creation
-time: name, cosmetic fields, current room, HP and inventory. It isn't
-tied to login time, it can be called at any point in the session, same
-treatment as STATUS/INVENTORY.
+Returns the character's full profile: name, cosmetic fields, current
+room, HP and inventory. It isn't tied to login time, it can be called at
+any point in the session, same treatment as STATUS/INVENTORY — and it's
+also what the client calls right after switching to the game window,
+whether it got there via CONNECT or CREATE_CHARACTER.
 
 Quests still get passed through the `in_progress` initialization on every
 CONNECT (see §7, no explicit ACCEPT command for quests — the RFC doesn't

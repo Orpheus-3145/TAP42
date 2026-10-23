@@ -92,7 +92,10 @@ void cmd_create_character(const std::shared_ptr<Session>& session, const std::ve
         character_store::save(created);
         SessionRegistry::instance().add(name, session);
         log_info("character_created", {{"player", name}, {"race", race}, {"ip", session->peer_ip}});
-        response = "OK " + character_info_json(created);
+        // literal "OK connected", same as CONNECT - the client fetches the
+        // profile itself via PROFILE right after switching to the game
+        // window, regardless of whether it got there via CONNECT or here.
+        response = "OK connected";
     }
     send_line(*session, response);
     if (created_ok) broadcast_stats();
