@@ -136,8 +136,7 @@ void OutputTab::activate(void)
 	if (this->divLineWin == nullptr)
 		return;
 
-	[[maybe_unused]] int32_t _;
-	int32_t widthDivLine;
+	int32_t _, widthDivLine;
 	getmaxyx(this->divLineWin, _, widthDivLine);
 
 	if (this->colorPair != -1)
@@ -161,8 +160,7 @@ void OutputTab::deactivate(void)
 	if (this->divLineWin == nullptr)
 		return;
 
-	[[maybe_unused]] int32_t _;
-	int32_t widthDivLine;
+	int32_t _, widthDivLine;
 	getmaxyx(this->divLineWin, _, widthDivLine);
 
 	if (this->colorPair != -1)
@@ -247,8 +245,7 @@ void OutputTab::printLine(TabMessage const& message) const
 
 	if (message.align != TextAlign::LEFT)
 	{
-		[[maybe_unused]] int32_t _;
-		int32_t w;
+		int32_t w, _;
 		getmaxyx(this->outputWin, _, w);
 		getyx(this->outputWin, y, x);
 		w -= x;

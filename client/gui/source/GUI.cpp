@@ -1,4 +1,3 @@
-#include <format>
 #include "GUI.hpp"
 #include "Logger.hpp"
 #include "Exceptions.hpp"

@@ -1,4 +1,3 @@
-#include <format>
 #include "Panel.hpp"
 #include "GUI.hpp"
 #include "Config.hpp"
