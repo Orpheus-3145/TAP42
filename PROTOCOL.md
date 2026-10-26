@@ -419,10 +419,10 @@ EVT GROUP LEAVE {"player":"...","group":"..."}   # if the player was in a group
 
 ### STATS — broadcast event
 ```
-EVT STATS {"count":<n>}
+EVT STATS players=<n>
 ```
-Required by RFC42TAP §6.2.4 (`EVT STATS players=<n>`, here as a JSON
-payload for consistency with the rest of the protocol). It isn't the
+Exactly as in RFC42TAP §6.2.4 (kept in the RFC's plain `key=value` form so
+that clients from other groups stay interchangeable). It isn't the
 response to a command: the server sends it to **every** connected session
 whenever the number of online players changes — a successful CONNECT or
 CREATE_CHARACTER, or a disconnect. The count is that of registered

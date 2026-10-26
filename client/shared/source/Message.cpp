@@ -2,6 +2,7 @@
 #include "Exceptions.hpp"
 #include "Config.hpp"
 
+#include <cctype>
 #include <format>
 #include <sstream>
 #include <iostream>
@@ -209,7 +210,8 @@ void Message::parseEvent(std::string const& event)
 	if (visibility == "STATS")	// STATS event doesn't have the type, therefore its data is stored in type
 	{
 		this->subType.eventType = EventType::STATS;
-		data = type;
+		static std::string const prefix = "players=";	// RFC 42TAP 6.2.4: EVT STATS players=<count>
+		data = (type.rfind(prefix, 0) == 0) ? type.substr(prefix.size()) : type;
 	}
 	else
 	{
@@ -223,7 +225,7 @@ void Message::parseEvent(std::string const& event)
 
 	if (data.empty() == true)
 		throw AppException(ErrorCode::BAD_MESSAGE, "Missing data for event: " + event);
-	else if ((data[0] != '{') and (data[0] != '['))		// in this case data is just a string
+	else if ((data[0] != '{') and (data[0] != '[') and (std::isdigit(static_cast<unsigned char>(data[0])) == 0))		// in this case data is just a string (numbers are stored as numbers)
 		data = std::format("\"{}\"", data);
 
 	this->storeJson(data);

@@ -81,7 +81,7 @@ void broadcast_to_group(const std::string& group_id, const std::string& except_p
 }
 
 void broadcast_stats() {
-    std::string message = "EVT STATS {\"count\":" + std::to_string(SessionRegistry::instance().count()) + "}";
+    std::string message = "EVT STATS players=" + std::to_string(SessionRegistry::instance().count());
     for (auto& session : SessionRegistry::instance().all()) {
         send_line(*session, message);
     }
