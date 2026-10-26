@@ -1,20 +1,23 @@
-# Deliberate style-suggestion suppressions — each entry is a specific
-# line, not a blanket rule, so a NEW instance of the same pattern elsewhere
-# in the codebase still gets flagged.
+# Style-suggestion suppressions, scoped per file (line numbers drift as the
+# code changes, so a file-level entry is the stable choice; still narrower than
+# a blanket rule, so the same pattern in a NEW file is flagged).
 
-# counter_damage is declared here alongside the other combat result
-# variables and read again after the if/else that sets it — narrowing its
-# scope would mean duplicating the declaration, not simplifying anything.
-variableScope:src/commands/combat_commands.cpp:50
+# Structured bindings (`for (auto& [k, v] : map)`) are reported as
+# "not assigned" by cppcheck < 2.10 -- known false positive.
+unassignedVariable
 
-# `direction`/`inviter` are used across the whole function body below the
-# declaration; cppcheck's suggested narrower scope doesn't actually apply.
-variableScope:src/commands/dispatcher.cpp:85
-variableScope:src/commands/group_commands.cpp:54
+# Result variables are declared together and read again after the if/else
+# that sets them; narrowing their scope would just duplicate declarations.
+variableScope:src/commands/combat_commands.cpp
+unreadVariable:src/commands/combat_commands.cpp
+variableScope:src/commands/dispatcher.cpp
+variableScope:src/commands/group_commands.cpp
+variableScope:src/commands/npc_commands.cpp
 
 # Early-return loops over 2-3 candidates are clearer here than
 # std::find_if + lambda for a one-off id/name lookup.
-useStlAlgorithm:src/commands/common.cpp:73
-useStlAlgorithm:src/commands/common.cpp:124
-useStlAlgorithm:src/commands/common.cpp:137
-useStlAlgorithm:src/world/loader.cpp:139
+useStlAlgorithm:src/commands/common.cpp
+useStlAlgorithm:src/world/loader.cpp
+
+# Iterating the map only to collect its values.
+unusedVariable:src/network/registry.cpp

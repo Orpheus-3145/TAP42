@@ -31,7 +31,9 @@ run: all
 	./$(TARGET)
 
 lint:
-	@command -v cppcheck > /dev/null 2>&1 && cppcheck --enable=warning,style --std=c++17 --quiet --error-exitcode=1 --suppressions-list=.cppcheck-suppressions -Isrc src || echo "cppcheck not found, skipping lint"
+	@if command -v cppcheck > /dev/null 2>&1; then \
+		cppcheck --enable=warning,style --std=c++20 --quiet --error-exitcode=1 --suppressions-list=.cppcheck-suppressions -Isrc src; \
+	else echo "cppcheck not found, skipping lint"; fi
 
 clean:
 	rm -f $(OBJ) $(TARGET)

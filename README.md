@@ -1,7 +1,151 @@
-# TAP42
-TAP, or The Answer Protocol, is a MUD (multi-user dungeon), or a multiplayer text-adventure game, served on a client-server architecture based on TCP protocol, as specifically defined inside the RFC.42TAP document protocol
+*This project has been created as part of the 42 curriculum by mtaranti, faru.*
 
-# Client
+# TAP42
+
+## Description
+
+TAP, or The Answer Protocol, is a MUD (multi-user dungeon): a multiplayer text-adventure game on a client-server architecture over TCP. Several players share one world — an inn on a dusty road whose basement leads down into rat-infested sewers — where they can explore rooms, chat, pick up and drop items, talk to NPCs, fight, complete quests and form groups, all in real time.
+
+The project delivers three programs that talk the line-based protocol defined in the RFC 42TAP (`rfc42TAP.html`, working notes and our extensions in `PROTOCOL.md`):
+
+- **`tap-server`** — the game server (C++20, standard library + POSIX sockets only).
+- **`tap-client-cli`** — a terminal client built on ncurses.
+- **`tap-client-gui`** — a graphical client built on Qt 6.
+
+Static world data lives in `server/data/world.json` (map in `server/data/rat-cellar-map.html`).
+
+## Instructions
+
+### Requirements
+
+- `make`, `cmake`, a C++20 compiler with `<format>` or the bundled fallback (g++ 10+ / clang tested)
+- `libncurses-dev` (CLI client)
+- `qt6-base-dev` (GUI client)
+- `cppcheck` (optional, for `make lint`)
+
+`make deps` checks what is missing.
+
+### Building and Running
+
+All commands are run from the repository root.
+
+| Target | What it does |
+|---|---|
+| `make deps` | Shows dependency info and warns about missing tools |
+| `make server` | Builds `server/tap-server` |
+| `make cli` / `make gui` | Configures CMake (with the same `CXX` as the server, g++ by default) and builds the CLI / GUI client into `client/` |
+| `make run-server` | Builds and runs the server on port `4242` (`./tap-server [port]` to choose another) |
+| `make run-client` (`run-cli`) | Runs the CLI client against `127.0.0.1:4242` |
+| `make run-client-gui` (`run-gui`) | Runs the GUI client against `127.0.0.1:4242` |
+| `make run-cli-debug` / `run-gui-debug` | Same, with sanitizers enabled |
+| `make lint` | Runs `cppcheck` on the server sources (skipped with a message if not installed) |
+| `make clean` / `make fclean` | Removes build artifacts / also the client build directory |
+
+Typical session, in three terminals:
+
+```bash
+make run-server
+make run-client
+make run-client-gui
+```
+
+Clients take `-i <host> -p <port>`; `-h` prints usage.
+
+## Resources
+
+- RFC 42TAP (`rfc42TAP.html`) and our protocol notes in `PROTOCOL.md`
+- [cppreference](https://en.cppreference.com/) — C++20 library and language reference
+- [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/) — sockets, `poll`
+- [ncurses programming HOWTO](https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/)
+- [Qt 6 documentation](https://doc.qt.io/qt-6/)
+- [MUD (Wikipedia)](https://en.wikipedia.org/wiki/MUD) — background on the genre
+
+**AI usage.** Claude (Anthropic) was used as an assistant for: making the project build on older toolchains (a `<format>` fallback, compiler warnings), adding the outgoing-response logging in the server, fixing the `make lint` target, running manual protocol tests against the server, and drafting this README. All AI-generated changes were reviewed and tested by the team, who remain responsible for them; the game design, server logic and both clients were written by the team.
+
+## Architecture
+
+**Server** (`server/src`)
+
+- *Concurrency model:* one OS thread per connection. The accept loop (`network/server.cpp`) hands each client a thread that blocks on `recv()` and feeds complete lines (`network/line_reader.cpp`, 8192-byte cap) to the dispatcher. All shared game state (`World`: rooms, players, NPCs, items, quests, groups) sits behind **one mutex**; every command takes it, mutates state, and releases it. This is deliberately simple and obviously correct, at the cost of serialising commands — fine for a small shared world.
+- *Dispatcher vs. inline handling:* a **dispatcher/router** (`commands/dispatcher.cpp`) parses the line, logs it, runs the flood check and routes by command name to handlers grouped by domain: `combat_commands`, `item_commands`, `npc_commands`, `quest_commands`, `group_commands`; movement, chat and presence live in the dispatcher.
+- *Writes:* all outgoing lines go through `send_line()`, which takes a per-session `write_mutex` and checks `connected` under the same lock, so a send can never race with the socket being closed. It is also the single place where responses/errors/events are logged.
+- *Disconnects:* player state is removed **before** the leave event is broadcast; broadcasts to sessions that vanished mid-send are skipped silently.
+- *World:* loaded from JSON by a hand-written parser, then validated (every exit, placed item/NPC and quest target must reference something that exists); the server refuses to start on an invalid world.
+
+**Clients** (`client/`) — a static library `TapShared` (TCP connection with `poll`, message parsing, argument parsing, logging, command suggestions) used by two front-ends, `cli/` (ncurses) and `gui/` (Qt Widgets). Both keep reading server events while waiting for user input.
+
+## Protocol Implementation
+
+We implement the full RFC 42TAP command set: `CONNECT`, `LOOK`, `MOVE`, `CHAT`, `TAKE`, `DROP`, `INVENTORY`, `TALK`, `ATTACK`, `STATUS`, `QUEST`, `QUESTS`, `WHO`, `GROUP`, `QUIT`, plus the `EVT` push events. Deviations and extensions (all documented in `PROTOCOL.md`):
+
+- **`CREATE_CHARACTER <name> [race] [attrs…]`** (alias `CREATE PLAYER <name>`) — non-RFC. Characters are persistent and `CONNECT` is login for an existing one, so a creation step was needed. Success reply is the same `OK connected`.
+- **`PROFILE`** and **`USE <item>`** — non-RFC (character data, healing/offensive items).
+- **`GROUP CREATE [name]`** — the RFC lists it in the command table, we gave it a concrete behaviour.
+- **Extra error codes** for conditions the RFC does not cover (`NAME_IN_USE`, `DEAD`, `CHARACTER_NOT_FOUND`, …) in the same numeric style; the symbolic name is always the first token after the code.
+- **Persistence**, although not required, was added: one JSON file per character under `server/data/characters/`, written atomically (temp file + rename).
+- `DEFEND` and `FLEE` are **not** implemented (see Combat System).
+
+## Combat System
+
+See *Design choices: combat and quest systems* below for the full description and justification.
+
+## Quest System
+
+See *Design choices: combat and quest systems* below.
+
+## World Design
+
+14 rooms, forming a closed loop in the sewers plus a dead-end branch to the boss:
+
+- **Surface/inn:** Traveler's Road (spawn) → Inn Hall → Inn Corridor → Guest Rooms ×2, Bathroom; Inn Attic (up from the hall); Inn Basement (down).
+- **Sewers:** Sewer Entrance → Sewer Passage → Flooded Chamber ↔ Stagnant Pool → Curving Passage (closing the loop), with a dead-end branch to the Rat Nest.
+- **NPCs (10, three roles):** the *Bartender* (dialogue + quest hook, tough counter-attacker), eight *Sewer Rats* (enemies) and the *Rat King* (boss).
+- **Items:** three Potions and one Grenade, placed in the world as unique instances (taking removes it from the room, dropping makes it available to others; items can be referenced by id or display name, multi-word names supported).
+- **Quests:** *Clear the Rats* and *Defeat the Rat King* (both `defeat` quests).
+
+## Server Logging
+
+Every line on **stdout** is one JSON object: `{"ts":"<ISO-8601 UTC>","level":"INFO|WARN|ERROR","event":"<name>", …fields}`. Redirect it to a file to keep it (`./tap-server 4242 > server.log`) and filter with `grep`/`jq`.
+
+| Level | Events |
+|---|---|
+| INFO | `server_started`, `world_loaded`, `client_connected` (with `ip`), `client_disconnected`, `player_connected`, `player_disconnected`, `character_created`, `command_received` (player + command), `response_sent` (player + `OK`), `event_sent` (player + event type), `player_moved`, `chat`, `item_taken`, `item_dropped`, `item_used`, `combat_attack`, `npc_defeated`, `player_respawned`, `quest_completed`, `quest_world_cleared`, `group_created`, `group_invite`, `group_join`, `group_leave` |
+| WARN | `error_sent` (player, numeric `code`, symbolic `name`), `command_flood_detected`, `rapid_reconnect_detected`, `line_too_long`, `partial_message_stalled`, `accept_failed` |
+| ERROR | `world_load_failed`, `world_parse_failed`, `world_validation_failed`, `character_save_failed`, `character_load_failed`, `bind_failed`, `listen_failed`, `socket_create_failed`, `platform_init_failed` |
+
+**Abuse detection** (`logging/abuse_monitor.cpp`) is intentionally log-only: more than 10 commands/second on one session logs `command_flood_detected`; more than 5 connections in 10 s from one IP logs `rapid_reconnect_detected`. Nobody is blocked. Logging is a single `printf` per event and sending is logged after the write lock is released, so it does not slow down the game loop. To monitor a running server: `tail -f server.log | grep '"level":"WARN"'`.
+
+## Group Contributions
+
+| Member | Login | Responsibilities |
+|---|---|---|
+| Marco Tarantino | mtaranti | Server: network layer, command dispatcher and handlers (movement, items, NPCs, combat, quests, groups), world loading/validation, persistence, structured logging and abuse monitor, `PROTOCOL.md`, world design |
+| Francesco | faru | Clients: shared client library, CLI client (ncurses), GUI client (Qt), command suggestions, client logging, CMake build |
+
+## Testing
+
+1. Build and start a server: `make run-server`.
+2. **Multiplayer:** start two clients (`make run-client` in two terminals, or one CLI and one GUI), create two characters, then check that `WHO` lists both, `CHAT GLOBAL hi` appears on the other client, and `MOVE` produces `EVT ROOM PRESENCE_*` events on the other side. Quit one client and check the other sees the leave event and the player count drop.
+3. **Without a client:** the protocol is plain text, so `nc 127.0.0.1 4242` works:
+   ```
+   CREATE_CHARACTER alice human
+   LOOK
+   MOVE east
+   STATUS
+   ```
+4. **Items:** `TAKE`/`DROP` an item from two clients and check it disappears from / appears in the other client's `LOOK`.
+5. **Combat:** go down to the sewers (`MOVE east` to the Inn Hall, `MOVE down` to the basement, then on to the Sewer Entrance), `ATTACK Sewer Rat` repeatedly, watch `STATUS` HP change; let HP reach 0 to see the respawn.
+6. **Quests:** `QUESTS` before and after killing every rat — *Clear the Rats* flips to `completed` for everyone who had it in progress.
+7. **Robustness:** send garbage (`nc` + `FOO`) and expect `ERR 200 BAD_MESSAGE`; paste more than 10 lines at once and check `command_flood_detected` in the server log.
+8. `make lint` runs static analysis on the server.
+
+## Known Limitations
+
+- The GUI game window is a set of panels (player info, world events, user events, chat) driven by typed commands with autocompletion. It does **not** yet have action buttons, an inventory panel with TAKE/DROP buttons, separate Global/Room/Group chat views, or player counters.
+- `DEFEND` and `FLEE` are not implemented.
+- The world has three NPC roles (dialogue/quest, enemy, boss); the quest-giver is the bartender's dialogue rather than a dedicated NPC type.
+
+## Client usage
 
 #### Building
 From the client/ folder:
